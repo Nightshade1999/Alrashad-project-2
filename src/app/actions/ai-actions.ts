@@ -22,7 +22,6 @@ export async function getClinicalAdvice(patientData: any, history: { role: "user
     `- Date: ${v.visit_date}, Notes: ${v.exam_notes}`
   ).join("\n")
 
-  // The base context/prompt for the clinical consultant
   const systemContext = `
 You are an expert Clinical Consultant in a Medical Ward. 
 Provide professional, evidence-based advice for optimizing the management of this patient's chronic diseases (specifically Diabetes and Hypertension if applicable).
@@ -53,18 +52,10 @@ Provide professional, evidence-based advice for optimizing the management of thi
 `
 
   try {
-    // For the first message or if history is empty, start with the system context
     const chat = model.startChat({
       history: history.length > 0 ? history : [],
     })
 
-    // If it's the very first request (no history), we send the full context as the user's first prompt
-    const message = history.length === 0 
-      ? `System Context: ${systemContext}\n\nClinical Inquiry: Please provide an initial clinical assessment and optimization plan for this patient.`
-      : history[history.length - 1].parts[0].text // This isn't quite right for startChat, but good for simple logic
-
-    // Actually, let's just use sendMessage for the last user message
-    // If no history, we send the base prompt.
     const result = await chat.sendMessage(history.length === 0 ? systemContext : history[history.length - 1].parts[0].text)
     const response = await result.response
     const text = response.text()
@@ -78,20 +69,15 @@ Provide professional, evidence-based advice for optimizing the management of thi
     console.error("Gemini AI API Error:", {
       message: error.message,
       status: error.status,
-      statusText: error.statusText,
     })
     
-    // Check for specific error types to help the user
     if (error.message?.includes("429")) {
-      throw new Error("API Quota exceeded. Please wait a minute or upgrade your Gemini API tier.")
-    }
-    if (error.message?.includes("400")) {
-      throw new Error(`API Request Error: ${error.message}. Please check patient data formatting.`)
+      throw new Error("API Quota exceeded. Please wait a minute.")
     }
     if (error.message?.includes("SAFETY")) {
-      throw new Error("The AI advisor blocked this request due to safety filters. Try refining the patient notes.")
+      throw new Error("AI advice blocked by safety filters. Review patient data.")
     }
     
-    throw new Error(`Gemini AI Error: ${error.message || "Unknown error occurred"}`)
+    throw new Error(`Gemini AI Error: ${error.message || "Unknown error"}`)
   }
 }
