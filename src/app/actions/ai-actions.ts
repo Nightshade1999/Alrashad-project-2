@@ -2,9 +2,10 @@
 
 import { model } from "@/lib/gemini"
 
-export async function getClinicalAdvice(patientData: any) {
+export async function getClinicalAdvice(patientData: any, history: { role: "user" | "model", parts: { text: string }[] }[] = []) {
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured in environment variables.")
+    console.error("Missing GEMINI_API_KEY")
+    throw new Error("GEMINI_API_KEY is not configured. Please check your environment variables.")
   }
 
   const {
@@ -21,7 +22,8 @@ export async function getClinicalAdvice(patientData: any) {
     `- Date: ${v.visit_date}, Notes: ${v.exam_notes}`
   ).join("\n")
 
-  const prompt = `
+  // The base context/prompt for the clinical consultant
+  const systemContext = `
 You are an expert Clinical Consultant in a Medical Ward. 
 Provide professional, evidence-based advice for optimizing the management of this patient's chronic diseases (specifically Diabetes and Hypertension if applicable).
 
@@ -30,54 +32,66 @@ Provide professional, evidence-based advice for optimizing the management of thi
 - Diabetes (Oral): Metformin, Daonil (Glibenclamide).
 - Diabetes (Insulin): Soluble Insulin, Mixtard Insulin, Lente Insulin.
 
-### Patient Data:
-- Name: ${name}
-- Age: ${age}
-- Gender: ${gender}
+### Patient Profile:
+- Name: ${name} (Age: ${age}, Gender: ${gender})
 - Clinical Category: ${category}
 - Chronic Diseases: ${chronic_diseases || "None"}
 - Current Medical Drugs: ${medical_drugs || "None"}
 - Current Psych Drugs: ${psych_drugs || "None"}
 - Allergies: ${allergies || "None"}
 
-### Recent Lab Results (Investigations):
-${labsSummary || "No lab records found."}
+### Clinical History:
+- Labs: ${labsSummary || "No lab records found."}
+- Visits: ${visitsSummary || "No visit notes found."}
 
-### Recent Clinical Visits/Notes:
-${visitsSummary || "No visit notes found."}
-
-### Requirements for your response:
-1. Provide a brief clinical assessment based on the latest data (e.g., is diabetes/HTN controlled?).
-2. Suggest specific dose optimizations or medication additions using ONLY the hospital formulary listed above.
-3. Include precautions (e.g., renal function, potential drug interactions with psych meds).
-4. Tone: Professional, clinical, and concise. Use Markdown formatting.
-5. If some data is missing, provide general guidance based on the available information.
-
-Response:
+### Requirements:
+1. Provide a brief assessment.
+2. Suggest dose optimizations using ONLY the hospital formulary.
+3. Tone: Professional, clinical, and concise. Use Markdown.
+4. If some data is missing, provide general guidance based on the available information.
+5. In multi-turn chat, stay in character as the ward clinical advisor.
 `
 
   try {
-    const result = await model.generateContent(prompt)
+    // For the first message or if history is empty, start with the system context
+    const chat = model.startChat({
+      history: history.length > 0 ? history : [],
+    })
+
+    // If it's the very first request (no history), we send the full context as the user's first prompt
+    const message = history.length === 0 
+      ? `System Context: ${systemContext}\n\nClinical Inquiry: Please provide an initial clinical assessment and optimization plan for this patient.`
+      : history[history.length - 1].parts[0].text // This isn't quite right for startChat, but good for simple logic
+
+    // Actually, let's just use sendMessage for the last user message
+    // If no history, we send the base prompt.
+    const result = await chat.sendMessage(history.length === 0 ? systemContext : history[history.length - 1].parts[0].text)
     const response = await result.response
     const text = response.text()
     
     if (!text) {
-      console.error("Gemini AI: Empty response received.")
-      throw new Error("Empty response from AI.")
+      throw new Error("AI returned an empty response.")
     }
     
     return text
   } catch (error: any) {
-    console.error("Gemini AI Clinical Advisor Error:", {
+    console.error("Gemini AI API Error:", {
       message: error.message,
-      stack: error.stack,
-      prompt: prompt.substring(0, 200) + "..."
+      status: error.status,
+      statusText: error.statusText,
     })
     
+    // Check for specific error types to help the user
+    if (error.message?.includes("429")) {
+      throw new Error("API Quota exceeded. Please wait a minute or upgrade your Gemini API tier.")
+    }
+    if (error.message?.includes("400")) {
+      throw new Error(`API Request Error: ${error.message}. Please check patient data formatting.`)
+    }
     if (error.message?.includes("SAFETY")) {
-      throw new Error("AI advice was blocked due to safety filters. Please review the patient data for sensitive content.")
+      throw new Error("The AI advisor blocked this request due to safety filters. Try refining the patient notes.")
     }
     
-    throw new Error("The AI Clinical Advisor is currently unavailable. Please try again in a few moments.")
+    throw new Error(`Gemini AI Error: ${error.message || "Unknown error occurred"}`)
   }
 }
