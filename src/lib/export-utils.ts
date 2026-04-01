@@ -266,16 +266,16 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
             
             return new TableRow({
               children: [
-                createTableCell(format(parseISO(inv.date), "dd MMM yy")),
-                createTableCell(inv.wbc || "-", false, undefined, undefined, isWbcAlert),
-                createTableCell(inv.hb || "-", false, undefined, undefined, isHbAlert),
-                createTableCell(inv.hba1c || "-", false, undefined, undefined, isHba1cAlert),
-                createTableCell(inv.rbs || "-", false, undefined, undefined, isRbsAlert),
-                createTableCell(inv.s_creatinine || "-", false, undefined, undefined, isCreatAlert),
-                createTableCell(inv.s_urea || "-", false, undefined, undefined, isUreaAlert),
-                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, undefined, undefined, isAstAlert || isAltAlert),
-                createTableCell(inv.tsb || "-", false, undefined, undefined, isTsbAlert),
-                createTableCell(inv.notes || "-", false, undefined, "FDFDFD"),
+                createTableCell(format(parseISO(inv.date), "dd MMM yy"), false, 13),
+                createTableCell(inv.wbc || "-", false, 8, undefined, isWbcAlert),
+                createTableCell(inv.hb || "-", false, 8, undefined, isHbAlert),
+                createTableCell(inv.hba1c || "-", false, 9, undefined, isHba1cAlert),
+                createTableCell(inv.rbs || "-", false, 8, undefined, isRbsAlert),
+                createTableCell(inv.s_creatinine || "-", false, 8, undefined, isCreatAlert),
+                createTableCell(inv.s_urea || "-", false, 8, undefined, isUreaAlert),
+                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, 15, undefined, isAstAlert || isAltAlert),
+                createTableCell(inv.tsb || "-", false, 8, undefined, isTsbAlert),
+                createTableCell(inv.notes || "-", false, 15, "FDFDFD"),
               ]
             })
           })
@@ -350,7 +350,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
     }
 
     if (index < patients.length - 1) {
-      children.push(new PageBreak())
+      children.push(new Paragraph({ children: [new PageBreak()] }))
     }
 
     return { children }

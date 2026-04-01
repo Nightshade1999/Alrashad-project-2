@@ -77,33 +77,35 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href={`/dashboard/category/${
             patient.category === 'High Risk' ? 'high-risk'
             : patient.category === 'Close Follow-up' ? 'close-follow-up'
             : 'normal'
           }`}>
-            <Button variant="outline" size="icon" className="h-10 w-10 bg-white dark:bg-slate-900">
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight" dir="auto">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight truncate" dir="auto">
               {patient.name}
             </h1>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <p className="text-sm text-muted-foreground">{patient.age} years old · {patient.gender}</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
           <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
-          <AddVisitModal patientId={patient.id} variant="icon" />
-          <AddInvestigationModal patientId={patient.id} variant="icon" />
-          <ExportPatientButton patient={displayPatient} />
-          <EditPatientModal patient={patient} />
-          <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+          <div className="flex gap-2">
+            <AddVisitModal patientId={patient.id} variant="icon" />
+            <AddInvestigationModal patientId={patient.id} variant="icon" />
+            <ExportPatientButton patient={displayPatient} />
+            <EditPatientModal patient={patient} />
+            <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+          </div>
         </div>
       </div>
 

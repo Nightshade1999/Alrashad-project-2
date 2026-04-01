@@ -245,11 +245,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-          {/* Table Header */}
-          <div
-            className="grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700"
-            style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
-          >
+          <div className="hidden xl:grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}>
             <button 
               onClick={toggleSelectAll} 
               className="text-muted-foreground hover:text-teal-600 transition-colors p-1"
@@ -269,86 +265,135 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col">
             {sorted.map(p => {
               const handleRowClick = () => {
                 window.location.href = `/patient/${p.id}`
               }
 
+              const OverdueTag = () => {
+                if (!p.lastVisit) return <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">Never Seen</span>
+                const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+                const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
+                const overdue = Math.floor(daysSince - threshold)
+                if (overdue > 0) return <span className="text-[10px] bg-amber-100 dark:bg-amber-950/40 text-amber-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">{overdue}d overdue</span>
+                return <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">On Track</span>
+              }
+
               return (
                 <div
                   key={p.id}
-                  className={`group grid items-center gap-4 px-5 py-4 border-l-2 transition-all cursor-pointer ${selectedIds.has(p.id) ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
-                  style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
+                  className={`group relative transition-all cursor-pointer border-l-2 ${selectedIds.has(p.id) ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
                   onClick={handleRowClick}
                 >
+                  {/* --- Desktop Row --- */}
                   <div 
-                    className="p-1 -m-1" 
-                    onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}
+                    className="hidden xl:grid items-center gap-4 px-5 py-4"
+                    style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
                   >
-                    {selectedIds.has(p.id) 
-                      ? <CheckSquare className="h-4 w-4 text-teal-600" /> 
-                      : <Square className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                    }
-                  </div>
-
-                  {/* Name + Bed */}
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
-                      {p.name.charAt(0).toUpperCase()}
+                    <div className="p-1 -m-1" onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}>
+                      {selectedIds.has(p.id) 
+                        ? <CheckSquare className="h-4 w-4 text-teal-600" /> 
+                        : <Square className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                      }
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1 group/link">
-                        <span className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm group-hover/link:text-teal-600 dark:group-hover/link:text-teal-400 transition-colors" dir="auto">
-                          {p.name}
-                        </span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+                        {p.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-xs font-mono text-muted-foreground">{p.ward_number}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 group/link">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm group-hover/link:text-teal-600 dark:group-hover/link:text-teal-400 transition-colors" dir="auto">
+                            {p.name}
+                          </span>
+                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+                        </div>
+                        <span className="text-xs font-mono text-muted-foreground">{p.ward_number}</span>
+                      </div>
+                    </div>
+
+                    <span className="text-sm text-slate-700 dark:text-slate-300">{p.age}y</span>
+
+                    <span className="text-sm text-slate-600 dark:text-slate-400 truncate" title={p.chronic_diseases ?? ''}>
+                      {p.chronic_diseases || <span className="text-muted-foreground italic text-xs">None</span>}
+                    </span>
+
+                    <span className={`text-sm font-medium tabular-nums ${p.lastHba1c != null && p.lastHba1c > 6.5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {p.lastHba1c != null ? `${p.lastHba1c}%` : <span className="text-muted-foreground">—</span>}
+                    </span>
+
+                    <span className={`text-sm font-medium tabular-nums ${p.lastHb != null && p.lastHb < 10 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {p.lastHb != null ? p.lastHb : <span className="text-muted-foreground">—</span>}
+                    </span>
+
+                    <span className="text-sm text-slate-600 dark:text-slate-400 text-xs">
+                      {p.lastVisit ? format(parseISO(p.lastVisit), 'dd MMM yyyy') : <span className="text-muted-foreground italic text-xs">No visits</span>}
+                    </span>
+
+                    <div className="flex items-center">
+                      <OverdueTag />
+                    </div>
+
+                    <div className="flex justify-end" onClick={e => e.stopPropagation()}>
+                      <DeletePatientButton patientId={p.id} variant="ghost" />
                     </div>
                   </div>
 
-                  {/* Age */}
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{p.age}y</span>
-
-                  {/* Chronic Disease */}
-                  <span className="text-sm text-slate-600 dark:text-slate-400 truncate" title={p.chronic_diseases ?? ''}>
-                    {p.chronic_diseases || <span className="text-muted-foreground italic text-xs">None</span>}
-                  </span>
-
-                  {/* HbA1c */}
-                  <span className={`text-sm font-medium tabular-nums ${p.lastHba1c != null && p.lastHba1c > 6.5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
-                    {p.lastHba1c != null ? `${p.lastHba1c}%` : <span className="text-muted-foreground">—</span>}
-                  </span>
-
-                  {/* Hb */}
-                  <span className={`text-sm font-medium tabular-nums ${p.lastHb != null && p.lastHb < 10 ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
-                    {p.lastHb != null ? p.lastHb : <span className="text-muted-foreground">—</span>}
-                  </span>
-
-                  {/* Last Visit */}
-                  <span className="text-sm text-slate-600 dark:text-slate-400 text-xs">
-                    {p.lastVisit
-                      ? format(parseISO(p.lastVisit), 'dd MMM yyyy')
-                      : <span className="text-muted-foreground italic text-xs">No visits</span>
-                    }
-                  </span>
-
-                  {/* Overdue Status Tag */}
-                  <div className="flex items-center">
-                    {(() => {
-                      if (!p.lastVisit) return <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">Never Seen</span>
-                      const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
-                      const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
-                      const overdue = Math.floor(daysSince - threshold)
-                      if (overdue > 0) return <span className="text-[10px] bg-amber-100 dark:bg-amber-950/40 text-amber-600 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">{overdue}d overdue</span>
-                      return <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">On Track</span>
-                    })()}
-                  </div>
-
-                  {/* Delete */}
-                  <div className="flex justify-end" onClick={e => e.stopPropagation()}>
-                    <DeletePatientButton patientId={p.id} variant="ghost" />
+                  {/* --- Mobile Row --- */}
+                  <div className="flex flex-col xl:hidden p-4 gap-3 cursor-pointer">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="mt-0.5 shrink-0" onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}>
+                          {selectedIds.has(p.id) 
+                            ? <CheckSquare className="h-5 w-5 text-teal-600" /> 
+                            : <Square className="h-5 w-5 text-muted-foreground/30" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <span className="font-bold text-slate-800 dark:text-slate-100 text-base break-words line-clamp-2" dir="auto" title={p.name}>{p.name}</span>
+                            <span className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{p.age}y</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground">Wait Number / Bed: {p.ward_number}</span>
+                            <OverdueTag />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <DeletePatientButton patientId={p.id} variant="ghost" />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 px-8">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Conditions</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 truncate" title={p.chronic_diseases ?? ''}>
+                          {p.chronic_diseases || <span className="text-muted-foreground italic text-xs">None</span>}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Last Visit</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300">
+                          {p.lastVisit ? format(parseISO(p.lastVisit), 'dd MMM yyyy') : <span className="text-muted-foreground italic text-xs">No visits</span>}
+                        </p>
+                      </div>
+                      <div className="flex gap-4 col-span-2">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">HbA1c</p>
+                          <p className={`text-xs font-bold tabular-nums ${p.lastHba1c != null && p.lastHba1c > 6.5 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                            {p.lastHba1c != null ? `${p.lastHba1c}%` : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground">Hb</p>
+                          <p className={`text-xs font-bold tabular-nums ${p.lastHb != null && p.lastHb < 10 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                            {p.lastHb != null ? p.lastHb : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )

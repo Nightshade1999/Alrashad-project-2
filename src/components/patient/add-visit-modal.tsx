@@ -107,26 +107,26 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
               <span className="h-1 w-1 rounded-full bg-emerald-500" />
               Vital Parameters
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="col-span-2 sm:col-span-1">
-                <Label htmlFor="bp-sys" className="text-[10px] font-semibold text-muted-foreground">BP (S/D)</Label>
+                <Label htmlFor="bp-sys" className="text-xs font-semibold text-muted-foreground">BP (S/D)</Label>
                 <div className="flex items-center gap-1 mt-1">
-                  <Input id="bp-sys" placeholder="120" value={bpSys} onChange={e => setBpSys(e.target.value)} className="h-8 text-xs px-2" />
+                  <Input id="bp-sys" placeholder="120" value={bpSys} onChange={e => setBpSys(e.target.value)} className="h-10 text-sm px-2" />
                   <span className="text-slate-300">/</span>
-                  <Input id="bp-dia" placeholder="80" value={bpDia} onChange={e => setBpDia(e.target.value)} className="h-8 text-xs px-2" />
+                  <Input id="bp-dia" placeholder="80" value={bpDia} onChange={e => setBpDia(e.target.value)} className="h-10 text-sm px-2" />
                 </div>
               </div>
               <div>
-                <Label htmlFor="pr" className="text-[10px] font-semibold text-muted-foreground">PR (BPM)</Label>
-                <Input id="pr" placeholder="72" value={pr} onChange={e => setPr(e.target.value)} className="h-8 text-xs mt-1" />
+                <Label htmlFor="pr" className="text-xs font-semibold text-muted-foreground">PR (BPM)</Label>
+                <Input id="pr" placeholder="72" value={pr} onChange={e => setPr(e.target.value)} className="h-10 text-sm mt-1" />
               </div>
               <div>
-                <Label htmlFor="spo2" className="text-[10px] font-semibold text-muted-foreground">SpO2 (%)</Label>
-                <Input id="spo2" placeholder="98" value={spo2} onChange={e => setSpo2(e.target.value)} className="h-8 text-xs mt-1" />
+                <Label htmlFor="spo2" className="text-xs font-semibold text-muted-foreground">SpO2 (%)</Label>
+                <Input id="spo2" placeholder="98" value={spo2} onChange={e => setSpo2(e.target.value)} className="h-10 text-sm mt-1" />
               </div>
               <div>
-                <Label htmlFor="temp" className="text-[10px] font-semibold text-muted-foreground">Temp (°C)</Label>
-                <Input id="temp" placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-8 text-xs mt-1" />
+                <Label htmlFor="temp" className="text-xs font-semibold text-muted-foreground">Temp (°C)</Label>
+                <Input id="temp" placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-10 text-sm mt-1" />
               </div>
             </div>
           </div>
