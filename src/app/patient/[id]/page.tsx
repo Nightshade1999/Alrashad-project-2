@@ -52,6 +52,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { data: investigations } = await supabase
     .from("investigations").select("*").eq("patient_id", id)
     .order("date", { ascending: false })
+    .order("id", { ascending: false })
 
   const { count: visitCount } = await supabase
     .from("visits").select("id", { count: "exact", head: true }).eq("patient_id", id)
@@ -196,12 +197,15 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 { label: 'Hb', value: lastInv.hb, unit: '', alert: lastInv.hb != null && lastInv.hb < 10 },
                 { label: 'WBC', value: lastInv.wbc, unit: '', alert: lastInv.wbc != null && (lastInv.wbc > 11 || lastInv.wbc < 4) },
                 { label: 'S.Creat', value: lastInv.s_creatinine, unit: '', alert: lastInv.s_creatinine != null && lastInv.s_creatinine > 1.2 },
+                { label: 'S.Urea', value: lastInv.s_urea, unit: '', alert: lastInv.s_urea != null && lastInv.s_urea > 40 },
                 { label: 'RBS', value: lastInv.rbs, unit: '', alert: lastInv.rbs != null && lastInv.rbs > 200 },
                 { label: 'TSB', value: lastInv.tsb, unit: '', alert: lastInv.tsb != null && lastInv.tsb > 1.2 },
+                { label: 'AST', value: lastInv.ast, unit: '', alert: lastInv.ast != null && lastInv.ast > 40 },
+                { label: 'ALT', value: lastInv.alt, unit: '', alert: lastInv.alt != null && lastInv.alt > 40 },
               ].map(item => (
                 <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                  <p className={`text-lg font-bold tabular-nums ${item.alert ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                  <p className={`text-lg font-bold tabular-nums truncate ${item.alert ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
                     {item.value != null ? `${item.value}${item.unit}` : '—'}
                   </p>
                 </div>
