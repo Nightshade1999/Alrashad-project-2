@@ -1,11 +1,17 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { Search, UserRound, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { 
+  Search, UserRound, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, 
+  CheckSquare, Square, FileText, Table as TableIcon, Loader2 
+} from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { DeletePatientButton } from '@/components/patient/delete-button'
 import { format, parseISO } from 'date-fns'
+import { exportPatientsToCsv, exportToWord } from '@/lib/export-utils'
+import { createClient } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 export interface PatientRow {
   id: string
@@ -51,6 +57,8 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
     defaultSort === 'lastVisit' || defaultSort === 'overdue' ? 'desc' : 'asc'
   )
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isExporting, setIsExporting] = useState(false)
 
   function handleSort(col: SortKey) {
     if (sortCol === col) {
@@ -70,6 +78,54 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
       (p.chronic_diseases ?? '').toLowerCase().includes(q)
     )
   }, [search, patients])
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(p => p.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const handleBulkExportExcel = () => {
+    const selectedPatients = patients.filter(p => selectedIds.has(p.id))
+    exportPatientsToCsv(selectedPatients)
+    toast.success(`Exported ${selectedIds.size} patients to CSV`)
+  }
+
+  const handleBulkExportWord = async () => {
+    setIsExporting(true)
+    const supabase = createClient()
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .in('id', Array.from(selectedIds))
+
+      if (error) throw error
+
+      // Merge with last visit/lab data from the rows
+      const merged = (data as any[]).map(p => {
+        const row = patients.find(r => r.id === p.id)
+        return { ...p, ...row }
+      })
+
+      await exportToWord(merged)
+      toast.success(`Exported ${selectedIds.size} patients to Word`)
+    } catch (err) {
+      console.error(err)
+      toast.error("Failed to export to Word")
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const sorted = useMemo(() => {
     const arr = [...filtered]
@@ -108,18 +164,48 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative max-w-lg">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name, bed, or disease..."
-          className="pl-10 h-12 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-teal-500"
-        />
+      {/* Search & Actions Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
+        <div className="relative w-full max-w-lg">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name, bed, or disease..."
+            className="pl-10 h-11 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-teal-500"
+          />
+        </div>
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/60 p-1.5 rounded-lg animate-in fade-in zoom-in duration-200 shadow-sm">
+            <span className="text-xs font-bold text-teal-700 dark:text-teal-400 px-2 min-w-[70px]">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-teal-200 dark:bg-teal-800 mx-1" />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 text-xs gap-1.5 hover:bg-white dark:hover:bg-slate-800"
+              onClick={handleBulkExportExcel}
+            >
+              <TableIcon className="h-3.5 w-3.5 text-emerald-600" />
+              Excel
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 text-xs gap-1.5 hover:bg-white dark:hover:bg-slate-800"
+              onClick={handleBulkExportWord}
+              disabled={isExporting}
+            >
+              {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5 text-blue-600" />}
+              Word
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* List */}
+      {/* List container */}
       {sorted.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800 mb-3">
@@ -134,8 +220,17 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           {/* Table Header */}
           <div
             className="grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700"
-            style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
+            style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
           >
+            <button 
+              onClick={toggleSelectAll} 
+              className="text-muted-foreground hover:text-teal-600 transition-colors p-1"
+            >
+              {selectedIds.size === filtered.length && filtered.length > 0 
+                ? <CheckSquare className="h-4 w-4 text-teal-600" /> 
+                : <Square className="h-4 w-4" />
+              }
+            </button>
             <SortableHeader label="Patient" col="name" {...headerProps} />
             <SortableHeader label="Age" col="age" {...headerProps} />
             <SortableHeader label="Chronic Disease" col="chronic_diseases" {...headerProps} />
@@ -155,10 +250,20 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
               return (
                 <div
                   key={p.id}
-                  className="group grid items-center gap-4 px-5 py-4 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 transition-colors cursor-pointer"
-                  style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
+                  className={`group grid items-center gap-4 px-5 py-4 border-l-2 transition-all cursor-pointer ${selectedIds.has(p.id) ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
+                  style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
                   onClick={handleRowClick}
                 >
+                  <div 
+                    className="p-1 -m-1" 
+                    onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}
+                  >
+                    {selectedIds.has(p.id) 
+                      ? <CheckSquare className="h-4 w-4 text-teal-600" /> 
+                      : <Square className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground" />
+                    }
+                  </div>
+
                   {/* Name + Bed */}
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
@@ -194,7 +299,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                   </span>
 
                   {/* Last Visit */}
-                  <span className="text-sm text-slate-600 dark:text-slate-400">
+                  <span className="text-sm text-slate-600 dark:text-slate-400 text-xs">
                     {p.lastVisit
                       ? format(parseISO(p.lastVisit), 'dd MMM yyyy')
                       : <span className="text-muted-foreground italic text-xs">No visits</span>

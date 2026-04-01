@@ -9,6 +9,7 @@ import {
 import { DeletePatientButton } from "@/components/patient/delete-button"
 import { EditPatientModal } from "@/components/patient/edit-patient-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
+import { ExportPatientButton } from "@/components/patient/export-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -84,6 +85,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex items-center gap-3">
           <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+          <ExportPatientButton patient={displayPatient} />
           <EditPatientModal patient={patient} />
           <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
         </div>
