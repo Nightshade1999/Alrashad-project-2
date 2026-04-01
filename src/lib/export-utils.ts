@@ -166,7 +166,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         }),
         ...p.investigations.map((inv: any) => new TableRow({
           children: [
-            new TableCell({ children: [new Paragraph(format(parseISO(inv.test_date), "dd MMM yyyy"))] }),
+            new TableCell({ children: [new Paragraph(format(parseISO(inv.date), "dd MMM yyyy"))] }),
             new TableCell({ children: [new Paragraph(inv.hba1c?.toString() || "-")] }),
             new TableCell({ children: [new Paragraph(inv.hb?.toString() || "-")] }),
             new TableCell({ children: [new Paragraph(inv.notes || "-")] }),

@@ -121,7 +121,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         .from('investigations')
         .select('*')
         .in('patient_id', Array.from(selectedIds))
-        .order('test_date', { ascending: false })
+        .order('date', { ascending: false })
 
       if (iError) throw iError
 

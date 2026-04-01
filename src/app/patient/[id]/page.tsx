@@ -10,6 +10,7 @@ import { DeletePatientButton } from "@/components/patient/delete-button"
 import { EditPatientModal } from "@/components/patient/edit-patient-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
 import { ExportPatientButton } from "@/components/patient/export-button"
+import { AIAdviceSection } from "@/components/patient/ai-advice-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -42,13 +43,13 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { data: patient } = await supabase.from("patients").select("*").eq("id", id).single()
   if (!patient) notFound()
 
-  const { data: lastVisitArr } = await supabase
+  const { data: visits } = await supabase
     .from("visits").select("*").eq("patient_id", id)
-    .order("visit_date", { ascending: false }).limit(1)
+    .order("visit_date", { ascending: false })
 
-  const { data: lastInvArr } = await supabase
+  const { data: investigations } = await supabase
     .from("investigations").select("*").eq("patient_id", id)
-    .order("date", { ascending: false }).limit(1)
+    .order("date", { ascending: false })
 
   const { count: visitCount } = await supabase
     .from("visits").select("id", { count: "exact", head: true }).eq("patient_id", id)
@@ -56,9 +57,18 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { count: invCount } = await supabase
     .from("investigations").select("id", { count: "exact", head: true }).eq("patient_id", id)
 
-  const lastVisit = lastVisitArr?.[0] ?? null
-  const lastInv = lastInvArr?.[0] ?? null
+  const lastVisit = visits?.[0] ?? null
+  const lastInv = investigations?.[0] ?? null
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
+
+  const displayPatient = {
+    ...patient,
+    lastHba1c: lastInv?.hba1c,
+    lastHb: lastInv?.hb,
+    lastVisit: lastVisit?.visit_date,
+    investigations: investigations || [],
+    visits: visits || []
+  }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -266,6 +276,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           </div>
         </Link>
       </div>
+
+      <AIAdviceSection patientData={displayPatient} />
     </div>
   )
 }
