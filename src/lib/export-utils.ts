@@ -5,16 +5,16 @@ import { format, parseISO } from "date-fns"
 /**
  * Helper to create a premium table cell with padding and alignment
  */
-function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string) {
+function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string, isAlert = false) {
   return new TableCell({
     children: [
       new Paragraph({
         children: [
           new TextRun({
             text: content?.toString() || "-",
-            bold: isHeader,
+            bold: isHeader || isAlert,
             size: isHeader ? 22 : 20, 
-            color: isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000")
+            color: isAlert ? "EF4444" : (isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000"))
           })
         ],
         alignment: AlignmentType.CENTER,
@@ -253,20 +253,32 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
               createTableCell("Notes", true, 15),
             ]
           }),
-          ...invList.map((inv: any) => new TableRow({
-            children: [
-              createTableCell(format(parseISO(inv.date), "dd MMM yy")),
-              createTableCell(inv.wbc || "-"),
-              createTableCell(inv.hb || "-"),
-              createTableCell(inv.hba1c || "-"),
-              createTableCell(inv.rbs || "-"),
-              createTableCell(inv.s_creatinine || "-"),
-              createTableCell(inv.s_urea || "-"),
-              createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false),
-              createTableCell(inv.tsb || "-"),
-              createTableCell(inv.notes || "-", false, undefined, "FDFDFD"),
-            ]
-          }))
+          ...invList.map((inv: any) => {
+            const isWbcAlert = inv.wbc && (inv.wbc > 11 || inv.wbc < 4)
+            const isHbAlert = inv.hb && inv.hb < 10
+            const isHba1cAlert = inv.hba1c && inv.hba1c > 6.5
+            const isRbsAlert = inv.rbs && inv.rbs > 200
+            const isCreatAlert = inv.s_creatinine && inv.s_creatinine > 1.2
+            const isUreaAlert = inv.s_urea && inv.s_urea > 40
+            const isTsbAlert = inv.tsb && inv.tsb > 1.2
+            const isAstAlert = inv.ast && inv.ast > 40
+            const isAltAlert = inv.alt && inv.alt > 40
+            
+            return new TableRow({
+              children: [
+                createTableCell(format(parseISO(inv.date), "dd MMM yy"), false, 13),
+                createTableCell(inv.wbc || "-", false, 8, undefined, isWbcAlert),
+                createTableCell(inv.hb || "-", false, 8, undefined, isHbAlert),
+                createTableCell(inv.hba1c || "-", false, 9, undefined, isHba1cAlert),
+                createTableCell(inv.rbs || "-", false, 8, undefined, isRbsAlert),
+                createTableCell(inv.s_creatinine || "-", false, 8, undefined, isCreatAlert),
+                createTableCell(inv.s_urea || "-", false, 8, undefined, isUreaAlert),
+                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, 15, undefined, isAstAlert || isAltAlert),
+                createTableCell(inv.tsb || "-", false, 8, undefined, isTsbAlert),
+                createTableCell(inv.notes || "-", false, 15, "FDFDFD"),
+              ]
+            })
+          })
         ]
       }))
     } else {
@@ -290,6 +302,27 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
           children: [new TextRun({ text: `Visit Date: ${format(parseISO(v.visit_date), "dd MMM yyyy")}`, bold: true, size: 20, color: "334155" })],
           spacing: { before: 200 },
         }))
+
+        // Vitals Row in Word
+        if (v.bp_sys || v.pr || v.spo2 || v.temp) {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ text: "VITALS: ", bold: true, size: 18, color: "0D9488" }),
+              new TextRun({ 
+                text: [
+                  v.bp_sys ? `BP: ${v.bp_sys}/${v.bp_dia || '?'}` : null,
+                  v.pr ? `PR: ${v.pr}bpm` : null,
+                  v.spo2 ? `SpO2: ${v.spo2}%` : null,
+                  v.temp ? `Temp: ${v.temp}°C` : null,
+                ].filter(Boolean).join("  |  "),
+                size: 18,
+                color: "334155"
+              })
+            ],
+            spacing: { before: 100, after: 100 },
+            indent: { left: 400 },
+          }))
+        }
         
         // Preserve original formatting by splitting into paragraphs
         const noteLines = (v.exam_notes || "No clinical exam notes recorded.").split("\n")
@@ -301,7 +334,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
             },
             shading: { fill: "F8FAFC" },
             indent: { left: 400 },
-            spacing: { before: 40, after: 40 },
+            spacing: { before: 42, after: 42 },
           }))
         })
       })
@@ -317,7 +350,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
     }
 
     if (index < patients.length - 1) {
-      children.push(new PageBreak())
+      children.push(new Paragraph({ children: [new PageBreak()] }))
     }
 
     return { children }

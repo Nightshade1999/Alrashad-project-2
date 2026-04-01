@@ -15,6 +15,11 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
+  const [bpSys, setBpSys] = useState('')
+  const [bpDia, setBpDia] = useState('')
+  const [pr, setPr] = useState('')
+  const [spo2, setSpo2] = useState('')
+  const [temp, setTemp] = useState('')
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +39,11 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
         doctor_id: user.id,
         visit_date: date,
         exam_notes: notes.trim(),
+        bp_sys: bpSys ? parseInt(bpSys) : null,
+        bp_dia: bpDia ? parseInt(bpDia) : null,
+        pr: pr ? parseInt(pr) : null,
+        spo2: spo2 ? parseInt(spo2) : null,
+        temp: temp ? parseFloat(temp) : null,
       })
       if (error) throw error
       toast.success('Visit note saved')
@@ -91,6 +101,36 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
             <Label htmlFor="visit-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Date</Label>
             <Input id="visit-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1.5" />
           </div>
+          {/* Vital Parameters Section */}
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-emerald-500" />
+              Vital Parameters
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="col-span-2 sm:col-span-1">
+                <Label htmlFor="bp-sys" className="text-xs font-semibold text-muted-foreground">BP (S/D)</Label>
+                <div className="flex items-center gap-1 mt-1">
+                  <Input id="bp-sys" placeholder="120" value={bpSys} onChange={e => setBpSys(e.target.value)} className="h-10 text-sm px-2" />
+                  <span className="text-slate-300">/</span>
+                  <Input id="bp-dia" placeholder="80" value={bpDia} onChange={e => setBpDia(e.target.value)} className="h-10 text-sm px-2" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="pr" className="text-xs font-semibold text-muted-foreground">PR (BPM)</Label>
+                <Input id="pr" placeholder="72" value={pr} onChange={e => setPr(e.target.value)} className="h-10 text-sm mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="spo2" className="text-xs font-semibold text-muted-foreground">SpO2 (%)</Label>
+                <Input id="spo2" placeholder="98" value={spo2} onChange={e => setSpo2(e.target.value)} className="h-10 text-sm mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="temp" className="text-xs font-semibold text-muted-foreground">Temp (°C)</Label>
+                <Input id="temp" placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-10 text-sm mt-1" />
+              </div>
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="visit-notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Exam Notes</Label>
             <Textarea
@@ -98,7 +138,7 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Write clinical findings, patient status, medication changes..."
-              rows={6}
+              rows={4}
               className="mt-1.5 resize-none text-sm leading-relaxed"
               required
             />

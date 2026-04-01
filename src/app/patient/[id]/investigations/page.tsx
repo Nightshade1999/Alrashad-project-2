@@ -10,15 +10,15 @@ import { format, parseISO } from "date-fns"
 export const dynamic = 'force-dynamic'
 
 const LAB_FIELDS = [
-  { key: 'wbc', label: 'WBC' },
+  { key: 'wbc', label: 'WBC', alertLow: 4, alertHigh: 11 },
   { key: 'hb', label: 'Hb', alertLow: 10 },
-  { key: 's_urea', label: 'S.Urea' },
-  { key: 's_creatinine', label: 'S.Creat' },
-  { key: 'ast', label: 'AST' },
-  { key: 'alt', label: 'ALT' },
-  { key: 'tsb', label: 'TSB' },
+  { key: 's_urea', label: 'S.Urea', alertHigh: 40 },
+  { key: 's_creatinine', label: 'S.Creat', alertHigh: 1.2 },
+  { key: 'ast', label: 'AST', alertHigh: 40 },
+  { key: 'alt', label: 'ALT', alertHigh: 40 },
+  { key: 'tsb', label: 'TSB', alertHigh: 1.2 },
   { key: 'hba1c', label: 'HbA1c', unit: '%', alertHigh: 6.5 },
-  { key: 'rbs', label: 'RBS' },
+  { key: 'rbs', label: 'RBS', alertHigh: 200 },
 ] as const
 
 export default async function InvestigationsPage({ params }: { params: Promise<{ id: string }> }) {

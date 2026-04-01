@@ -77,33 +77,35 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href={`/dashboard/category/${
             patient.category === 'High Risk' ? 'high-risk'
             : patient.category === 'Close Follow-up' ? 'close-follow-up'
             : 'normal'
           }`}>
-            <Button variant="outline" size="icon" className="h-10 w-10 bg-white dark:bg-slate-900">
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight" dir="auto">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight truncate" dir="auto">
               {patient.name}
             </h1>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <p className="text-sm text-muted-foreground">{patient.age} years old · {patient.gender}</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
           <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
-          <AddVisitModal patientId={patient.id} variant="icon" />
-          <AddInvestigationModal patientId={patient.id} variant="icon" />
-          <ExportPatientButton patient={displayPatient} />
-          <EditPatientModal patient={patient} />
-          <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+          <div className="flex gap-2">
+            <AddVisitModal patientId={patient.id} variant="icon" />
+            <AddInvestigationModal patientId={patient.id} variant="icon" />
+            <ExportPatientButton patient={displayPatient} />
+            <EditPatientModal patient={patient} />
+            <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+          </div>
         </div>
       </div>
 
@@ -226,7 +228,33 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             {lastVisit?.visit_date && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastVisit.visit_date), 'dd MMM yyyy')}</span>}
           </div>
           {lastVisit ? (
-            <div className="p-5">
+            <div className="p-5 space-y-4">
+              {(lastVisit.bp_sys || lastVisit.pr || lastVisit.spo2 || lastVisit.temp) && (
+                <div className="grid grid-cols-4 gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">BP</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.bp_sys ? `${lastVisit.bp_sys}/${lastVisit.bp_dia || '?'}` : '—'}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">PR</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{lastVisit.pr || '—'}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">SpO2</p>
+                    <p className={`text-sm font-bold ${lastVisit.spo2 && lastVisit.spo2 < 94 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {lastVisit.spo2 ? `${lastVisit.spo2}%` : '—'}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Temp</p>
+                    <p className={`text-sm font-bold ${lastVisit.temp && lastVisit.temp > 37.5 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {lastVisit.temp ? `${lastVisit.temp}°C` : '—'}
+                    </p>
+                  </div>
+                </div>
+              )}
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 rounded-lg p-4">
                 {lastVisit.exam_notes || <span className="italic text-muted-foreground">No notes recorded</span>}
               </p>
