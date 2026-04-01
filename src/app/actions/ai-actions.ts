@@ -1,6 +1,6 @@
 "use server"
 
-import { model } from "@/lib/gemini"
+import { getGenerativeModel, MODEL_PRIORITY } from "@/lib/gemini"
 
 export async function getClinicalAdvice(patientData: any, history: { role: "user" | "model", parts: { text: string }[] }[] = []) {
   if (!process.env.GEMINI_API_KEY) {
@@ -51,35 +51,47 @@ Provide professional, evidence-based advice for optimizing the management of thi
 5. In multi-turn chat, stay in character as the ward clinical advisor.
 `
 
-  try {
-    const chat = model.startChat({
-      history: history.length > 0 ? history : [],
-    })
+  let lastError: any = null
 
-    const result = await chat.sendMessage(history.length === 0 ? systemContext : history[history.length - 1].parts[0].text)
-    const response = await result.response
-    const text = response.text()
-    
-    if (!text) {
-      throw new Error("AI returned an empty response.")
+  // Try models in order of priority: Pro > Thinking > Flash
+  for (const modelName of MODEL_PRIORITY) {
+    try {
+      console.log(`Attempting clinical advice with model: ${modelName}`)
+      const model = getGenerativeModel(modelName)
+      const chat = model.startChat({
+        history: history.length > 0 ? history : [],
+      })
+
+      const result = await chat.sendMessage(history.length === 0 ? systemContext : history[history.length - 1].parts[0].text)
+      const response = await result.response
+      const text = response.text()
+      
+      if (text) {
+        return text
+      }
+    } catch (error: any) {
+      console.warn(`Model ${modelName} failed:`, error.message)
+      lastError = error
+      // If it's a 404 or unsupported error, continue to next model
+      // If it's a SAFETY error, we might want to stop early, but let's try other models just in case
+      if (error.message?.includes("SAFETY")) {
+          // Safety blocks are often model-specific, but if all block it, we'll see it at the end
+      }
     }
-    
-    return text
-  } catch (error: any) {
-    console.error("Gemini AI API Error:", {
-      message: error.message,
-      status: error.status,
-    })
-    
-    if (error.message?.includes("429")) {
-      throw new Error("API Quota exceeded. Please wait a minute.")
-    }
-    if (error.message?.includes("SAFETY")) {
-      throw new Error("AI advice blocked by clinical safety filters. Review patient data.")
-    }
-    
-    // Final diagnostic fallback
-    const msg = error.message || "Connection to clinical advisor failed."
-    throw new Error(`Gemini AI Error: ${msg}`)
   }
+
+  // If we reach here, all models failed
+  console.error("All Gemini models failed:", {
+    message: lastError?.message,
+    status: lastError?.status,
+  })
+  
+  if (lastError?.message?.includes("429")) {
+    throw new Error("API Quota exceeded across all models. Please wait a minute.")
+  }
+  if (lastError?.message?.includes("SAFETY")) {
+    throw new Error("AI advice blocked by clinical safety filters. Review patient data.")
+  }
+  
+  throw new Error(`Gemini AI Error: ${lastError?.message || "Connection to clinical advisor failed across all available models."}`)
 }
