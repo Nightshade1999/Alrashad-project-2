@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { DeletePatientButton } from '@/components/patient/delete-button'
 import { format, parseISO } from 'date-fns'
-import { exportPatientsToCsv, exportToWord } from '@/lib/export-utils'
+import { exportPatientsToExcel, exportToWord } from '@/lib/export-utils'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useEffect } from 'react'
 
 export interface PatientRow {
   id: string
@@ -94,30 +95,57 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
     setSelectedIds(next)
   }
 
-  const handleBulkExportExcel = () => {
+  const handleBulkExportExcel = async () => {
     const selectedPatients = patients.filter(p => selectedIds.has(p.id))
-    exportPatientsToCsv(selectedPatients)
-    toast.success(`Exported ${selectedIds.size} patients to CSV`)
+    await exportPatientsToExcel(selectedPatients)
+    toast.success(`Exported ${selectedIds.size} patients to Excel`)
   }
 
   const handleBulkExportWord = async () => {
     setIsExporting(true)
     const supabase = createClient()
     try {
-      const { data, error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      const doctorEmail = user?.email || ""
+
+      // Fetch full patient data
+      const { data: patientsData, error: pError } = await supabase
         .from('patients')
         .select('*')
         .in('id', Array.from(selectedIds))
 
-      if (error) throw error
+      if (pError) throw pError
 
-      // Merge with last visit/lab data from the rows
-      const merged = (data as any[]).map(p => {
+      // Fetch all investigations for these patients
+      const { data: invs, error: iError } = await supabase
+        .from('investigations')
+        .select('*')
+        .in('patient_id', Array.from(selectedIds))
+        .order('test_date', { ascending: false })
+
+      if (iError) throw iError
+
+      // Fetch all visits for these patients
+      const { data: visits, error: vError } = await supabase
+        .from('visits')
+        .select('*')
+        .in('patient_id', Array.from(selectedIds))
+        .order('visit_date', { ascending: false })
+
+      if (vError) throw vError
+
+      // Merge data
+      const merged = (patientsData as any[]).map(p => {
         const row = patients.find(r => r.id === p.id)
-        return { ...p, ...row }
+        return { 
+          ...p, 
+          ...row, 
+          investigations: (invs as any[] || []).filter(i => i.patient_id === p.id),
+          visits: (visits as any[] || []).filter(v => v.patient_id === p.id)
+        }
       })
 
-      await exportToWord(merged)
+      await exportToWord(merged, doctorEmail)
       toast.success(`Exported ${selectedIds.size} patients to Word`)
     } catch (err) {
       console.error(err)
