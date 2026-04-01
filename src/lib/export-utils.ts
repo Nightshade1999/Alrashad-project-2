@@ -79,7 +79,7 @@ export async function exportPatientsToExcel(patients: any[]) {
 
 /**
  * Advanced Word document generation for one or more patients.
- * Redesigned with side-by-side meds and full lab panel.
+ * Redesigned with individual medication rows and formatted notes.
  */
 export async function exportToWord(patients: any[], doctorEmail: string = "") {
   let doctorName = "Ward Clinician"
@@ -163,55 +163,63 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         ],
         spacing: { after: 300 },
       }),
-      // Side-by-side Medications Table
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: {
-          top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-          insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-        },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({ 
-                children: [new Paragraph({ 
-                  children: [new TextRun({ text: "Internal Medical Drugs", bold: true, size: 20, color: "FFFFFF" })],
-                  alignment: AlignmentType.CENTER
-                })],
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                shading: { fill: "0D9488" }
-              }),
-              new TableCell({ 
-                children: [new Paragraph({ 
-                  children: [new TextRun({ text: "Psychiatric Medications", bold: true, size: 20, color: "FFFFFF" })],
-                  alignment: AlignmentType.CENTER
-                })],
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                shading: { fill: "7C3AED" }
-              }),
-            ],
+    ]
+
+    // Multi-row Medications Table
+    const medDrugsList = (p.medical_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean)
+    const psychDrugsList = (p.psych_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean)
+    const maxMeds = Math.max(medDrugsList.length, psychDrugsList.length, 1)
+
+    const medRows = [
+      new TableRow({
+        children: [
+          new TableCell({ 
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Internal Medical Treatment", bold: true, size: 20, color: "FFFFFF" })],
+              alignment: AlignmentType.CENTER
+            })],
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            shading: { fill: "0D9488" }
           }),
-          new TableRow({
-            children: [
-              new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: p.medical_drugs || "None", size: 20 })] }),],
-                verticalAlign: VerticalAlign.TOP,
-                margins: { top: 100, bottom: 100, left: 100, right: 100 }
-              }),
-              new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: p.psych_drugs || "None", size: 20 })] })],
-                verticalAlign: VerticalAlign.TOP,
-                margins: { top: 100, bottom: 100, left: 100, right: 100 }
-              }),
-            ],
+          new TableCell({ 
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Psychiatric Treatment", bold: true, size: 20, color: "FFFFFF" })],
+              alignment: AlignmentType.CENTER
+            })],
+            width: { size: 50, type: WidthType.PERCENTAGE },
+            shading: { fill: "7C3AED" }
           }),
         ],
-      }),
+      })
     ]
+
+    for (let i = 0; i < maxMeds; i++) {
+      medRows.push(new TableRow({
+        children: [
+          new TableCell({ 
+            children: [new Paragraph({ children: [new TextRun({ text: medDrugsList[i] || "-", size: 20 })], alignment: AlignmentType.CENTER })],
+            verticalAlign: VerticalAlign.CENTER,
+          }),
+          new TableCell({ 
+            children: [new Paragraph({ children: [new TextRun({ text: psychDrugsList[i] || "-", size: 20 })], alignment: AlignmentType.CENTER })],
+            verticalAlign: VerticalAlign.CENTER,
+          }),
+        ],
+      }))
+    }
+
+    children.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+        left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+        right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
+      },
+      rows: medRows
+    }))
 
     children.push(new Paragraph({
       children: [new TextRun({ text: "CLINICAL INVESTIGATIONS HISTORY (ALL PARAMETERS)", bold: true, size: 24, color: "0D9488" })],
@@ -282,15 +290,20 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
           children: [new TextRun({ text: `Visit Date: ${format(parseISO(v.visit_date), "dd MMM yyyy")}`, bold: true, size: 20, color: "334155" })],
           spacing: { before: 200 },
         }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: v.exam_notes || "No clinical exam notes recorded.", size: 20 })],
-          border: {
-            left: { color: "0D9488", size: 18, style: BorderStyle.SINGLE },
-          },
-          shading: { fill: "F8FAFC" },
-          indent: { left: 400 },
-          spacing: { after: 300, before: 100 },
-        }))
+        
+        // Preserve original formatting by splitting into paragraphs
+        const noteLines = (v.exam_notes || "No clinical exam notes recorded.").split("\n")
+        noteLines.forEach((line: string) => {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: line, size: 20 })],
+            border: {
+              left: { color: "0D9488", size: 18, style: BorderStyle.SINGLE },
+            },
+            shading: { fill: "F8FAFC" },
+            indent: { left: 400 },
+            spacing: { top: 40, bottom: 40 },
+          }))
+        })
       })
       if ((p.visits?.length || 0) > visitsToPrint.length) {
         children.push(new Paragraph({
