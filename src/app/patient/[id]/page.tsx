@@ -11,6 +11,8 @@ import { EditPatientModal } from "@/components/patient/edit-patient-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
 import { ExportPatientButton } from "@/components/patient/export-button"
 import { AIAdviceSection } from "@/components/patient/ai-advice-section"
+import { AddInvestigationModal } from "@/components/patient/add-investigation-modal"
+import { AddVisitModal } from "@/components/patient/add-visit-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -95,6 +97,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex items-center gap-3">
           <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+          <AddVisitModal patientId={patient.id} variant="icon" />
+          <AddInvestigationModal patientId={patient.id} variant="icon" />
           <ExportPatientButton patient={displayPatient} />
           <EditPatientModal patient={patient} />
           <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />

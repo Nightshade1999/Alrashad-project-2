@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns"
 /**
  * Helper to create a premium table cell with padding and alignment
  */
-function createTableCell(content: string | number, isHeader = false, width?: number) {
+function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string) {
   return new TableCell({
     children: [
       new Paragraph({
@@ -14,13 +14,13 @@ function createTableCell(content: string | number, isHeader = false, width?: num
             text: content?.toString() || "-",
             bold: isHeader,
             size: isHeader ? 22 : 20, 
-            color: isHeader ? "FFFFFF" : "334155"
+            color: isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000")
           })
         ],
         alignment: AlignmentType.CENTER,
       })
     ],
-    shading: isHeader ? { fill: "0D9488" } : undefined,
+    shading: isHeader ? { fill: bgColor || "0D9488" } : (bgColor ? { fill: bgColor } : undefined),
     verticalAlign: VerticalAlign.CENTER,
     margins: { top: 100, bottom: 100, left: 100, right: 100 },
     width: width ? { size: width, type: WidthType.PERCENTAGE } : undefined
@@ -79,6 +79,7 @@ export async function exportPatientsToExcel(patients: any[]) {
 
 /**
  * Advanced Word document generation for one or more patients.
+ * Redesigned with side-by-side meds and full lab panel.
  */
 export async function exportToWord(patients: any[], doctorEmail: string = "") {
   let doctorName = "Ward Clinician"
@@ -162,6 +163,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         ],
         spacing: { after: 300 },
       }),
+      // Side-by-side Medications Table
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: {
@@ -176,24 +178,34 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
           new TableRow({
             children: [
               new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: "Medical Treatment", bold: true, size: 20, color: "0D9488" })] })],
-                width: { size: 30, type: WidthType.PERCENTAGE },
-                shading: { fill: "F8FAFC" }
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: "Internal Medical Drugs", bold: true, size: 20, color: "FFFFFF" })],
+                  alignment: AlignmentType.CENTER
+                })],
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                shading: { fill: "0D9488" }
               }),
               new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: p.medical_drugs || "No internal medical drugs recorded.", size: 20 })] }),],
-                width: { size: 70, type: WidthType.PERCENTAGE }
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: "Psychiatric Medications", bold: true, size: 20, color: "FFFFFF" })],
+                  alignment: AlignmentType.CENTER
+                })],
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                shading: { fill: "7C3AED" }
               }),
             ],
           }),
           new TableRow({
             children: [
               new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: "Psychiatric Treatment", bold: true, size: 20, color: "7C3AED" })] })],
-                shading: { fill: "F8FAFC" }
+                children: [new Paragraph({ children: [new TextRun({ text: p.medical_drugs || "None", size: 20 })] }),],
+                verticalAlign: VerticalAlign.TOP,
+                margins: { top: 100, bottom: 100, left: 100, right: 100 }
               }),
               new TableCell({ 
-                children: [new Paragraph({ children: [new TextRun({ text: p.psych_drugs || "No psychiatric drugs recorded.", size: 20 })] })]
+                children: [new Paragraph({ children: [new TextRun({ text: p.psych_drugs || "None", size: 20 })] })],
+                verticalAlign: VerticalAlign.TOP,
+                margins: { top: 100, bottom: 100, left: 100, right: 100 }
               }),
             ],
           }),
@@ -202,7 +214,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
     ]
 
     children.push(new Paragraph({
-      children: [new TextRun({ text: "CLINICAL INVESTIGATIONS HISTORY", bold: true, size: 24, color: "0D9488" })],
+      children: [new TextRun({ text: "CLINICAL INVESTIGATIONS HISTORY (ALL PARAMETERS)", bold: true, size: 24, color: "0D9488" })],
       spacing: { before: 600, after: 200 },
     }))
 
@@ -221,25 +233,37 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         rows: [
           new TableRow({
             children: [
-              createTableCell("Date", true, 25),
-              createTableCell("HbA1c (%)", true, 15),
-              createTableCell("Hb (g/dL)", true, 15),
-              createTableCell("Notes", true, 45),
+              createTableCell("Date", true, 13),
+              createTableCell("WBC", true, 8),
+              createTableCell("Hb", true, 8),
+              createTableCell("HbA1c", true, 9),
+              createTableCell("RBS", true, 8),
+              createTableCell("S.Cr", true, 8),
+              createTableCell("Urea", true, 8),
+              createTableCell("AST/ALT", true, 15),
+              createTableCell("TSB", true, 8),
+              createTableCell("Notes", true, 15),
             ]
           }),
           ...invList.map((inv: any) => new TableRow({
             children: [
-              createTableCell(format(parseISO(inv.date), "dd MMM yyyy")),
-              createTableCell(inv.hba1c || "-"),
+              createTableCell(format(parseISO(inv.date), "dd MMM yy")),
+              createTableCell(inv.wbc || "-"),
               createTableCell(inv.hb || "-"),
-              createTableCell(inv.notes || "-"),
+              createTableCell(inv.hba1c || "-"),
+              createTableCell(inv.rbs || "-"),
+              createTableCell(inv.s_creatinine || "-"),
+              createTableCell(inv.s_urea || "-"),
+              createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false),
+              createTableCell(inv.tsb || "-"),
+              createTableCell(inv.notes || "-", false, undefined, "FDFDFD"),
             ]
           }))
         ]
       }))
     } else {
       children.push(new Paragraph({
-        children: [new TextRun({ text: "No clinical investigation data found for this period.", italics: true, color: "64748B", size: 18 })],
+        children: [new TextRun({ text: "No comprehensive clinical investigation data found.", italics: true, color: "64748B", size: 18 })],
       }))
     }
 
@@ -259,7 +283,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
           spacing: { before: 200 },
         }))
         children.push(new Paragraph({
-          children: [new TextRun({ text: v.notes || "No clinical exam notes recorded.", size: 20 })],
+          children: [new TextRun({ text: v.exam_notes || "No clinical exam notes recorded.", size: 20 })],
           border: {
             left: { color: "0D9488", size: 18, style: BorderStyle.SINGLE },
           },

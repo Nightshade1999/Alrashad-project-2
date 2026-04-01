@@ -21,7 +21,7 @@ const LAB_FIELDS = [
   { key: 'rbs',          label: 'RBS',       placeholder: 'e.g. 145' },
 ]
 
-export function AddInvestigationModal({ patientId }: { patientId: string }) {
+export function AddInvestigationModal({ patientId, variant = "button" }: { patientId: string, variant?: "button" | "icon" }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -53,6 +53,19 @@ export function AddInvestigationModal({ patientId }: { patientId: string }) {
   }
 
   if (!open) {
+    if (variant === "icon") {
+      return (
+        <Button 
+          onClick={() => setOpen(true)} 
+          variant="outline" 
+          size="icon" 
+          className="h-10 w-10 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+          title="Add Lab Results"
+        >
+          <FlaskConical className="h-5 w-5" />
+        </Button>
+      )
+    }
     return (
       <Button onClick={() => setOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white h-10">
         <Plus className="h-4 w-4 mr-2" /> Add Labs

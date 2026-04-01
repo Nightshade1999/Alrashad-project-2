@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Search, AlertCircle, Clock, Activity, CalendarClock, Plus, Download } from 'lucide-react'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { ExportButton } from '@/components/dashboard/export-button'
+import { DashboardSearch } from '@/components/dashboard/dashboard-search'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +61,7 @@ export default async function DashboardPage() {
 
   const { data: patients } = await supabase
     .from('patients')
-    .select('id, category')
+    .select('id, name, ward_number, category')
 
   const counts = {
     'High Risk': patients?.filter(p => p.category === 'High Risk').length ?? 0,
@@ -87,14 +88,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-lg">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search patients by name or bed..."
-          className="pl-10 h-12 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-teal-500"
-        />
-      </div>
+      {/* Search Bar - Client Component */}
+      <DashboardSearch patients={patients || []} />
 
       {/* Category Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">

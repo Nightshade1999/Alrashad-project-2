@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 
-export function AddVisitModal({ patientId }: { patientId: string }) {
+export function AddVisitModal({ patientId, variant = "button" }: { patientId: string, variant?: "button" | "icon" }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -48,6 +48,19 @@ export function AddVisitModal({ patientId }: { patientId: string }) {
   }
 
   if (!open) {
+    if (variant === "icon") {
+      return (
+        <Button 
+          onClick={() => setOpen(true)} 
+          variant="outline" 
+          size="icon" 
+          className="h-10 w-10 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+          title="Add Visit Note"
+        >
+          <ClipboardList className="h-5 w-5" />
+        </Button>
+      )
+    }
     return (
       <Button onClick={() => setOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10">
         <Plus className="h-4 w-4 mr-2" /> Add Visit
