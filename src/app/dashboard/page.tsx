@@ -6,6 +6,7 @@ import { Search, AlertCircle, Clock, Activity, CalendarClock, Plus, Download } f
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { ExportButton } from '@/components/dashboard/export-button'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
+import { UrgentInsights } from '@/components/dashboard/urgent-insights'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +91,9 @@ export default async function DashboardPage() {
 
       {/* Search Bar - Client Component */}
       <DashboardSearch patients={patients || []} />
+
+      {/* AI Safety Monitor */}
+      <UrgentInsights />
 
       {/* Category Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">

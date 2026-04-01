@@ -5,16 +5,16 @@ import { format, parseISO } from "date-fns"
 /**
  * Helper to create a premium table cell with padding and alignment
  */
-function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string) {
+function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string, isAlert = false) {
   return new TableCell({
     children: [
       new Paragraph({
         children: [
           new TextRun({
             text: content?.toString() || "-",
-            bold: isHeader,
+            bold: isHeader || isAlert,
             size: isHeader ? 22 : 20, 
-            color: isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000")
+            color: isAlert ? "EF4444" : (isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000"))
           })
         ],
         alignment: AlignmentType.CENTER,
@@ -253,20 +253,32 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
               createTableCell("Notes", true, 15),
             ]
           }),
-          ...invList.map((inv: any) => new TableRow({
-            children: [
-              createTableCell(format(parseISO(inv.date), "dd MMM yy")),
-              createTableCell(inv.wbc || "-"),
-              createTableCell(inv.hb || "-"),
-              createTableCell(inv.hba1c || "-"),
-              createTableCell(inv.rbs || "-"),
-              createTableCell(inv.s_creatinine || "-"),
-              createTableCell(inv.s_urea || "-"),
-              createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false),
-              createTableCell(inv.tsb || "-"),
-              createTableCell(inv.notes || "-", false, undefined, "FDFDFD"),
-            ]
-          }))
+          ...invList.map((inv: any) => {
+            const isWbcAlert = inv.wbc && (inv.wbc > 11 || inv.wbc < 4)
+            const isHbAlert = inv.hb && inv.hb < 10
+            const isHba1cAlert = inv.hba1c && inv.hba1c > 6.5
+            const isRbsAlert = inv.rbs && inv.rbs > 200
+            const isCreatAlert = inv.s_creatinine && inv.s_creatinine > 1.2
+            const isUreaAlert = inv.s_urea && inv.s_urea > 40
+            const isTsbAlert = inv.tsb && inv.tsb > 1.2
+            const isAstAlert = inv.ast && inv.ast > 40
+            const isAltAlert = inv.alt && inv.alt > 40
+            
+            return new TableRow({
+              children: [
+                createTableCell(format(parseISO(inv.date), "dd MMM yy")),
+                createTableCell(inv.wbc || "-", false, undefined, undefined, isWbcAlert),
+                createTableCell(inv.hb || "-", false, undefined, undefined, isHbAlert),
+                createTableCell(inv.hba1c || "-", false, undefined, undefined, isHba1cAlert),
+                createTableCell(inv.rbs || "-", false, undefined, undefined, isRbsAlert),
+                createTableCell(inv.s_creatinine || "-", false, undefined, undefined, isCreatAlert),
+                createTableCell(inv.s_urea || "-", false, undefined, undefined, isUreaAlert),
+                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, undefined, undefined, isAstAlert || isAltAlert),
+                createTableCell(inv.tsb || "-", false, undefined, undefined, isTsbAlert),
+                createTableCell(inv.notes || "-", false, undefined, "FDFDFD"),
+              ]
+            })
+          })
         ]
       }))
     } else {
