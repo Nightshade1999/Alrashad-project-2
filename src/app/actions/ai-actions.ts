@@ -18,7 +18,7 @@ export async function getClinicalAdvice(patientData: any) {
   ).join("\n")
 
   const visitsSummary = visits?.slice(0, 3).map((v: any) => 
-    `- Date: ${v.visit_date}, Notes: ${v.notes}`
+    `- Date: ${v.visit_date}, Notes: ${v.exam_notes}`
   ).join("\n")
 
   const prompt = `
@@ -59,9 +59,25 @@ Response:
   try {
     const result = await model.generateContent(prompt)
     const response = await result.response
-    return response.text()
-  } catch (error) {
-    console.error("Gemini AI Error:", error)
-    throw new Error("Failed to generate clinical advice.")
+    const text = response.text()
+    
+    if (!text) {
+      console.error("Gemini AI: Empty response received.")
+      throw new Error("Empty response from AI.")
+    }
+    
+    return text
+  } catch (error: any) {
+    console.error("Gemini AI Clinical Advisor Error:", {
+      message: error.message,
+      stack: error.stack,
+      prompt: prompt.substring(0, 200) + "..."
+    })
+    
+    if (error.message?.includes("SAFETY")) {
+      throw new Error("AI advice was blocked due to safety filters. Please review the patient data for sensitive content.")
+    }
+    
+    throw new Error("The AI Clinical Advisor is currently unavailable. Please try again in a few moments.")
   }
 }
