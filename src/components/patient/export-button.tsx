@@ -26,7 +26,7 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
         .from('investigations')
         .select('*')
         .eq('patient_id', patient.id)
-        .order('test_date', { ascending: false })
+        .order('date', { ascending: false })
 
       const { data: visits } = await supabase
         .from('visits')

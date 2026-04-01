@@ -5,13 +5,14 @@ import { format, parseISO } from "date-fns"
 /**
  * Helper to create a premium table cell with padding and alignment
  */
-function createTableCell(content: string | number, isHeader = false, width?: number, bgColor?: string, isAlert = false) {
+function createTableCell(content: string | number | null | undefined, isHeader = false, bgColor?: string, isAlert = false) {
+  const textVal = (content === null || content === undefined || content === "") ? "-" : String(content);
   return new TableCell({
     children: [
       new Paragraph({
         children: [
           new TextRun({
-            text: content?.toString() || "-",
+            text: textVal,
             bold: isHeader || isAlert,
             size: isHeader ? 22 : 20, 
             color: isAlert ? "EF4444" : (isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000"))
@@ -20,10 +21,7 @@ function createTableCell(content: string | number, isHeader = false, width?: num
         alignment: AlignmentType.CENTER,
       })
     ],
-    shading: isHeader ? { fill: bgColor || "0D9488" } : (bgColor ? { fill: bgColor } : undefined),
-    verticalAlign: VerticalAlign.CENTER,
-    margins: { top: 100, bottom: 100, left: 100, right: 100 },
-    width: width ? { size: width, type: WidthType.PERCENTAGE } : undefined
+    shading: isHeader ? { fill: bgColor || "0D9488" } : (bgColor ? { fill: bgColor } : undefined)
   })
 }
 
@@ -229,7 +227,6 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
     const invList = p.investigations || []
     if (invList.length > 0) {
       children.push(new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
         borders: {
           top: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
           bottom: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
@@ -241,16 +238,16 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         rows: [
           new TableRow({
             children: [
-              createTableCell("Date", true, 13),
-              createTableCell("WBC", true, 8),
-              createTableCell("Hb", true, 8),
-              createTableCell("HbA1c", true, 9),
-              createTableCell("RBS", true, 8),
-              createTableCell("S.Cr", true, 8),
-              createTableCell("Urea", true, 8),
-              createTableCell("AST/ALT", true, 15),
-              createTableCell("TSB", true, 8),
-              createTableCell("Notes", true, 15),
+              createTableCell("Date", true),
+              createTableCell("WBC", true),
+              createTableCell("Hb", true),
+              createTableCell("HbA1c", true),
+              createTableCell("RBS", true),
+              createTableCell("S.Cr", true),
+              createTableCell("Urea", true),
+              createTableCell("AST/ALT", true),
+              createTableCell("TSB", true),
+              createTableCell("Notes", true),
             ]
           }),
           ...invList.map((inv: any) => {
@@ -266,16 +263,16 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
             
             return new TableRow({
               children: [
-                createTableCell(format(parseISO(inv.date), "dd MMM yy"), false, 13),
-                createTableCell(inv.wbc || "-", false, 8, undefined, isWbcAlert),
-                createTableCell(inv.hb || "-", false, 8, undefined, isHbAlert),
-                createTableCell(inv.hba1c || "-", false, 9, undefined, isHba1cAlert),
-                createTableCell(inv.rbs || "-", false, 8, undefined, isRbsAlert),
-                createTableCell(inv.s_creatinine || "-", false, 8, undefined, isCreatAlert),
-                createTableCell(inv.s_urea || "-", false, 8, undefined, isUreaAlert),
-                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, 15, undefined, isAstAlert || isAltAlert),
-                createTableCell(inv.tsb || "-", false, 8, undefined, isTsbAlert),
-                createTableCell(inv.notes || "-", false, 15, "FDFDFD"),
+                createTableCell(format(parseISO(inv.date), "dd MMM yy")),
+                createTableCell(inv.wbc, false, undefined, isWbcAlert),
+                createTableCell(inv.hb, false, undefined, isHbAlert),
+                createTableCell(inv.hba1c, false, undefined, isHba1cAlert),
+                createTableCell(inv.rbs, false, undefined, isRbsAlert),
+                createTableCell(inv.s_creatinine, false, undefined, isCreatAlert),
+                createTableCell(inv.s_urea, false, undefined, isUreaAlert),
+                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, undefined, isAstAlert || isAltAlert),
+                createTableCell(inv.tsb, false, undefined, isTsbAlert),
+                createTableCell(inv.notes, false, "FDFDFD"),
               ]
             })
           })

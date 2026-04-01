@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import Link from 'next/link'
 import { LogOut, Stethoscope } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
@@ -35,17 +36,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <div className="flex h-16 sm:h-20 items-center justify-between px-4 sm:px-8 max-w-screen-2xl mx-auto w-full">
           
           {/* Left: Logo + Ward Name */}
-          <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer">
             <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md shadow-teal-500/20 shrink-0">
               <Stethoscope className="h-5 w-5 text-white" />
             </div>
             <div className="flex flex-col">
               <WardHeader />
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground hover:text-teal-600 transition-colors">
                 Dr. {formattedName}
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Right: Status + Logout */}
           <div className="flex items-center gap-2 sm:gap-3">
