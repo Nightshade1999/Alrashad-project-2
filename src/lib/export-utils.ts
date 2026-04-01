@@ -301,7 +301,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
             },
             shading: { fill: "F8FAFC" },
             indent: { left: 400 },
-            spacing: { top: 40, bottom: 40 },
+            spacing: { before: 40, after: 40 },
           }))
         })
       })
