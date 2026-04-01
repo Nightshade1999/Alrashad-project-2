@@ -25,6 +25,9 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  icons: {
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
