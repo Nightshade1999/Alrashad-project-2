@@ -75,9 +75,11 @@ Provide professional, evidence-based advice for optimizing the management of thi
       throw new Error("API Quota exceeded. Please wait a minute.")
     }
     if (error.message?.includes("SAFETY")) {
-      throw new Error("AI advice blocked by safety filters. Review patient data.")
+      throw new Error("AI advice blocked by clinical safety filters. Review patient data.")
     }
     
-    throw new Error(`Gemini AI Error: ${error.message || "Unknown error"}`)
+    // Final diagnostic fallback
+    const msg = error.message || "Connection to clinical advisor failed."
+    throw new Error(`Gemini AI Error: ${msg}`)
   }
 }

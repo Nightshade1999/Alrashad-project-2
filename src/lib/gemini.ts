@@ -4,7 +4,7 @@ const apiKey = process.env.GEMINI_API_KEY || ""
 const genAI = new GoogleGenerativeAI(apiKey)
 
 export const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash-latest",
+  model: "gemini-flash-latest",
   safetySettings: [
     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
