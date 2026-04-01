@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import {
   ArrowLeft, AlertTriangle, Activity, FileText,
-  User, Pill, BedDouble, Heart, FlaskConical, ClipboardList
+  User, Database, Layers, Heart, FlaskConical as Flask, Clipboard as ClipboardIcon
 } from "lucide-react"
 import { DeletePatientButton } from "@/components/patient/delete-button"
 import { EditPatientModal } from "@/components/patient/edit-patient-modal"
@@ -153,7 +153,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-violet-50/60 dark:bg-violet-900/10">
             <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
-              <Pill className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <Database className="h-4 w-4 text-violet-600 dark:text-violet-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Psychiatric Medications</h2>
           </div>
@@ -166,7 +166,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-teal-50/60 dark:bg-teal-900/10">
             <div className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-900/40">
-              <BedDouble className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+              <Layers className="h-4 w-4 text-teal-600 dark:text-teal-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Internal Medical Drugs</h2>
           </div>
@@ -184,7 +184,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-900/10">
             <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-              <FlaskConical className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <Flask className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Investigation</h2>
             {lastInv?.date && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastInv.date), 'dd MMM yyyy')}</span>}
@@ -216,7 +216,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-emerald-50/60 dark:bg-emerald-900/10">
             <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-              <ClipboardList className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <ClipboardIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Visit</h2>
             {lastVisit?.visit_date && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastVisit.visit_date), 'dd MMM yyyy')}</span>}
