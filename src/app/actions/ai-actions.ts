@@ -25,11 +25,10 @@ export async function getClinicalAdvice(patientData: any) {
 You are an expert Clinical Consultant in a Medical Ward. 
 Provide professional, evidence-based advice for optimizing the management of this patient's chronic diseases (specifically Diabetes and Hypertension if applicable).
 
-### Hospital Formulary (Available Medications):
-- Diabetes: Metformin, Gliclazide (Diamicron), Sitagliptin (Januvia), Empagliflozin (Jardiance), Insulins (Actrapid, Insulatard, Mixtard, Lantus).
-- Hypertension: Enalapril, Lisinopril, Amlodipine, Valsartan, Atenolol, Bisoprolol, Hydrochlorothiazide (HCTZ), Frusemide.
-- Lipids/Coagulation: Atorvastatin, Rosuvastatin, Aspirin, Clopidogrel.
-- Others: Omeprazole, Esomeprazole.
+### Hospital Formulary (Available Medications ONLY):
+- Hypertension: Amlodipine, Capoten (Captopril).
+- Diabetes (Oral): Metformin, Daonil (Glibenclamide).
+- Diabetes (Insulin): Soluble Insulin, Mixtard Insulin, Lente Insulin.
 
 ### Patient Data:
 - Name: ${name}
