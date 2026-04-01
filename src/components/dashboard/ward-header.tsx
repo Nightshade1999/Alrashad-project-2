@@ -11,7 +11,10 @@ export function WardHeader() {
   const [editValue, setEditValue] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const [mounted, setMounted] = useState(false)
+
   useEffect(() => {
+    setMounted(true)
     const savedName = localStorage.getItem("wardManager_wardName")
     if (savedName) {
       setWardName(savedName)
@@ -44,6 +47,10 @@ export function WardHeader() {
     if (e.key === 'Escape') cancelEdit()
   }
 
+  if (!mounted) {
+    return <div className="h-9 w-64 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-md" />
+  }
+
   if (isEditing) {
     return (
       <div className="flex items-center gap-2">
@@ -52,6 +59,7 @@ export function WardHeader() {
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onBlur={() => setTimeout(saveEdit, 100)} // Allow click on checkmark to fire first
           className="h-9 w-[250px] sm:w-[350px] font-bold text-lg"
         />
         <Button variant="ghost" size="icon" onClick={saveEdit} className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">

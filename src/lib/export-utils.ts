@@ -2,28 +2,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Page
 import ExcelJS from "exceljs"
 import { format, parseISO } from "date-fns"
 
-/**
- * Helper to create a premium table cell with padding and alignment
- */
-function createTableCell(content: string | number | null | undefined, isHeader = false, bgColor?: string, isAlert = false) {
-  const textVal = (content === null || content === undefined || content === "") ? "-" : String(content);
-  return new TableCell({
-    children: [
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: textVal,
-            bold: isHeader || isAlert,
-            size: isHeader ? 22 : 20, 
-            color: isAlert ? "EF4444" : (isHeader ? "FFFFFF" : (bgColor === "F8FAFC" ? "334155" : "000000"))
-          })
-        ],
-        alignment: AlignmentType.CENTER,
-      })
-    ],
-    shading: isHeader ? { fill: bgColor || "0D9488" } : (bgColor ? { fill: bgColor } : undefined)
-  })
-}
+// Removed createTableCell helper completely since tables are deprecated for mobile compatibility
 
 /**
  * Exports patient data to an Excel file with category-based row coloring and bold headers.
@@ -84,11 +63,17 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
   if (doctorEmail.includes("ahmed")) doctorName = "Dr. Ahmed Safaa"
   else if (doctorEmail.includes("zahraa")) doctorName = "Dr. Zahraa"
 
+  let dynamicWardName = "ALRASHAD MEDICAL WARD"
+  if (typeof window !== "undefined") {
+    const savedName = localStorage.getItem("wardManager_wardName")
+    if (savedName) dynamicWardName = savedName.toUpperCase()
+  }
+
   const sections = patients.map((p, index) => {
     const children: any[] = [
       new Paragraph({
         children: [
-          new TextRun({ text: "ALRASHAD MEDICAL WARD", bold: true, size: 36, color: "0D9488" }),
+          new TextRun({ text: dynamicWardName, bold: true, size: 36, color: "0D9488" }),
         ],
         alignment: AlignmentType.RIGHT,
         spacing: { before: 200 },
@@ -120,34 +105,24 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
         spacing: { after: 200 },
       }),
       
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: {
-          top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-          insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-        },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Age:", bold: true, size: 20 })] })], width: { size: 25, type: WidthType.PERCENTAGE } }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: `${p.age} Years`, size: 20 })] })], width: { size: 25, type: WidthType.PERCENTAGE } }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Gender:", bold: true, size: 20 })] })], width: { size: 25, type: WidthType.PERCENTAGE } }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: p.gender || "N/A", size: 20 })] })], width: { size: 25, type: WidthType.PERCENTAGE } }),
-            ],
-          }),
-          new TableRow({
-            children: [
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Ward/Bed:", bold: true, size: 20 })] })] }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: p.ward_number || "N/A", size: 20 })] })] }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Category:", bold: true, size: 20 })] })] }),
-              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: p.category || "Normal", color: p.category === 'High Risk' ? 'EF4444' : '0D9488', bold: true, size: 20 })] })] }),
-            ],
-          }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: "Age: ", bold: true, size: 20, color: "334155" }),
+          new TextRun({ text: `${p.age} Years`, size: 20, color: "000000" }),
+          new TextRun({ text: "   |   Gender: ", bold: true, size: 20, color: "334155" }),
+          new TextRun({ text: p.gender || "N/A", size: 20, color: "000000" }),
         ],
+        spacing: { after: 120 }
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: "Ward/Bed: ", bold: true, size: 20, color: "334155" }),
+          new TextRun({ text: p.ward_number || "N/A", size: 20, color: "000000" }),
+          new TextRun({ text: "   |   Category: ", bold: true, size: 20, color: "334155" }),
+          new TextRun({ text: p.category || "Normal", color: p.category === 'High Risk' ? 'EF4444' : '0D9488', bold: true, size: 20 }),
+        ],
+        spacing: { after: 400 },
+        border: { bottom: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } }
       }),
 
       new Paragraph({
@@ -163,61 +138,51 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
       }),
     ]
 
-    // Multi-row Medications Table
-    const medDrugsList = (p.medical_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean)
-    const psychDrugsList = (p.psych_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean)
-    const maxMeds = Math.max(medDrugsList.length, psychDrugsList.length, 1)
+    // Pharmacology Paragraphs
+    const medDrugsList = (p.medical_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean);
+    const psychDrugsList = (p.psych_drugs || "").split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean);
 
-    const medRows = [
-      new TableRow({
-        children: [
-          new TableCell({ 
-            children: [new Paragraph({ 
-              children: [new TextRun({ text: "Internal Medical Treatment", bold: true, size: 20, color: "FFFFFF" })],
-              alignment: AlignmentType.CENTER
-            })],
-            width: { size: 50, type: WidthType.PERCENTAGE },
-            shading: { fill: "0D9488" }
-          }),
-          new TableCell({ 
-            children: [new Paragraph({ 
-              children: [new TextRun({ text: "Psychiatric Treatment", bold: true, size: 20, color: "FFFFFF" })],
-              alignment: AlignmentType.CENTER
-            })],
-            width: { size: 50, type: WidthType.PERCENTAGE },
-            shading: { fill: "7C3AED" }
-          }),
-        ],
-      })
-    ]
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Internal Medical Treatment:", bold: true, size: 20, color: "0D9488" })],
+      spacing: { before: 200, after: 120 }
+    }));
 
-    for (let i = 0; i < maxMeds; i++) {
-      medRows.push(new TableRow({
-        children: [
-          new TableCell({ 
-            children: [new Paragraph({ children: [new TextRun({ text: medDrugsList[i] || "-", size: 20 })], alignment: AlignmentType.CENTER })],
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-          new TableCell({ 
-            children: [new Paragraph({ children: [new TextRun({ text: psychDrugsList[i] || "-", size: 20 })], alignment: AlignmentType.CENTER })],
-            verticalAlign: VerticalAlign.CENTER,
-          }),
-        ],
-      }))
+    if (medDrugsList.length > 0) {
+      medDrugsList.forEach((drug: string) => {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `• ${drug}`, size: 20 })],
+          indent: { left: 400 },
+          spacing: { after: 60 }
+        }));
+      });
+    } else {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "None recorded", size: 20, italics: true, color: "64748B" })],
+        indent: { left: 400 },
+        spacing: { after: 120 }
+      }));
     }
 
-    children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-        bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-        left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-        right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "F1F5F9" },
-      },
-      rows: medRows
-    }))
+    children.push(new Paragraph({
+      children: [new TextRun({ text: "Psychiatric Treatment:", bold: true, size: 20, color: "7C3AED" })],
+      spacing: { before: 200, after: 120 }
+    }));
+
+    if (psychDrugsList.length > 0) {
+      psychDrugsList.forEach((drug: string) => {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `• ${drug}`, size: 20 })],
+          indent: { left: 400 },
+          spacing: { after: 60 }
+        }));
+      });
+    } else {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "None recorded", size: 20, italics: true, color: "64748B" })],
+        indent: { left: 400 },
+        spacing: { after: 120 }
+      }));
+    }
 
     children.push(new Paragraph({
       children: [new TextRun({ text: "CLINICAL INVESTIGATIONS HISTORY (ALL PARAMETERS)", bold: true, size: 24, color: "0D9488" })],
