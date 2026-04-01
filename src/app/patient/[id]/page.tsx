@@ -63,14 +63,15 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const lastInv = investigations?.[0] ?? null
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
 
-  const displayPatient = {
+  // Ensure data is serializable for Client Components (JSON-safe)
+  const displayPatient = JSON.parse(JSON.stringify({
     ...patient,
     lastHba1c: lastInv?.hba1c,
     lastHb: lastInv?.hb,
     lastVisit: lastVisit?.visit_date,
     investigations: investigations || [],
     visits: visits || []
-  }
+  }))
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -186,7 +187,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
               <FlaskConical className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Investigation</h2>
-            {lastInv && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastInv.date), 'dd MMM yyyy')}</span>}
+            {lastInv?.date && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastInv.date), 'dd MMM yyyy')}</span>}
           </div>
           {lastInv ? (
             <div className="p-5 grid grid-cols-3 gap-3 text-center">
@@ -218,7 +219,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
               <ClipboardList className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Visit</h2>
-            {lastVisit && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastVisit.visit_date), 'dd MMM yyyy')}</span>}
+            {lastVisit?.visit_date && <span className="ml-auto text-xs text-muted-foreground">{format(parseISO(lastVisit.visit_date), 'dd MMM yyyy')}</span>}
           </div>
           {lastVisit ? (
             <div className="p-5">
