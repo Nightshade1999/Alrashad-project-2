@@ -302,12 +302,12 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                       <div className="h-9 w-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
                         {p.name.charAt(0).toUpperCase()}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1 group/link">
-                          <span className="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm group-hover/link:text-teal-600 dark:group-hover/link:text-teal-400 transition-colors" dir="auto">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-1 group/link max-w-full">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm group-hover/link:text-teal-600 dark:group-hover/link:text-teal-400 transition-colors break-words whitespace-normal" style={{ wordBreak: 'break-word' }} dir="auto">
                             {p.name}
                           </span>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+                          <ExternalLink className="h-3 w-3 mt-1 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
                         </div>
                         <span className="text-xs font-mono text-muted-foreground">{p.ward_number}</span>
                       </div>
@@ -351,8 +351,8 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                           }
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center flex-wrap gap-2">
-                            <span className="font-bold text-slate-800 dark:text-slate-100 text-base break-words line-clamp-2" dir="auto" title={p.name}>{p.name}</span>
+                          <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 w-full">
+                            <span className="font-bold text-slate-800 dark:text-slate-100 text-base break-words whitespace-normal" style={{ wordBreak: 'break-word' }} dir="auto">{p.name}</span>
                             <span className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{p.age}y</span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
