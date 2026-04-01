@@ -67,7 +67,35 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
                   {formatDistanceToNow(parseISO(visit.visit_date), { addSuffix: true })}
                 </span>
               </div>
-              <div className="px-5 py-4">
+              <div className="px-5 py-4 space-y-3">
+                {(visit.bp_sys || visit.pr || visit.spo2 || visit.temp) && (
+                  <div className="flex flex-wrap gap-x-6 gap-y-2 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {visit.bp_sys && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">BP:</span>
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{visit.bp_sys}/{visit.bp_dia || '?'}</span>
+                      </div>
+                    )}
+                    {visit.pr && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">PR:</span>
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{visit.pr} <span className="text-[10px] font-normal text-muted-foreground">BPM</span></span>
+                      </div>
+                    )}
+                    {visit.spo2 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">SpO2:</span>
+                        <span className={`text-sm font-bold ${visit.spo2 < 94 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{visit.spo2}%</span>
+                      </div>
+                    )}
+                    {visit.temp && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Temp:</span>
+                        <span className={`text-sm font-bold ${visit.temp > 37.5 ? 'text-red-500' : 'text-slate-700 dark:text-slate-200'}`}>{visit.temp}°C</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                   {visit.exam_notes || <span className="italic text-muted-foreground">No notes recorded</span>}
                 </p>

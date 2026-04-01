@@ -302,6 +302,27 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
           children: [new TextRun({ text: `Visit Date: ${format(parseISO(v.visit_date), "dd MMM yyyy")}`, bold: true, size: 20, color: "334155" })],
           spacing: { before: 200 },
         }))
+
+        // Vitals Row in Word
+        if (v.bp_sys || v.pr || v.spo2 || v.temp) {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ text: "VITALS: ", bold: true, size: 18, color: "0D9488" }),
+              new TextRun({ 
+                text: [
+                  v.bp_sys ? `BP: ${v.bp_sys}/${v.bp_dia || '?'}` : null,
+                  v.pr ? `PR: ${v.pr}bpm` : null,
+                  v.spo2 ? `SpO2: ${v.spo2}%` : null,
+                  v.temp ? `Temp: ${v.temp}°C` : null,
+                ].filter(Boolean).join("  |  "),
+                size: 18,
+                color: "334155"
+              })
+            ],
+            spacing: { before: 100, after: 100 },
+            indent: { left: 400 },
+          }))
+        }
         
         // Preserve original formatting by splitting into paragraphs
         const noteLines = (v.exam_notes || "No clinical exam notes recorded.").split("\n")
