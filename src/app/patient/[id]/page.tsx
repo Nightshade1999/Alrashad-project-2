@@ -192,12 +192,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           {lastInv ? (
             <div className="p-5 grid grid-cols-3 gap-3 text-center">
               {[
-                { label: 'HbA1c', value: lastInv.hba1c, unit: '%', alert: lastInv.hba1c > 6.5 },
-                { label: 'Hb', value: lastInv.hb, unit: '', alert: lastInv.hb < 10 },
-                { label: 'WBC', value: lastInv.wbc, unit: '', alert: false },
-                { label: 'S.Creat', value: lastInv.s_creatinine, unit: '', alert: false },
-                { label: 'RBS', value: lastInv.rbs, unit: '', alert: false },
-                { label: 'TSB', value: lastInv.tsb, unit: '', alert: false },
+                { label: 'HbA1c', value: lastInv.hba1c, unit: '%', alert: lastInv.hba1c != null && lastInv.hba1c > 6.5 },
+                { label: 'Hb', value: lastInv.hb, unit: '', alert: lastInv.hb != null && lastInv.hb < 10 },
+                { label: 'WBC', value: lastInv.wbc, unit: '', alert: lastInv.wbc != null && (lastInv.wbc > 11 || lastInv.wbc < 4) },
+                { label: 'S.Creat', value: lastInv.s_creatinine, unit: '', alert: lastInv.s_creatinine != null && lastInv.s_creatinine > 1.2 },
+                { label: 'RBS', value: lastInv.rbs, unit: '', alert: lastInv.rbs != null && lastInv.rbs > 200 },
+                { label: 'TSB', value: lastInv.tsb, unit: '', alert: lastInv.tsb != null && lastInv.tsb > 1.2 },
               ].map(item => (
                 <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
