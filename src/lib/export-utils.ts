@@ -185,7 +185,7 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
     }
 
     children.push(new Paragraph({
-      children: [new TextRun({ text: "CLINICAL INVESTIGATIONS HISTORY (ALL PARAMETERS)", bold: true, size: 24, color: "0D9488" })],
+      children: [new TextRun({ text: "Clinical investigations", bold: true, size: 24, color: "0D9488" })],
       spacing: { before: 600, after: 200 },
     }))
 
@@ -310,7 +310,13 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
   const blob = await Packer.toBlob(doc)
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
+  
+  // Create descriptive filename (e.g., John_Doe_ALRASHAD_MEDICAL_WARD.docx)
+  const patientName = patients.length === 1 ? patients[0].name.replace(/\s+/g, '_') : "Multiple_Patients"
+  const safeWardName = dynamicWardName.replace(/\s+/g, '_')
+  const fileName = `${patientName}_${safeWardName}.docx`
+  
   link.setAttribute("href", url)
-  link.setAttribute("download", `clinical_report_${format(new Date(), "yyyyMMdd")}.docx`)
+  link.setAttribute("download", fileName)
   link.click()
 }
