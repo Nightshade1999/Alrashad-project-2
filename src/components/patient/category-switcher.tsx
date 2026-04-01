@@ -30,10 +30,9 @@ export function CategorySwitcher({ patientId, currentCategory }: CategorySwitche
     const supabase = createClient()
     
     try {
-      // @ts-ignore
-      const { error } = await supabase
-        .from('patients')
-        .update({ category: newCat } as any)
+      // @ts-ignore - Supabase type inference has issues in this environment
+      const { error } = await (supabase.from('patients') as any)
+        .update({ category: newCat })
         .eq('id', patientId)
 
       if (error) throw error

@@ -38,8 +38,8 @@ export function AddInvestigationModal({ patientId }: { patientId: string }) {
         const v = values[f.key]
         if (v !== undefined && v !== '') payload[f.key] = parseFloat(v)
       }
-      // @ts-expect-error – generated types don't reflect the actual schema
-      const { error } = await supabase.from('investigations').insert(payload)
+      // @ts-ignore - Supabase type mismatch in this environment
+      const { error } = await (supabase.from('investigations') as any).insert(payload)
       if (error) throw error
       toast.success('Lab results saved')
       setOpen(false)

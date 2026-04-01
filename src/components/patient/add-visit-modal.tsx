@@ -28,8 +28,8 @@ export function AddVisitModal({ patientId }: { patientId: string }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error('Not authenticated'); return }
 
-      // @ts-expect-error – generated types don't reflect the actual schema
-      const { error } = await supabase.from('visits').insert({
+      // @ts-ignore - Supabase type mismatch in this environment
+      const { error } = await (supabase.from('visits') as any).insert({
         patient_id: patientId,
         doctor_id: user.id,
         visit_date: date,

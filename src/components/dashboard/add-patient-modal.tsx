@@ -59,8 +59,8 @@ export function AddPatientModal() {
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine) {
         const supabase = createClient()
-        // @ts-expect-error - Supabase type inference issue with insert
-        const { error } = await supabase.from('patients').insert([payload as any])
+        // @ts-ignore - Supabase type mismatch in this environment
+        const { error } = await (supabase.from('patients') as any).insert([payload])
         if (error) throw error
         toast.success("Patient added successfully!")
       } else {

@@ -75,10 +75,9 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
 
     try {
       const supabase = createClient()
-      // @ts-ignore
-      const { error } = await supabase
-        .from('patients')
-        .update(payload as any)
+      // @ts-ignore - Supabase type mismatch in this environment
+      const { error } = await (supabase.from('patients') as any)
+        .update(payload)
         .eq('id', patient.id)
 
       if (error) throw error
