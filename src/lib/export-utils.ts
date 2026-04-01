@@ -224,60 +224,48 @@ export async function exportToWord(patients: any[], doctorEmail: string = "") {
       spacing: { before: 600, after: 200 },
     }))
 
-    const invList = p.investigations || []
+    const invList = p.investigations || [];
     if (invList.length > 0) {
-      children.push(new Table({
-        borders: {
-          top: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
-          bottom: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
-          left: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
-          right: { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" },
-          insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-        },
-        rows: [
-          new TableRow({
+      invList.forEach((inv: any) => {
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: `Lab Date: ${format(parseISO(inv.date), "dd MMM yyyy")}`, bold: true, size: 22, color: "0D9488" }),
+          ],
+          spacing: { before: 240, after: 120 },
+          border: { bottom: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } }
+        }));
+
+        const labData = [];
+        if (inv.wbc) labData.push(`WBC: ${inv.wbc}`);
+        if (inv.hb) labData.push(`Hb: ${inv.hb}`);
+        if (inv.hba1c) labData.push(`HbA1c: ${inv.hba1c}%`);
+        if (inv.rbs) labData.push(`RBS: ${inv.rbs}`);
+        if (inv.s_creatinine) labData.push(`S.Cr: ${inv.s_creatinine}`);
+        if (inv.s_urea) labData.push(`Urea: ${inv.s_urea}`);
+        if (inv.ast || inv.alt) labData.push(`AST/ALT: ${inv.ast || "-"}/${inv.alt || "-"}`);
+        if (inv.tsb) labData.push(`TSB: ${inv.tsb}`);
+
+        if (labData.length > 0) {
+          children.push(new Paragraph({
             children: [
-              createTableCell("Date", true),
-              createTableCell("WBC", true),
-              createTableCell("Hb", true),
-              createTableCell("HbA1c", true),
-              createTableCell("RBS", true),
-              createTableCell("S.Cr", true),
-              createTableCell("Urea", true),
-              createTableCell("AST/ALT", true),
-              createTableCell("TSB", true),
-              createTableCell("Notes", true),
-            ]
-          }),
-          ...invList.map((inv: any) => {
-            const isWbcAlert = inv.wbc && (inv.wbc > 11 || inv.wbc < 4)
-            const isHbAlert = inv.hb && inv.hb < 10
-            const isHba1cAlert = inv.hba1c && inv.hba1c > 6.5
-            const isRbsAlert = inv.rbs && inv.rbs > 200
-            const isCreatAlert = inv.s_creatinine && inv.s_creatinine > 1.2
-            const isUreaAlert = inv.s_urea && inv.s_urea > 40
-            const isTsbAlert = inv.tsb && inv.tsb > 1.2
-            const isAstAlert = inv.ast && inv.ast > 40
-            const isAltAlert = inv.alt && inv.alt > 40
-            
-            return new TableRow({
-              children: [
-                createTableCell(format(parseISO(inv.date), "dd MMM yy")),
-                createTableCell(inv.wbc, false, undefined, isWbcAlert),
-                createTableCell(inv.hb, false, undefined, isHbAlert),
-                createTableCell(inv.hba1c, false, undefined, isHba1cAlert),
-                createTableCell(inv.rbs, false, undefined, isRbsAlert),
-                createTableCell(inv.s_creatinine, false, undefined, isCreatAlert),
-                createTableCell(inv.s_urea, false, undefined, isUreaAlert),
-                createTableCell(`${inv.ast || "-"}/${inv.alt || "-"}`, false, undefined, isAstAlert || isAltAlert),
-                createTableCell(inv.tsb, false, undefined, isTsbAlert),
-                createTableCell(inv.notes, false, "FDFDFD"),
-              ]
-            })
-          })
-        ]
-      }))
+              new TextRun({ text: labData.join("   |   "), size: 20, color: "334155" })
+            ],
+            spacing: { before: 60, after: 60 },
+            indent: { left: 300 }
+          }));
+        }
+
+        if (inv.notes && inv.notes.trim() !== "") {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ text: "Notes: ", bold: true, size: 18, color: "64748B" }),
+              new TextRun({ text: inv.notes, size: 18, color: "64748B", italics: true })
+            ],
+            spacing: { before: 60, after: 100 },
+            indent: { left: 300 }
+          }));
+        }
+      });
     } else {
       children.push(new Paragraph({
         children: [new TextRun({ text: "No comprehensive clinical investigation data found.", italics: true, color: "64748B", size: 18 })],

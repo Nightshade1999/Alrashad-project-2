@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import {
-  ArrowLeft, AlertTriangle, Activity, FileText,
+  ArrowLeft, AlertTriangle, Activity, FileText, Home,
   User, Database, Layers, Heart, FlaskConical as Flask, Clipboard as ClipboardIcon
 } from "lucide-react"
 import { DeletePatientButton } from "@/components/patient/delete-button"
@@ -84,11 +84,16 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             : patient.category === 'Close Follow-up' ? 'close-follow-up'
             : 'normal'
           }`}>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900">
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900" title="Back to Category">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div className="min-w-0">
+          <Link href="/dashboard">
+            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900 text-teal-600 hover:text-teal-700 hover:bg-teal-50" title="Dashboard">
+              <Home className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="min-w-0 ml-1">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight truncate" dir="auto">
               {patient.name}
             </h1>
