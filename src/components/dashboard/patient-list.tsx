@@ -12,13 +12,14 @@ export interface PatientRow {
   name: string
   age: number
   ward_number: string
+  category: string
   chronic_diseases: string | null
   lastHba1c: number | null
   lastHb: number | null
   lastVisit: string | null
 }
 
-type SortKey = 'name' | 'age' | 'chronic_diseases' | 'lastHba1c' | 'lastHb' | 'lastVisit'
+type SortKey = 'name' | 'age' | 'chronic_diseases' | 'lastHba1c' | 'lastHb' | 'lastVisit' | 'overdue'
 
 function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/50 inline-block" />
@@ -47,7 +48,9 @@ function SortableHeader({
 export function PatientList({ patients, defaultSort = 'name' }: { patients: PatientRow[]; defaultSort?: SortKey }) {
   const [search, setSearch] = useState('')
   const [sortCol, setSortCol] = useState<SortKey>(defaultSort)
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(defaultSort === 'lastVisit' ? 'asc' : 'asc')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    defaultSort === 'lastVisit' || defaultSort === 'overdue' ? 'desc' : 'asc'
+  )
 
   function handleSort(col: SortKey) {
     if (sortCol === col) {
@@ -82,6 +85,16 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           // nulls go to end regardless of dir
           va = a.lastVisit ? new Date(a.lastVisit).getTime() : (sortDir === 'asc' ? Infinity : -Infinity)
           vb = b.lastVisit ? new Date(b.lastVisit).getTime() : (sortDir === 'asc' ? Infinity : -Infinity)
+          break
+        case 'overdue':
+          const getOverdueScore = (p: PatientRow) => {
+            if (!p.lastVisit) return 999999999 // Never seen = high priority
+            const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+            const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
+            return daysSince - threshold
+          }
+          va = getOverdueScore(a)
+          vb = getOverdueScore(b)
           break
       }
       if (va < vb) return sortDir === 'asc' ? -1 : 1
@@ -121,7 +134,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           {/* Table Header */}
           <div
             className="grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700"
-            style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 2rem' }}
+            style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
           >
             <SortableHeader label="Patient" col="name" {...headerProps} />
             <SortableHeader label="Age" col="age" {...headerProps} />
@@ -129,7 +142,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
             <SortableHeader label="HbA1c" col="lastHba1c" {...headerProps} />
             <SortableHeader label="Hb" col="lastHb" {...headerProps} />
             <SortableHeader label="Last Visit" col="lastVisit" {...headerProps} />
-            <span />
+            <SortableHeader label="Status" col="overdue" {...headerProps} />
           </div>
 
           {/* Rows */}
@@ -143,7 +156,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                 <div
                   key={p.id}
                   className="group grid items-center gap-4 px-5 py-4 hover:bg-teal-50/50 dark:hover:bg-teal-950/20 transition-colors cursor-pointer"
-                  style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 2rem' }}
+                  style={{ gridTemplateColumns: '2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
                   onClick={handleRowClick}
                 >
                   {/* Name + Bed */}
@@ -187,6 +200,18 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                       : <span className="text-muted-foreground italic text-xs">No visits</span>
                     }
                   </span>
+
+                  {/* Overdue Status Tag */}
+                  <div className="flex items-center">
+                    {(() => {
+                      if (!p.lastVisit) return <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">Never Seen</span>
+                      const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+                      const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
+                      const overdue = Math.floor(daysSince - threshold)
+                      if (overdue > 0) return <span className="text-[10px] bg-amber-100 dark:bg-amber-950/40 text-amber-600 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">{overdue}d overdue</span>
+                      return <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">On Track</span>
+                    })()}
+                  </div>
 
                   {/* Delete */}
                   <div className="flex justify-end" onClick={e => e.stopPropagation()}>

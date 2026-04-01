@@ -91,6 +91,7 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
     age: p.age,
     ward_number: p.ward_number,
     chronic_diseases: p.chronic_diseases,
+    category: p.category,
     lastHba1c: latestInv[p.id]?.hba1c ?? null,
     lastHb: latestInv[p.id]?.hb ?? null,
     lastVisit: latestVisit[p.id] ?? null,
@@ -145,7 +146,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
       </div>
 
       {/* Patient List */}
-      <PatientList patients={rows} defaultSort={isPending ? 'lastVisit' : 'name'} />
+      <PatientList patients={rows} defaultSort={isPending ? 'overdue' : 'name'} />
     </div>
   )
 }
