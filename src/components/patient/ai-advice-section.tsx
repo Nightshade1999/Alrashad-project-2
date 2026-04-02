@@ -12,6 +12,60 @@ interface Message {
   parts: { text: string }[]
 }
 
+interface Tip {
+  emoji: string
+  text: string
+}
+
+function generateTips(p: any): Tip[] {
+  const tips: Tip[] = []
+  const conditions = (p.chronic_diseases || '').toLowerCase()
+  const psych = (p.psych_drugs || '').toLowerCase()
+  const medical = (p.medical_drugs || '').toLowerCase()
+  const hba1c = p.lastHba1c ?? p.investigations?.[0]?.hba1c
+  const hb = p.lastHb ?? p.investigations?.[0]?.hb
+
+  // Condition-based
+  if (conditions.includes('diabet') || conditions.includes('dm'))
+    tips.push({ emoji: '🩸', text: 'Optimize insulin titration & HbA1c targets' })
+  if (conditions.includes('hypertens') || conditions.includes('htn'))
+    tips.push({ emoji: '💊', text: 'Review HTN medication control & BP targets' })
+  if (conditions.includes('renal') || conditions.includes('ckd') || conditions.includes('kidney'))
+    tips.push({ emoji: '🧪', text: 'Assess renal precautions & dose adjustments' })
+  if (conditions.includes('heart') || conditions.includes('cardiac') || conditions.includes('chf'))
+    tips.push({ emoji: '❤️', text: 'Review cardiac medications & fluid status' })
+  if (conditions.includes('liver') || conditions.includes('hepat'))
+    tips.push({ emoji: '🟡', text: 'Assess hepatic drug metabolism & LFTs' })
+  if (conditions.includes('thyroid'))
+    tips.push({ emoji: '🦋', text: 'Review thyroid function & levothyroxine dosing' })
+
+  // Drug-based
+  if (psych || medical)
+    tips.push({ emoji: '⚠️', text: 'Check for drug-drug interactions in current regimen' })
+  if (psych.includes('lithium') || psych.includes('clozap'))
+    tips.push({ emoji: '🔬', text: 'Monitor drug levels & toxicity signs' })
+
+  // Lab-based
+  if (hba1c != null && hba1c > 8)
+    tips.push({ emoji: '📈', text: `HbA1c ${hba1c}% — suggest intensification strategy` })
+  if (hb != null && hb < 10)
+    tips.push({ emoji: '🩺', text: `Hb ${hb} — evaluate anaemia aetiology` })
+
+  // Allergies
+  if (p.allergies)
+    tips.push({ emoji: '🚨', text: `Allergy alert: ${p.allergies} — confirm safe alternatives` })
+
+  // Fallbacks
+  if (tips.length === 0) {
+    tips.push({ emoji: '📋', text: 'Review overall medication appropriateness' })
+    tips.push({ emoji: '🔍', text: 'Check for any missed follow-up investigations' })
+    tips.push({ emoji: '📊', text: 'Summarize clinical progress to date' })
+    tips.push({ emoji: '💡', text: 'Suggest evidence-based management plan' })
+  }
+
+  return tips.slice(0, 4)
+}
+
 interface AIAdviceSectionProps {
   patientData: any
 }
@@ -196,18 +250,17 @@ export function AIAdviceSection({ patientData }: AIAdviceSectionProps) {
         </form>
       )}
 
-      {/* Empty State Help */}
+      {/* Empty State Help — dynamic tips from patient data */}
       {messages.length === 0 && !isLoading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-          {[
-            "Review HTN medication control",
-            "Check for drug interactions",
-            "Optimize insulin titration",
-            "Assess renal precautions"
-          ].map(tip => (
-            <div key={tip} className="p-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-600 border border-slate-100 dark:border-slate-800/60 rounded-xl bg-slate-50/50 dark:bg-slate-900/30 text-center">
-              💡 {tip}
-            </div>
+          {generateTips(patientData).map(tip => (
+            <button
+              key={tip.text}
+              onClick={() => { setInputText(tip.text); }}
+              className="p-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-800/60 rounded-xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:border-teal-200 dark:hover:border-teal-800 hover:text-teal-700 dark:hover:text-teal-400 transition-all duration-150 cursor-pointer"
+            >
+              {tip.emoji} {tip.text}
+            </button>
           ))}
         </div>
       )}

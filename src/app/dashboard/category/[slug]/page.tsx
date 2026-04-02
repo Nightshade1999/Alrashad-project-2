@@ -67,7 +67,7 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
 
   const { data: visits } = await supabase
     .from('visits')
-    .select('patient_id, visit_date')
+    .select('patient_id, visit_date, bp_sys, bp_dia, pr, spo2, temp')
     .in('patient_id', ids)
     .order('visit_date', { ascending: false })
 
@@ -78,10 +78,17 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
     }
   }
 
-  const latestVisit: Record<string, string> = {}
+  const latestVisit: Record<string, { date: string; bp_sys: number | null; bp_dia: number | null; pr: number | null; spo2: number | null; temp: number | null }> = {}
   for (const v of visits ?? []) {
     if (!latestVisit[v.patient_id]) {
-      latestVisit[v.patient_id] = v.visit_date
+      latestVisit[v.patient_id] = {
+        date: v.visit_date,
+        bp_sys: v.bp_sys ?? null,
+        bp_dia: v.bp_dia ?? null,
+        pr: v.pr ?? null,
+        spo2: v.spo2 ?? null,
+        temp: v.temp ?? null,
+      }
     }
   }
 
@@ -94,7 +101,12 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
     category: p.category,
     lastHba1c: latestInv[p.id]?.hba1c ?? null,
     lastHb: latestInv[p.id]?.hb ?? null,
-    lastVisit: latestVisit[p.id] ?? null,
+    lastVisit: latestVisit[p.id]?.date ?? null,
+    lastBpSys: latestVisit[p.id]?.bp_sys ?? null,
+    lastBpDia: latestVisit[p.id]?.bp_dia ?? null,
+    lastPr: latestVisit[p.id]?.pr ?? null,
+    lastSpo2: latestVisit[p.id]?.spo2 ?? null,
+    lastTemp: latestVisit[p.id]?.temp ?? null,
   }))
 }
 

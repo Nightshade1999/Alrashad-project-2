@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react'
 import { 
   Search, UserRound, ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, 
-  CheckSquare, Square, FileText, Table as TableIcon, Loader2 
+  CheckSquare, Square, FileText, Table as TableIcon, Loader2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { DeletePatientButton } from '@/components/patient/delete-button'
+import { AddVisitModal } from '@/components/patient/add-visit-modal'
+import { AddInvestigationModal } from '@/components/patient/add-investigation-modal'
 import { format, parseISO } from 'date-fns'
 import { exportPatientsToExcel, exportToWord } from '@/lib/export-utils'
 import { createClient } from '@/lib/supabase'
@@ -24,6 +26,12 @@ export interface PatientRow {
   lastHba1c: number | null
   lastHb: number | null
   lastVisit: string | null
+  // vitals from last visit
+  lastBpSys: number | null
+  lastBpDia: number | null
+  lastPr: number | null
+  lastSpo2: number | null
+  lastTemp: number | null
 }
 
 type SortKey = 'name' | 'age' | 'chronic_diseases' | 'lastHba1c' | 'lastHb' | 'lastVisit' | 'overdue'
@@ -245,7 +253,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-          <div className="hidden xl:grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}>
+          <div className="hidden xl:grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr auto' }}>
             <button 
               onClick={toggleSelectAll} 
               className="text-muted-foreground hover:text-teal-600 transition-colors p-1"
@@ -288,8 +296,12 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                 >
                   {/* --- Desktop Row --- */}
                   <div 
-                    className="hidden xl:grid items-center gap-4 px-5 py-4"
-                    style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 2rem' }}
+                    className="hidden xl:flex xl:flex-col"
+                  >
+                    {/* Main desktop grid row */}
+                    <div
+                      className="grid items-center gap-4 px-5 py-4"
+                      style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr auto' }}
                   >
                     <div className="p-1 -m-1" onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}>
                       {selectedIds.has(p.id) 
@@ -335,9 +347,47 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                       <OverdueTag />
                     </div>
 
-                    <div className="flex justify-end" onClick={e => e.stopPropagation()}>
-                      <DeletePatientButton patientId={p.id} variant="ghost" />
+                      <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <AddVisitModal patientId={p.id} variant="icon" />
+                        <AddInvestigationModal patientId={p.id} variant="icon" />
+                        <DeletePatientButton patientId={p.id} variant="ghost" />
+                      </div>
                     </div>
+
+                    {/* Vitals sub-row — only shown if vitals exist */}
+                    {(p.lastBpSys || p.lastPr || p.lastSpo2 || p.lastTemp) && (
+                      <div className="flex items-center gap-2 px-5 pb-3 flex-wrap" onClick={e => e.stopPropagation()}>
+                        <span className="text-[9px] uppercase font-bold text-muted-foreground/60 tracking-widest mr-1">Vitals</span>
+                        {p.lastBpSys != null && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.lastBpSys > 140 || p.lastBpSys < 90
+                              ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                          }`}>BP {p.lastBpSys}/{p.lastBpDia ?? '?'}</span>
+                        )}
+                        {p.lastPr != null && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.lastPr > 100 || p.lastPr < 50
+                              ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                          }`}>PR {p.lastPr}</span>
+                        )}
+                        {p.lastSpo2 != null && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.lastSpo2 < 94
+                              ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                          }`}>SpO2 {p.lastSpo2}%</span>
+                        )}
+                        {p.lastTemp != null && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.lastTemp > 37.5
+                              ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                          }`}>T {p.lastTemp}°C</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* --- Mobile Row --- */}
@@ -356,7 +406,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                             <span className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{p.age}y</span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground">Wait Number / Bed: {p.ward_number}</span>
+                            <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground">Bed: {p.ward_number}</span>
                             <OverdueTag />
                           </div>
                         </div>
@@ -379,6 +429,8 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                           {p.lastVisit ? format(parseISO(p.lastVisit), 'dd MMM yyyy') : <span className="text-muted-foreground italic text-xs">No visits</span>}
                         </p>
                       </div>
+
+                      {/* Labs */}
                       <div className="flex gap-4 col-span-2">
                         <div>
                           <p className="text-[10px] uppercase font-bold text-muted-foreground">HbA1c</p>
@@ -392,6 +444,46 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                             {p.lastHb != null ? p.lastHb : '—'}
                           </p>
                         </div>
+                      </div>
+
+                      {/* Vitals row */}
+                      {(p.lastBpSys || p.lastPr || p.lastSpo2 || p.lastTemp) && (
+                        <div className="col-span-2 flex flex-wrap gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                          {p.lastBpSys != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              p.lastBpSys > 140 || p.lastBpSys < 90
+                                ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            }`}>BP {p.lastBpSys}/{p.lastBpDia ?? '?'}</span>
+                          )}
+                          {p.lastPr != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              p.lastPr > 100 || p.lastPr < 50
+                                ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            }`}>PR {p.lastPr}</span>
+                          )}
+                          {p.lastSpo2 != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              p.lastSpo2 < 94
+                                ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            }`}>SpO2 {p.lastSpo2}%</span>
+                          )}
+                          {p.lastTemp != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              p.lastTemp > 37.5
+                                ? 'bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                            }`}>T {p.lastTemp}°C</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Quick actions */}
+                      <div className="col-span-2 flex gap-2 pt-1" onClick={e => e.stopPropagation()}>
+                        <AddVisitModal patientId={p.id} variant="icon" />
+                        <AddInvestigationModal patientId={p.id} variant="icon" />
                       </div>
                     </div>
                   </div>
