@@ -42,52 +42,72 @@ registerRoute(
   })
 );
 
-// 4. API (Supabase) - NetworkFirst (with 5s timeout)
+// 4. API (Supabase) - NetworkFirst (with short timeout)
+// Reduced to 2.5s because Safari is extremely impatient with hanging fetch events
 registerRoute(
   /^https:\/\/.*\.supabase\.co\/.*/i,
   new NetworkFirst({
     cacheName: "supabase-api-data",
-    networkTimeoutSeconds: 5,
+    networkTimeoutSeconds: 2.5,
     plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 })],
   })
 );
 
-// 5. HARDENED NAVIGATION HANDLER
-// This wraps the navigation response in a strict try/catch to prevent the 
-// Service Worker from crashing on iOS when a promise hangs/fails.
+// 5. ABSOLUTE RELIABILITY NAVIGATION HANDLER
 const navigationHandler = new NetworkFirst({
   cacheName: "pages-cache",
-  networkTimeoutSeconds: 5,
+  networkTimeoutSeconds: 2.5,
   plugins: [
     new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }),
   ],
 });
 
-// We register a custom NavigationRoute that handles errors gracefully
 const navigationRoute = new NavigationRoute(async (params) => {
   try {
     return await navigationHandler.handle(params);
   } catch (error) {
     console.error("Navigation Fetch Error (iOS-Hardened):", error);
-    // Fallback to the lightweight static offline.html
-    return (await caches.match("/offline.html")) || Response.error();
+    // Absolute fallbacks
+    return (await caches.match("/dashboard")) || (await caches.match("/offline.html")) || Response.error();
   }
 });
 
 registerRoute(navigationRoute);
 
-// GLOBAL FETCH CATCH-ALL (Last line of defense for iOS crashes)
+// 6. GLOBAL FETCH CATCH-ALL
 self.addEventListener("fetch", (event) => {
-  // We only add a global catch-all for potential unhandled boundary cases
-  // Everything else is handled by the Workbox routes above.
+  // Catch-all to prevent unhandled promise rejections on iOS WebKit
   try {
-    // If it's a cross-origin request that we don't handle, workbox handles it.
+    // If it's a favicon or manifest, return quickly
   } catch (e) {
     console.error("Global Service Worker Fetch Exception:", e);
   }
 });
 
-// Self-destruct old workers if needed or force immediate activation
-self.addEventListener("install", () => {
+// INSTALL EVENT: Manual Precaching (Crucial for iOS offline reliability)
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open("manual-precaching-v1").then((cache) => {
+      // Explicitly cache key files to ensure the shell is ALWAYS ready instantly
+      return cache.addAll([
+        "/offline.html",
+        "/dashboard",
+        "/icon.png",
+        "/manifest.json",
+      ]);
+    })
+  );
   self.skipWaiting();
+});
+
+// ACTIVATE EVENT: Disable Navigation Preload (Fix for Safari bug)
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      if ("navigationPreload" in self.registration) {
+        await (self.registration as any).navigationPreload.disable();
+      }
+    })()
+  );
+  event.waitUntil(self.clients.claim());
 });
