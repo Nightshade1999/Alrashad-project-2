@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FlaskConical, Plus, X } from 'lucide-react'
+import { FlaskConical, Plus, X, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase'
+import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
 
 const LAB_FIELDS = [
@@ -31,13 +32,29 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    const payload: Record<string, any> = { patient_id: patientId, date }
+    for (const f of LAB_FIELDS) {
+      const v = values[f.key]
+      if (v !== undefined && v !== '') payload[f.key] = parseFloat(v)
+    }
+
+    // ── Offline path ──────────────────────────────────────────
+    if (!navigator.onLine) {
+      await queueMutation('ADD_LABS', payload)
+      toast.success('Lab results saved offline — will sync when you reconnect', {
+        icon: '📴',
+        duration: 4000,
+      })
+      setOpen(false)
+      setValues({})
+      setLoading(false)
+      return
+    }
+
+    // ── Online path ───────────────────────────────────────────
     try {
       const supabase = createClient()
-      const payload: Record<string, any> = { patient_id: patientId, date }
-      for (const f of LAB_FIELDS) {
-        const v = values[f.key]
-        if (v !== undefined && v !== '') payload[f.key] = parseFloat(v)
-      }
       // @ts-ignore - Supabase type mismatch in this environment
       const { error } = await (supabase.from('investigations') as any).insert(payload)
       if (error) throw error

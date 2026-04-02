@@ -39,15 +39,16 @@ export async function queueMutation(action: MutationAction, payload: any) {
   // Optionally, we could merge this optimistically directly into dataStore here
 }
 
-export async function processSyncQueue() {
-  if (typeof navigator === 'undefined' || !navigator.onLine) return
+export async function processSyncQueue(): Promise<number> {
+  if (typeof navigator === 'undefined' || !navigator.onLine) return 0
 
   const supabase = createClient()
   const keys = await syncQueue.keys()
 
-  if (keys.length === 0) return
+  if (keys.length === 0) return 0
 
   console.log(`Processing ${keys.length} offline mutations...`)
+  let synced = 0
 
   for (const key of keys) {
     const mutation = await syncQueue.getItem<QueuedMutation>(key)
@@ -68,8 +69,20 @@ export async function processSyncQueue() {
         if (error) throw error
       }
       await syncQueue.removeItem(key)
+      synced++
     } catch (error) {
       console.error('Failed to sync mutation:', mutation, error)
     }
+  }
+
+  return synced
+}
+
+export async function getPendingCount(): Promise<number> {
+  try {
+    const keys = await syncQueue.keys()
+    return keys.length
+  } catch {
+    return 0
   }
 }

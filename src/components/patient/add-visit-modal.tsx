@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardList, Plus, X } from 'lucide-react'
+import { ClipboardList, Plus, X, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase'
+import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
 
 export function AddVisitModal({ patientId, variant = "button" }: { patientId: string, variant?: "button" | "icon" }) {
@@ -26,24 +27,41 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
     e.preventDefault()
     if (!notes.trim()) { toast.error('Please enter visit notes'); return }
     setLoading(true)
+
+    const payload = {
+      patient_id: patientId,
+      visit_date: date,
+      exam_notes: notes.trim(),
+      bp_sys: bpSys ? parseInt(bpSys) : null,
+      bp_dia: bpDia ? parseInt(bpDia) : null,
+      pr: pr ? parseInt(pr) : null,
+      spo2: spo2 ? parseInt(spo2) : null,
+      temp: temp ? parseFloat(temp) : null,
+    }
+
+    // ── Offline path ──────────────────────────────────────────
+    if (!navigator.onLine) {
+      await queueMutation('ADD_VISIT', payload)
+      toast.success('Saved offline — will sync when you reconnect', {
+        icon: '📴',
+        duration: 4000,
+      })
+      setOpen(false)
+      setNotes('')
+      setLoading(false)
+      return
+    }
+
+    // ── Online path ───────────────────────────────────────────
     try {
       const supabase = createClient()
-
-      // Get current user so we can set doctor_id (required by schema)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { toast.error('Not authenticated'); return }
 
       // @ts-ignore - Supabase type mismatch in this environment
       const { error } = await (supabase.from('visits') as any).insert({
-        patient_id: patientId,
+        ...payload,
         doctor_id: user.id,
-        visit_date: date,
-        exam_notes: notes.trim(),
-        bp_sys: bpSys ? parseInt(bpSys) : null,
-        bp_dia: bpDia ? parseInt(bpDia) : null,
-        pr: pr ? parseInt(pr) : null,
-        spo2: spo2 ? parseInt(spo2) : null,
-        temp: temp ? parseFloat(temp) : null,
       })
       if (error) throw error
       toast.success('Visit note saved')
