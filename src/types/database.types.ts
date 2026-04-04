@@ -12,6 +12,8 @@ export interface Database {
           age: number;
           gender: string;
           category: PatientCategory;
+          province: string | null;
+          education_level: string | null;
           past_surgeries: string | null;
           chronic_diseases: string | null;
           psych_drugs: string | null;

@@ -27,6 +27,24 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import type { PatientCategory } from "@/types/database.types"
 
+const IRAQ_PROVINCES = [
+  "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
+  "Kirkuk", "Anbar", "Diyala", "Saladin", "Babylon", "Karbala",
+  "Najaf", "Wasit", "Dhi Qar", "Muthanna", "Qadisiyyah", "Maysan",
+]
+
+const EDUCATION_LEVELS = [
+  "Illiterate",
+  "Can Read & Write",
+  "Elementary School",
+  "Middle School",
+  "High School",
+  "Diploma",
+  "Bachelor's Degree",
+  "Master's Degree",
+  "PhD",
+]
+
 interface EditPatientModalProps {
   patient: {
     id: string
@@ -35,6 +53,8 @@ interface EditPatientModalProps {
     age: number
     gender: string
     category: PatientCategory
+    province: string | null
+    education_level: string | null
     past_surgeries: string | null
     chronic_diseases: string | null
     medical_drugs: string | null
@@ -48,6 +68,8 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [gender, setGender] = useState(patient.gender)
   const [category, setCategory] = useState<PatientCategory>(patient.category)
+  const [province, setProvince] = useState(patient.province || "")
+  const [educationLevel, setEducationLevel] = useState(patient.education_level || "")
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -59,13 +81,15 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
 
     setIsSubmitting(true)
     const formData = new FormData(e.currentTarget)
-    
+
     const payload = {
       name: formData.get('name') as string,
       ward_number: formData.get('wardNumber') as string,
       age: parseInt(formData.get('age') as string),
       gender: gender,
       category: category,
+      province: province || null,
+      education_level: educationLevel || null,
       past_surgeries: formData.get('pastSurgeries') as string || null,
       chronic_diseases: formData.get('chronicDiseases') as string || null,
       medical_drugs: formData.get('medicalDrugs') as string || null,
@@ -81,7 +105,7 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
         .eq('id', patient.id)
 
       if (error) throw error
-      
+
       toast.success("Patient updated successfully!")
       setOpen(false)
       router.refresh()
@@ -112,6 +136,8 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-6">
+
+            {/* ── Basic Demographics ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
@@ -138,6 +164,32 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="province">Province</Label>
+                <Select value={province} onValueChange={(val) => setProvince(val || "")}>
+                  <SelectTrigger id="province">
+                    <SelectValue placeholder="Select Province" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IRAQ_PROVINCES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="educationLevel">Education Level</Label>
+                <Select value={educationLevel} onValueChange={(val) => setEducationLevel(val || "")}>
+                  <SelectTrigger id="educationLevel">
+                    <SelectValue placeholder="Select Education Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EDUCATION_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="category">Category (Follow-up Level)</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val as PatientCategory)}>
                   <SelectTrigger id="category">
@@ -151,9 +203,10 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
                 </Select>
               </div>
             </div>
-            
+
             <hr className="my-2 border-slate-200 dark:border-slate-800" />
-            
+
+            {/* ── Medical History ── */}
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Medical History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">

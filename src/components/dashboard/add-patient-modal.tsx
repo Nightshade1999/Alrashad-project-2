@@ -27,11 +27,31 @@ import { queueMutation } from "@/lib/offline-sync"
 import { toast } from "sonner"
 import type { PatientCategory } from "@/types/database.types"
 
+const IRAQ_PROVINCES = [
+  "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
+  "Kirkuk", "Anbar", "Diyala", "Saladin", "Babylon", "Karbala",
+  "Najaf", "Wasit", "Dhi Qar", "Muthanna", "Qadisiyyah", "Maysan",
+]
+
+const EDUCATION_LEVELS = [
+  "Illiterate",
+  "Can Read & Write",
+  "Elementary School",
+  "Middle School",
+  "High School",
+  "Diploma",
+  "Bachelor's Degree",
+  "Master's Degree",
+  "PhD",
+]
+
 export function AddPatientModal() {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [gender, setGender] = useState("")
   const [category, setCategory] = useState<PatientCategory>("Normal")
+  const [province, setProvince] = useState("")
+  const [educationLevel, setEducationLevel] = useState("")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -59,6 +79,8 @@ export function AddPatientModal() {
       age: parseInt(formData.get('age') as string),
       gender: gender,
       category: category,
+      province: province || null,
+      education_level: educationLevel || null,
       past_surgeries: formData.get('pastSurgeries') as string || null,
       chronic_diseases: formData.get('chronicDiseases') as string || null,
       medical_drugs: formData.get('medicalDrugs') as string || null,
@@ -77,6 +99,11 @@ export function AddPatientModal() {
         toast.success("Saved offline. Will sync when reconnected.")
       }
       setOpen(false)
+      // Reset dropdowns
+      setGender("")
+      setCategory("Normal")
+      setProvince("")
+      setEducationLevel("")
     } catch (error) {
       console.error(error)
       toast.error("Failed to add patient")
@@ -100,6 +127,8 @@ export function AddPatientModal() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
+
+            {/* ── Basic Demographics ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
@@ -126,6 +155,32 @@ export function AddPatientModal() {
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="province">Province</Label>
+                <Select value={province} onValueChange={(val) => setProvince(val || "")}>
+                  <SelectTrigger id="province">
+                    <SelectValue placeholder="Select Province" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IRAQ_PROVINCES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="educationLevel">Education Level</Label>
+                <Select value={educationLevel} onValueChange={(val) => setEducationLevel(val || "")}>
+                  <SelectTrigger id="educationLevel">
+                    <SelectValue placeholder="Select Education Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EDUCATION_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="category">Category (Follow-up Level)</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val as PatientCategory)}>
                   <SelectTrigger id="category">
@@ -139,9 +194,10 @@ export function AddPatientModal() {
                 </Select>
               </div>
             </div>
-            
+
             <hr className="my-2 border-border" />
-            
+
+            {/* ── Medical History ── */}
             <h3 className="text-lg font-medium">Medical History</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">

@@ -129,6 +129,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={`${patient.age} years`} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
+            <InfoRow label="Province" value={patient.province} />
+            <InfoRow label="Education" value={patient.education_level} />
             {patient.allergies && (
               <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
