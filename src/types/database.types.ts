@@ -6,6 +6,7 @@ export interface Database {
       patients: {
         Row: {
           id: string;
+          user_id: string;
           ward_number: string;
           name: string;
           age: number;
@@ -29,6 +30,11 @@ export interface Database {
           doctor_id: string;
           visit_date: string;
           exam_notes: string;
+          bp_sys: number | null;
+          bp_dia: number | null;
+          pr: number | null;
+          spo2: number | null;
+          temp: number | null;
         };
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'visit_date'>;
         Update: Partial<Database['public']['Tables']['visits']['Insert']>;
@@ -51,6 +57,16 @@ export interface Database {
         };
         Insert: Omit<Database['public']['Tables']['investigations']['Row'], 'id' | 'date'>;
         Update: Partial<Database['public']['Tables']['investigations']['Insert']>;
+      };
+      user_profiles: {
+        Row: {
+          user_id: string;
+          ward_name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['user_profiles']['Insert']>;
       };
     };
   };

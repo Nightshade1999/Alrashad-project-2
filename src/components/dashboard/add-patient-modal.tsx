@@ -41,9 +41,19 @@ export function AddPatientModal() {
     }
 
     setIsSubmitting(true)
+    const supabase = createClient()
     const formData = new FormData(e.currentTarget)
-    
+
+    // Get the current user — required for RLS user_id column
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      toast.error("You must be logged in to add a patient.")
+      setIsSubmitting(false)
+      return
+    }
+
     const payload = {
+      user_id: user.id,
       name: formData.get('name') as string,
       ward_number: formData.get('wardNumber') as string,
       age: parseInt(formData.get('age') as string),
@@ -58,7 +68,6 @@ export function AddPatientModal() {
 
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine) {
-        const supabase = createClient()
         // @ts-ignore - Supabase type mismatch in this environment
         const { error } = await (supabase.from('patients') as any).insert([payload])
         if (error) throw error

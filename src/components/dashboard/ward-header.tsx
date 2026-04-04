@@ -4,21 +4,40 @@ import { useState, useEffect, useRef } from 'react'
 import { Edit2, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { createClient } from '@/lib/supabase'
+
+const DEFAULT_WARD_NAME = "Internal Medicine - Psych Ward"
 
 export function WardHeader() {
   const [isEditing, setIsEditing] = useState(false)
-  const [wardName, setWardName] = useState("Internal Medicine - Psych Ward")
+  const [wardName, setWardName] = useState(DEFAULT_WARD_NAME)
   const [editValue, setEditValue] = useState("")
+  const [mounted, setMounted] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [mounted, setMounted] = useState(false)
-
+  // Load ward name from Supabase on mount (cross-device, per user account)
   useEffect(() => {
     setMounted(true)
-    const savedName = localStorage.getItem("wardManager_wardName")
-    if (savedName) {
-      setWardName(savedName)
+    const loadWardName = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('ward_name')
+          .eq('user_id', user.id)
+          .single()
+
+        if (data?.ward_name) {
+          setWardName(data.ward_name)
+        }
+      } catch {
+        // Silently fall back to default — DB might not have migration yet
+      }
     }
+    loadWardName()
   }, [])
 
   const startEditing = () => {
@@ -30,12 +49,27 @@ export function WardHeader() {
     }, 50)
   }
 
-  const saveEdit = () => {
-    if (editValue.trim() !== "") {
-      setWardName(editValue.trim())
-      localStorage.setItem("wardManager_wardName", editValue.trim())
+  const saveEdit = async () => {
+    const newName = editValue.trim()
+    if (!newName) {
+      setIsEditing(false)
+      return
     }
+    setWardName(newName)
     setIsEditing(false)
+
+    // Persist to Supabase (upsert so it creates the profile if missing)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase
+        .from('user_profiles')
+        .upsert({ user_id: user.id, ward_name: newName }, { onConflict: 'user_id' })
+    } catch (err) {
+      console.error('Failed to save ward name:', err)
+    }
   }
 
   const cancelEdit = () => {
@@ -54,12 +88,12 @@ export function WardHeader() {
   if (isEditing) {
     return (
       <div className="flex items-center gap-2">
-        <Input 
+        <Input
           ref={inputRef}
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={() => setTimeout(saveEdit, 100)} // Allow click on checkmark to fire first
+          onBlur={() => setTimeout(saveEdit, 100)}
           className="h-9 w-[250px] sm:w-[350px] font-bold text-lg"
         />
         <Button variant="ghost" size="icon" onClick={saveEdit} className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
