@@ -29,9 +29,9 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string
 
 function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
-    <div className="space-y-0.5 mt-1">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <div className="text-sm text-slate-800 dark:text-slate-100">{value ? value : <span className="italic text-muted-foreground">None</span>}</div>
+    <div className="flex flex-col sm:space-y-0.5">
+      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</p>
+      <div className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{value ? value : <span className="italic text-muted-foreground opacity-50">None</span>}</div>
     </div>
   )
 }
@@ -176,11 +176,13 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
           </div>
         </div>
         
-        {/* Actions - Scrollable on mobile to prevent layout zooming */}
-        <div className="w-full sm:w-auto overflow-x-auto pb-2 -mb-2 no-scrollbar">
+        {/* Actions - Structured Grid on Mobile for Better Arrangement */}
+        <div className="w-full sm:w-auto">
           {!isDeceased ? (
-            <div className="flex items-center gap-2 min-w-max pr-4">
-              <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+            <div className="grid grid-cols-4 sm:flex sm:items-center gap-2 items-center">
+              <div className="col-span-4 sm:col-span-1">
+                <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+              </div>
               <AddVisitModal patientId={patient.id} variant="icon" />
               <AddInvestigationModal patientId={patient.id} variant="icon" />
               <ExportPatientButton patient={displayPatient} />
@@ -190,7 +192,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
             </div>
           ) : (
-            <div className="flex items-center gap-2 min-w-max pr-4">
+            <div className="grid grid-cols-3 sm:flex sm:items-center gap-2">
               <ExportPatientButton patient={displayPatient} />
               <ShareAIPromptModal patient={displayPatient} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
@@ -209,34 +211,27 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Patient Info</h2>
           </div>
-          <div className="p-5 grid grid-cols-2 gap-4">
-            <InfoRow label="Ward Number" value={patient.ward_number} />
+          <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-2 gap-x-4 gap-y-3 sm:gap-4">
+            <InfoRow label="Ward / Room" value={`${patient.doctor_ward || 'N/A'} / ${patient.room_number}`} />
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={`${patient.age} years`} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
-            {isDeceased && (
-              <>
-                <InfoRow label="Last Category" value={patient.previous_category || "N/A"} />
-                <InfoRow label="Date of Death" value={patient.date_of_death ? format(parseISO(patient.date_of_death), 'dd MMM yyyy (HH:mm)') : "Unknown"} />
-                <div className="col-span-2">
-                  <InfoRow label="Cause of Death" value={patient.cause_of_death || "Not specified"} />
-                </div>
-              </>
-            )}
             <InfoRow label="Province" value={patient.province} />
             <InfoRow label="Education" value={patient.education_level} />
-            <InfoRow label="Relative Status" value={
-                patient.relative_status === 'Known' 
-                ? <span className="text-emerald-600 font-medium">Known ({patient.relative_visits || '0'} visits / 3mo)</span> 
-                : <span className="text-slate-500 italic">Unknown</span>
-              } 
-            />
+            <div className="col-span-2">
+               <InfoRow label="Relative Status" value={
+                  patient.relative_status === 'Known' 
+                  ? <span className="text-emerald-600 font-bold">Known ({patient.relative_visits || '0'} visits / 3mo)</span> 
+                  : <span className="text-slate-400 italic font-medium">Unknown</span>
+                } 
+              />
+            </div>
             {patient.allergies && patient.allergies.length > 0 && (
-              <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-2">
-                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-xl p-2.5 mt-1">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-0.5">Allergies</p>
-                  <p className="text-sm text-red-800 dark:text-red-200 font-medium">{patient.allergies.join(", ")}</p>
+                  <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-0.5">Alert: Allergies</p>
+                  <p className="text-xs text-red-800 dark:text-red-200 font-bold leading-tight">{patient.allergies.join(", ")}</p>
                 </div>
               </div>
             )}
@@ -251,9 +246,9 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Medical History</h2>
           </div>
-          <div className="p-5 flex-1 relative flex flex-col gap-5 overflow-auto max-h-[350px]">
+          <div className="p-4 sm:p-5 flex-1 relative flex flex-col gap-4 overflow-auto max-h-[300px]">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Chronic Diseases</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Chronic Diseases</p>
               {patient.chronic_diseases && patient.chronic_diseases.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {(patient.chronic_diseases as any[]).map((d: any, i: number) => (
@@ -266,7 +261,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Past Surgeries</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Past Surgeries</p>
               {patient.past_surgeries && patient.past_surgeries.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {(patient.past_surgeries as string[]).map((s: string, i: number) => (
@@ -293,12 +288,12 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
              {patient.psych_drugs && patient.psych_drugs.length > 0 ? (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(patient.psych_drugs as any[]).map((drug: any, i: number) => (
-                    <div key={i} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div key={i} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold text-slate-800 dark:text-slate-100">{drug.name}</p>
-                        <Badge variant="secondary" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 font-mono text-xs">{drug.frequency}</Badge>
+                        <p className="font-bold text-xs text-slate-800 dark:text-slate-100">{drug.name}</p>
+                        <Badge variant="secondary" className="h-4 px-1.5 bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 font-mono text-[9px] uppercase tracking-tighter">{drug.frequency}</Badge>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Dose: {drug.dosage}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Dose: {drug.dosage}</p>
                     </div>
                   ))}
                 </div>
@@ -322,12 +317,12 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
              {patient.medical_drugs && patient.medical_drugs.length > 0 ? (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {(patient.medical_drugs as any[]).map((drug: any, i: number) => (
-                    <div key={i} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div key={i} className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold text-slate-800 dark:text-slate-100">{drug.name}</p>
-                        <Badge variant="secondary" className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 font-mono text-xs">{drug.frequency}</Badge>
+                        <p className="font-bold text-xs text-slate-800 dark:text-slate-100">{drug.name}</p>
+                        <Badge variant="secondary" className="h-4 px-1.5 bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 font-mono text-[9px] uppercase tracking-tighter">{drug.frequency}</Badge>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Dose: {drug.dosage}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Dose: {drug.dosage}</p>
                     </div>
                   ))}
                 </div>
