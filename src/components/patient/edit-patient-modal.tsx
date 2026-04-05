@@ -25,8 +25,9 @@ import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
-import { COMMON_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
+import { GENERAL_SURGERIES, FEMALE_SURGERIES, MALE_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
 import { DrugListInput, DiseaseListInput, StringListInput } from "../dashboard/medical-inputs"
+import { convertArabicNumbers } from "@/lib/utils"
 
 const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
@@ -105,8 +106,8 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
 
     const payload: any = {
       name: formData.get('name') as string,
-      room_number: formData.get('roomNumber') as string,
-      age: parseInt(formData.get('age') as string),
+      room_number: convertArabicNumbers(formData.get('roomNumber') as string),
+      age: parseInt(convertArabicNumbers(formData.get('age') as string)),
       gender: gender,
       category: category,
       province: province || null,
@@ -277,7 +278,11 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
                   label="Past Surgeries" 
                   items={pastSurgeries} 
                   onChange={setPastSurgeries}
-                  presetList={COMMON_SURGERIES}
+                  presetList={[
+                    ...GENERAL_SURGERIES,
+                    ...(gender === 'Female' ? FEMALE_SURGERIES : []),
+                    ...(gender === 'Male' ? MALE_SURGERIES : [])
+                  ]}
                 />
 
                 <DrugListInput 

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase'
 import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
+import { convertArabicNumbers } from '@/lib/utils'
 
 const LAB_FIELDS = [
   { key: 'wbc',          label: 'WBC',       placeholder: 'e.g. 8.5' },
@@ -36,7 +37,10 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
     const payload: Record<string, any> = { patient_id: patientId, date }
     for (const f of LAB_FIELDS) {
       const v = values[f.key]
-      if (v !== undefined && v !== '') payload[f.key] = parseFloat(v)
+      if (v !== undefined && v !== '') {
+        const sanitized = convertArabicNumbers(v)
+        payload[f.key] = parseFloat(sanitized)
+      }
     }
 
     // ── Offline path ──────────────────────────────────────────
@@ -96,7 +100,7 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl flex flex-col max-h-[95dvh]">
+      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl flex flex-col max-h-[95dvh] animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-950/20">
           <div className="flex items-center gap-2">
@@ -122,11 +126,12 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
                 <Label htmlFor={f.key} className="text-xs font-semibold text-muted-foreground">{f.label}</Label>
                 <Input
                   id={f.key}
-                  type="number"
-                  step="any"
                   placeholder={f.placeholder}
                   value={values[f.key] ?? ''}
-                  onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
+                  onChange={e => {
+                    const val = convertArabicNumbers(e.target.value)
+                    setValues(v => ({ ...v, [f.key]: val }))
+                  }}
                   className="mt-1 h-9 text-sm"
                 />
               </div>

@@ -24,9 +24,10 @@ import {
 import { createClient } from "@/lib/supabase"
 import { queueMutation } from "@/lib/offline-sync"
 import { toast } from "sonner"
-import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
-import { COMMON_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
+import { GENERAL_SURGERIES, FEMALE_SURGERIES, MALE_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
 import { DrugListInput, DiseaseListInput, StringListInput } from "./medical-inputs"
+import { convertArabicNumbers } from "@/lib/utils"
+import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
 
 const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
@@ -106,8 +107,8 @@ export function AddPatientModal() {
       user_id: user.id,
       ward_name: (profile as any).ward_name,
       name: formData.get('name') as string,
-      room_number: formData.get('roomNumber') as string,
-      age: parseInt(formData.get('age') as string),
+      room_number: convertArabicNumbers(formData.get('roomNumber') as string),
+      age: parseInt(convertArabicNumbers(formData.get('age') as string)),
       gender,
       category,
       province: province || null,
@@ -290,7 +291,11 @@ export function AddPatientModal() {
                   label="Past Surgeries" 
                   items={pastSurgeries} 
                   onChange={setPastSurgeries}
-                  presetList={COMMON_SURGERIES}
+                  presetList={[
+                    ...GENERAL_SURGERIES,
+                    ...(gender === 'Female' ? FEMALE_SURGERIES : []),
+                    ...(gender === 'Male' ? MALE_SURGERIES : [])
+                  ]}
                 />
 
                 <DrugListInput 

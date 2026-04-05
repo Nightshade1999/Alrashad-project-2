@@ -14,12 +14,12 @@ export interface PatientSummary {
 
 export function PatientCard({ patient }: { patient: PatientSummary }) {
   return (
-    <div className="relative group">
+    <div className="relative group hover-lift animate-fade-in-up">
       <Link
         href={`/patient/${patient.id}`}
         className="block"
       >
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 hover:shadow-md hover:border-teal-300 dark:hover:border-teal-700 transition-all duration-200 hover:-translate-y-0.5">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 hover:shadow-md hover:border-teal-300 dark:hover:border-teal-700 transition-all duration-300">
           {/* Bed + Age row */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5 bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 px-2.5 py-1 rounded-lg text-sm font-bold font-mono border border-teal-200 dark:border-teal-800">

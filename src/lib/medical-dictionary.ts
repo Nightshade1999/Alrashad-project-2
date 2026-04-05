@@ -14,33 +14,68 @@ export const COMMON_DISEASES = [
   "Hyperthyroidism",
   "Stroke (CVA)",
   "Epilepsy",
-  "Schizophrenia",
-  "Bipolar Disorder",
-  "Major Depressive Disorder",
-  "Anxiety Disorder",
+  "Liver Cirrhosis",
+  "PVD (Peripheral Vascular Disease)",
+  "DVT (Deep Vein Thrombosis)",
+  "PE (Pulmonary Embolism)",
 ];
 
-export const COMMON_SURGERIES = [
+export const GENERAL_SURGERIES = [
   "Appendectomy",
   "Cholecystectomy",
-  "Cesarean Section (C-Section)",
   "Hernia Repair",
-  "CABG (Coronary Artery Bypass Graft)",
+  "Laparotomy",
+  "Hemorrhoidectomy",
+  "Thyroidectomy",
+  "Gastrectomy",
+  "Splenectomy",
   "Tonsillectomy",
+  "Septoplasty",
+  "Adenoidectomy",
+  "Cataract Surgery",
+  "ORIF (Open Reduction Internal Fixation)",
   "Total Knee Replacement",
   "Total Hip Replacement",
+  "CABG (Coronary Artery Bypass Graft)",
+  "PCI (Stent Insertion)",
+  "Pacemaker Insertion",
+  "AV Fistula",
+];
+
+export const FEMALE_SURGERIES = [
+  "Cesarean Section (C-Section)",
   "Hysterectomy",
-  "Cataract Surgery",
-  "Percutaneous Coronary Intervention (PCI / Stent)",
-  "Thyroidectomy",
+  "Oophorectomy",
+  "Myomectomy",
+  "D&C (Dilation & Curettage)",
+  "Tubal Ligation",
+  "Mastectomy",
+];
+
+export const MALE_SURGERIES = [
+  "Prostatectomy",
+  "TURP (Transurethral Resection of Prostate)",
+  "Circumcision",
+  "Orchidectomy",
 ];
 
 export const COMMON_ALLERGIES = [
+  "Penicillins",
+  "Cephalosporins",
+  "NSAIDs (Ibuprofen, Naproxen, etc.)",
+  "Sulfa drugs (Sulfonamides)",
+  "Anticonvulsants",
+  "Contrast Media (Iodinated)",
+  "ACE Inhibitors",
+  "Local Anesthetics (Lidocaine, etc.)",
+  "General Anesthetics",
+  "Aminoglycosides",
+  "Fluoroquinolones",
+  "Macrolides",
+  "Latex",
+  "Iodine",
   "No known drug allergy",
   "Unknown",
-  "Pencillin",
-  "cephalosporin",
-  "Sulfa",
 ];
 
 export interface DrugDictionaryItem {

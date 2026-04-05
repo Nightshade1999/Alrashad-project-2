@@ -23,7 +23,7 @@ export default function WardManagementClient({
   const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics'>('users')
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 animate-fade-in-up">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
@@ -49,47 +49,47 @@ export default function WardManagementClient({
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex space-x-2 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl max-w-fit">
+      {/* Navigation Tabs - Scrollable on mobile */}
+      <div className="flex space-x-2 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-2xl overflow-x-auto no-scrollbar scroll-smooth w-full sm:max-w-fit">
         <button
           onClick={() => setActiveTab('users')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === 'users' 
               ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
-          <Users className="h-4 w-4" /> User Control
+          <Users className="h-4 w-4 shrink-0" /> User Control
         </button>
         <button
           onClick={() => setActiveTab('performance')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === 'performance' 
               ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-sm' 
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
-          <Activity className="h-4 w-4" /> Doctor Performance
+          <Activity className="h-4 w-4 shrink-0" /> Doctor Performance
         </button>
         <button
           onClick={() => setActiveTab('analytics')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === 'analytics' 
               ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
-          <TrendingUp className="h-4 w-4" /> Analytics
+          <TrendingUp className="h-4 w-4 shrink-0" /> Analytics
         </button>
         <button
           onClick={() => setActiveTab('research')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === 'research' 
               ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-400 shadow-sm' 
               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
-          <BarChart3 className="h-4 w-4" /> Medical Research
+          <BarChart3 className="h-4 w-4 shrink-0" /> Medical Research
         </button>
       </div>
 

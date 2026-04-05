@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase'
 import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
+import { convertArabicNumbers } from '@/lib/utils'
 
 export function AddVisitModal({ patientId, variant = "button" }: { patientId: string, variant?: "button" | "icon" }) {
   const [open, setOpen] = useState(false)
@@ -32,11 +33,11 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
       patient_id: patientId,
       visit_date: date,
       exam_notes: notes.trim(),
-      bp_sys: bpSys ? parseInt(bpSys) : null,
-      bp_dia: bpDia ? parseInt(bpDia) : null,
-      pr: pr ? parseInt(pr) : null,
-      spo2: spo2 ? parseInt(spo2) : null,
-      temp: temp ? parseFloat(temp) : null,
+      bp_sys: bpSys ? parseInt(convertArabicNumbers(bpSys)) : null,
+      bp_dia: bpDia ? parseInt(convertArabicNumbers(bpDia)) : null,
+      pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
+      spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
+      temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
     }
 
     // ── Offline path ──────────────────────────────────────────
@@ -100,7 +101,7 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg flex flex-col max-h-[95dvh]">
+      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg flex flex-col max-h-[95dvh] animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-emerald-50/60 dark:bg-emerald-950/20">
           <div className="flex items-center gap-2">
