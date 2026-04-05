@@ -111,7 +111,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
   const { data: { user: authUser } } = await supabase.auth.getUser()
   const { data: userProfile } = await supabase
     .from('user_profiles')
-    .select('ai_enabled')
+    .select('ai_enabled, ward_name')
     .eq('user_id', authUser?.id)
     .single()
 
@@ -196,7 +196,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Patient Info</h2>
           </div>
           <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-2 gap-x-4 gap-y-3 sm:gap-4">
-            <InfoRow label="Ward / Room" value={`${patient.doctor_ward || 'N/A'} / ${patient.room_number}`} />
+            <InfoRow label="Ward / Room" value={`${userProfile?.ward_name || patient.ward_number || 'General Ward'} / Room ${patient.room_number}`} />
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={`${patient.age} years`} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
