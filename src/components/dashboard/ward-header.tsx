@@ -30,8 +30,9 @@ export function WardHeader() {
           .eq('user_id', user.id)
           .single()
 
-        if (data?.ward_name) {
-          setWardName(data.ward_name)
+        const profileData = data as any
+        if (profileData?.ward_name) {
+          setWardName(profileData.ward_name)
         }
       } catch {
         // Silently fall back to default — DB might not have migration yet
@@ -64,8 +65,8 @@ export function WardHeader() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      await supabase
-        .from('user_profiles')
+      await (supabase
+        .from('user_profiles') as any)
         .upsert({ user_id: user.id, ward_name: newName }, { onConflict: 'user_id' })
     } catch (err) {
       console.error('Failed to save ward name:', err)

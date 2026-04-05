@@ -28,8 +28,8 @@ async function verifyAdmin() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized: Login required")
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
+  const { data: profile } = await (supabase
+    .from('user_profiles') as any)
     .select('role')
     .eq('user_id', user.id)
     .single()
@@ -68,8 +68,8 @@ export async function createUserAction(formData: FormData) {
   // then forcefully apply the requested role/ward settings.
   await new Promise(r => setTimeout(r, 1000))
   
-  const { error: profileError } = await supabaseAdmin
-    .from('user_profiles')
+  const { error: profileError } = await (supabaseAdmin
+    .from('user_profiles') as any)
     .upsert({ 
       user_id: authData.user.id, 
       role, 
@@ -148,8 +148,8 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
 
-    const { error: profError } = await supabaseAdmin
-      .from('user_profiles')
+    const { error: profError } = await (supabaseAdmin
+      .from('user_profiles') as any)
       .update(updatePayload)
       .eq('user_id', userId)
 
@@ -190,12 +190,12 @@ export async function getAllUsersAction() {
   const { data: users, error: authError } = await supabaseAdmin.auth.admin.listUsers()
   if (authError) return { error: authError.message, users: [] }
   
-  const { data: profiles, error: profError } = await supabaseAdmin.from('user_profiles').select('*')
+  const { data: profiles, error: profError } = await (supabaseAdmin.from('user_profiles') as any).select('*')
   if (profError) return { error: profError.message, users: [] }
 
   // Merge auth data with profile data
   const combined = users.users.map(u => {
-    const prof = profiles?.find(p => p.user_id === u.id)
+    const prof = profiles?.find((p: any) => p.user_id === u.id)
     return {
       id: u.id,
       email: u.email,
@@ -213,13 +213,13 @@ export async function getAllUsersAction() {
 }
 
 export async function getAllPatientsForAdminAction() {
-  const [patientsRes, profilesRes] = await Promise.all([
+    const [patientsRes, profilesRes] = await Promise.all([
     supabaseAdmin
       .from('patients')
       .select('*, visits(*), investigations(*)')
       .order('created_at', { ascending: false }),
-    supabaseAdmin
-      .from('user_profiles')
+    (supabaseAdmin
+      .from('user_profiles') as any)
       .select('user_id, ward_name')
   ])
 
