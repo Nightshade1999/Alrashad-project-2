@@ -4,15 +4,18 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import {
   ArrowLeft, AlertTriangle, Activity, FileText, Home,
-  User, Database, Layers, Heart, FlaskConical as Flask, Clipboard as ClipboardIcon
+  User, Database, Layers, Heart, FlaskConical as Flask, Clipboard as ClipboardIcon, Cross
 } from "lucide-react"
 import { DeletePatientButton } from "@/components/patient/delete-button"
 import { EditPatientModal } from "@/components/patient/edit-patient-modal"
+import { DeclareDeathModal } from "@/components/patient/declare-death-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
 import { ExportPatientButton } from "@/components/patient/export-button"
 import { AIAdviceSection } from "@/components/patient/ai-advice-section"
 import { AddInvestigationModal } from "@/components/patient/add-investigation-modal"
 import { AddVisitModal } from "@/components/patient/add-visit-modal"
+import { RestorePatientButton } from "@/components/patient/restore-patient-button"
+import { ShareAIPromptModal } from "@/components/patient/share-ai-prompt-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
@@ -21,13 +24,14 @@ const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string
   'High Risk':       { label: 'High Risk',       color: 'text-red-700 dark:text-red-300',    bg: 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800',    dot: '🔴' },
   'Close Follow-up': { label: 'Close Follow-up', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40 border-amber-200 dark:border-amber-800', dot: '🟡' },
   'Normal':          { label: 'Normal',          color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800', dot: '🟢' },
+  'Deceased/Archive':{ label: 'Deceased/Archive',color: 'text-slate-700 dark:text-slate-400', bg: 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700', dot: '⚫' },
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
+function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0.5 mt-1">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="text-sm text-slate-800 dark:text-slate-100">{value || <span className="italic text-muted-foreground">None</span>}</p>
+      <div className="text-sm text-slate-800 dark:text-slate-100">{value ? value : <span className="italic text-muted-foreground">None</span>}</div>
     </div>
   )
 }
@@ -44,6 +48,21 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
 
   const { data: patient } = await supabase.from("patients").select("*").eq("id", id).single()
   if (!patient) notFound()
+
+  // Safely normalize all JSONB arrays that might be returned as strings from Supabase text columns
+  function safeParse(val: any) {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
+    }
+    return [];
+  }
+  
+  patient.allergies = safeParse(patient.allergies);
+  patient.past_surgeries = safeParse(patient.past_surgeries);
+  patient.chronic_diseases = safeParse(patient.chronic_diseases);
+  patient.psych_drugs = safeParse(patient.psych_drugs);
+  patient.medical_drugs = safeParse(patient.medical_drugs);
 
   const { data: visits } = await supabase
     .from("visits").select("*").eq("patient_id", id)
@@ -64,9 +83,21 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const lastInv = investigations?.[0] ?? null
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
 
+function getDynamicAge(baseAge: number, timestampIso?: string): number {
+  if (!timestampIso) return baseAge;
+  const ts = new Date(timestampIso);
+  const now = new Date();
+  let diffYears = now.getFullYear() - ts.getFullYear();
+  if (now.getMonth() < ts.getMonth() || (now.getMonth() === ts.getMonth() && now.getDate() < ts.getDate())) {
+    diffYears--;
+  }
+  return baseAge + Math.max(0, diffYears);
+}
+
   // Ensure data is serializable for Client Components (JSON-safe)
   const displayPatient = JSON.parse(JSON.stringify({
     ...patient,
+    age: getDynamicAge(patient.age, patient.created_at),
     lastHba1c: lastInv?.hba1c,
     lastHb: lastInv?.hb,
     lastVisit: lastVisit?.visit_date,
@@ -74,14 +105,54 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
     visits: visits || []
   }))
 
+  const isDeceased = patient.category === 'Deceased/Archive';
+
+  // Fetch current user profile for AI permission check
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('ai_enabled')
+    .eq('user_id', authUser?.id)
+    .single()
+
+  const aiEnabled = userProfile?.ai_enabled ?? true
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+      
+      {/* ── Deceased Banner ── */}
+      {isDeceased && (
+        <div className="bg-slate-800 text-slate-100 p-4 rounded-xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-700 p-2 rounded-lg">
+              <Cross className="h-5 w-5 text-slate-300" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg leading-tight text-white">Patient Archived (Deceased)</h2>
+              <p className="text-sm text-slate-300">
+                Date of Death: {patient.date_of_death ? format(parseISO(patient.date_of_death), 'dd MMM yyyy') : 'Unknown'}
+              </p>
+            </div>
+          </div>
+          {patient.cause_of_death && (
+            <div className="text-right hidden sm:block">
+              <p className="text-xs uppercase text-slate-400 font-bold tracking-wider">Cause of Death</p>
+              <p className="text-sm font-medium max-w-xs truncate">{patient.cause_of_death}</p>
+            </div>
+          )}
+          <div className="ml-4 shrink-0">
+             <RestorePatientButton patientId={patient.id} previousCategory={patient.previous_category} />
+          </div>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href={`/dashboard/category/${
             patient.category === 'High Risk' ? 'high-risk'
             : patient.category === 'Close Follow-up' ? 'close-follow-up'
+            : patient.category === 'Deceased/Archive' ? 'archive'
             : 'normal'
           }`}>
             <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900" title="Back to Category">
@@ -94,7 +165,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             </Button>
           </Link>
           <div className="min-w-0 ml-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight truncate" dir="auto">
+            <h1 className={`text-xl sm:text-2xl font-bold leading-tight truncate ${isDeceased ? 'text-slate-500 line-through decoration-slate-300 dark:decoration-slate-600' : 'text-slate-800 dark:text-slate-100'}`} dir="auto">
               {patient.name}
             </h1>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -102,16 +173,30 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
         </div>
-        <div className="flex items-center flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
-          <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
-          <div className="flex gap-2">
-            <AddVisitModal patientId={patient.id} variant="icon" />
-            <AddInvestigationModal patientId={patient.id} variant="icon" />
-            <ExportPatientButton patient={displayPatient} />
-            <EditPatientModal patient={patient} />
-            <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+        
+        {/* Actions */}
+        {!isDeceased && (
+          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+            <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+            <div className="flex gap-2">
+              <AddVisitModal patientId={patient.id} variant="icon" />
+              <AddInvestigationModal patientId={patient.id} variant="icon" />
+              <ExportPatientButton patient={displayPatient} />
+              <ShareAIPromptModal patient={displayPatient} />
+              <EditPatientModal patient={patient} />
+              <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} />
+              <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+            </div>
           </div>
-        </div>
+        )}
+        
+        {isDeceased && (
+            <div className="flex gap-2 w-full sm:w-auto">
+              <ExportPatientButton patient={displayPatient} />
+              <ShareAIPromptModal patient={displayPatient} />
+              <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+            </div>
+        )}
       </div>
 
       {/* ── Demographics + Medical Info ── */}
@@ -125,65 +210,132 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Patient Info</h2>
           </div>
           <div className="p-5 grid grid-cols-2 gap-4">
-            <InfoRow label="Bed / Ward" value={patient.ward_number} />
+            <InfoRow label="Ward Number" value={patient.ward_number} />
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={`${patient.age} years`} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
+            {isDeceased && (
+              <>
+                <InfoRow label="Last Category" value={patient.previous_category || "N/A"} />
+                <InfoRow label="Date of Death" value={patient.date_of_death ? format(parseISO(patient.date_of_death), 'dd MMM yyyy (HH:mm)') : "Unknown"} />
+                <div className="col-span-2">
+                  <InfoRow label="Cause of Death" value={patient.cause_of_death || "Not specified"} />
+                </div>
+              </>
+            )}
             <InfoRow label="Province" value={patient.province} />
             <InfoRow label="Education" value={patient.education_level} />
-            {patient.allergies && (
-              <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <InfoRow label="Relative Status" value={
+                patient.relative_status === 'Known' 
+                ? <span className="text-emerald-600 font-medium">Known ({patient.relative_visits || '0'} visits / 3mo)</span> 
+                : <span className="text-slate-500 italic">Unknown</span>
+              } 
+            />
+            {patient.allergies && patient.allergies.length > 0 && (
+              <div className="col-span-2 flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 mt-2">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-0.5">Allergies</p>
-                  <p className="text-sm text-red-700 dark:text-red-300">{patient.allergies}</p>
+                  <p className="text-sm text-red-800 dark:text-red-200 font-medium">{patient.allergies.join(", ")}</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Medical Info */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+        {/* Medical History */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 shrink-0">
             <div className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40">
               <Heart className="h-4 w-4 text-rose-500 dark:text-rose-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Medical History</h2>
           </div>
-          <div className="p-5 space-y-4">
-            <InfoRow label="Chronic Diseases" value={patient.chronic_diseases} />
-            <InfoRow label="Past Surgeries" value={patient.past_surgeries} />
+          <div className="p-5 flex-1 relative flex flex-col gap-5 overflow-auto max-h-[350px]">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Chronic Diseases</p>
+              {patient.chronic_diseases && patient.chronic_diseases.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(patient.chronic_diseases as any[]).map((d: any, i: number) => (
+                    <Badge key={i} variant={d.type === 'preset' ? "default" : "secondary"}>
+                      {d.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : <p className="text-sm italic text-muted-foreground">None</p>}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Past Surgeries</p>
+              {patient.past_surgeries && patient.past_surgeries.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(patient.past_surgeries as string[]).map((s: string, i: number) => (
+                    <Badge key={i} variant="outline" className="bg-slate-50">{s}</Badge>
+                  ))}
+                </div>
+              ) : <p className="text-sm italic text-muted-foreground">None</p>}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── Medications ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-violet-50/60 dark:bg-violet-900/10">
+        {/* Psych Drugs */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-violet-50/60 dark:bg-violet-900/10 shrink-0">
             <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
               <Database className="h-4 w-4 text-violet-600 dark:text-violet-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Psychiatric Medications</h2>
           </div>
-          <div className="p-5">
-            <p className="text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-800/40 rounded-lg p-3">
-              {patient.psych_drugs || <span className="italic text-muted-foreground not-italic font-sans">None</span>}
-            </p>
+          <div className="p-0 flex-1 overflow-auto max-h-[300px]">
+             {patient.psych_drugs && patient.psych_drugs.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(patient.psych_drugs as any[]).map((drug: any, i: number) => (
+                    <div key={i} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100">{drug.name}</p>
+                        <Badge variant="secondary" className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 font-mono text-xs">{drug.frequency}</Badge>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Dose: {drug.dosage}</p>
+                    </div>
+                  ))}
+                </div>
+             ) : (
+                <div className="p-5">
+                  <p className="text-sm italic text-muted-foreground">None prescribed</p>
+                </div>
+             )}
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-teal-50/60 dark:bg-teal-900/10">
+
+        {/* Medical Drugs */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-teal-50/60 dark:bg-teal-900/10 shrink-0">
             <div className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-900/40">
               <Layers className="h-4 w-4 text-teal-600 dark:text-teal-400" />
             </div>
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Internal Medical Drugs</h2>
           </div>
-          <div className="p-5">
-            <p className="text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-800/40 rounded-lg p-3">
-              {patient.medical_drugs || <span className="italic text-muted-foreground not-italic font-sans">None</span>}
-            </p>
+          <div className="p-0 flex-1 overflow-auto max-h-[300px]">
+             {patient.medical_drugs && patient.medical_drugs.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(patient.medical_drugs as any[]).map((drug: any, i: number) => (
+                    <div key={i} className="px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100">{drug.name}</p>
+                        <Badge variant="secondary" className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 font-mono text-xs">{drug.frequency}</Badge>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Dose: {drug.dosage}</p>
+                    </div>
+                  ))}
+                </div>
+             ) : (
+                <div className="p-5">
+                  <p className="text-sm italic text-muted-foreground">None prescribed</p>
+                </div>
+             )}
           </div>
         </div>
       </div>
@@ -321,7 +473,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         </Link>
       </div>
 
-      <AIAdviceSection patientData={displayPatient} />
+      {!isDeceased && <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />}
     </div>
   )
 }

@@ -5,7 +5,6 @@ import { Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -25,7 +24,9 @@ import {
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import type { PatientCategory } from "@/types/database.types"
+import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
+import { COMMON_SURGERIES } from "@/lib/medical-dictionary"
+import { DrugListInput, DiseaseListInput, StringListInput } from "../dashboard/medical-inputs"
 
 const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
@@ -49,17 +50,20 @@ interface EditPatientModalProps {
   patient: {
     id: string
     name: string
-    ward_number: string
+    room_number: string
     age: number
     gender: string
     category: PatientCategory
     province: string | null
     education_level: string | null
-    past_surgeries: string | null
-    chronic_diseases: string | null
-    medical_drugs: string | null
-    psych_drugs: string | null
-    allergies: string | null
+    relative_status: 'Known' | 'Unknown'
+    relative_visits: string | null
+    past_surgeries: string[]
+    chronic_diseases: ChronicDiseaseParams[]
+    medical_drugs: MedicalDrugParams[]
+    psych_drugs: MedicalDrugParams[]
+    allergies: string[]
+    high_risk_date?: string | null
   }
 }
 
@@ -70,6 +74,16 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
   const [category, setCategory] = useState<PatientCategory>(patient.category)
   const [province, setProvince] = useState(patient.province || "")
   const [educationLevel, setEducationLevel] = useState(patient.education_level || "")
+  
+  const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>(patient.relative_status || 'Unknown')
+  const [relativeVisits, setRelativeVisits] = useState(patient.relative_visits || "")
+
+  const [pastSurgeries, setPastSurgeries] = useState<string[]>(patient.past_surgeries || [])
+  const [chronicDiseases, setChronicDiseases] = useState<ChronicDiseaseParams[]>(patient.chronic_diseases || [])
+  const [medicalDrugs, setMedicalDrugs] = useState<MedicalDrugParams[]>(patient.medical_drugs || [])
+  const [psychDrugs, setPsychDrugs] = useState<MedicalDrugParams[]>(patient.psych_drugs || [])
+  const [allergies, setAllergies] = useState<string[]>(patient.allergies || [])
+
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -79,27 +93,40 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
       return
     }
 
+    if (category === 'Normal' && chronicDiseases.length >= 2) {
+      const confirmNormal = window.confirm("This patient has 2 or more chronic diseases. Standard protocol places them in 'Close Follow-up' or 'High Risk'.\n\nAre you sure you want to categorize them as 'Normal Follow-up'?")
+      if (!confirmNormal) {
+        return
+      }
+    }
+
     setIsSubmitting(true)
     const formData = new FormData(e.currentTarget)
 
-    const payload = {
+    const payload: any = {
       name: formData.get('name') as string,
-      ward_number: formData.get('wardNumber') as string,
+      room_number: formData.get('roomNumber') as string,
       age: parseInt(formData.get('age') as string),
       gender: gender,
       category: category,
       province: province || null,
       education_level: educationLevel || null,
-      past_surgeries: formData.get('pastSurgeries') as string || null,
-      chronic_diseases: formData.get('chronicDiseases') as string || null,
-      medical_drugs: formData.get('medicalDrugs') as string || null,
-      psych_drugs: formData.get('psychDrugs') as string || null,
-      allergies: formData.get('allergies') as string || null,
+      relative_status: relativeStatus,
+      relative_visits: relativeStatus === 'Known' ? relativeVisits || null : null,
+      past_surgeries: pastSurgeries,
+      chronic_diseases: chronicDiseases,
+      medical_drugs: medicalDrugs,
+      psych_drugs: psychDrugs,
+      allergies: allergies,
+    }
+
+    if (category === 'High Risk') {
+      payload.high_risk_date = new Date().toISOString()
     }
 
     try {
       const supabase = createClient()
-      // @ts-ignore - Supabase type mismatch in this environment
+      // @ts-ignore
       const { error } = await (supabase.from('patients') as any)
         .update(payload)
         .eq('id', patient.id)
@@ -119,33 +146,31 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm" className="h-9 px-3 gap-2">
-            <Pencil className="h-3.5 w-3.5" />
-            Edit Info
-          </Button>
-        }
-      />
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogTrigger>
+        <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-2">
+          <Pencil className="h-3.5 w-3.5" />
+          Edit Info
+        </span>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-4xl w-[95vw] sm:w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto p-4 sm:p-6 mx-auto rounded-2xl">
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
+          <DialogHeader className="mb-4">
             <DialogTitle className="text-2xl text-primary font-bold">Edit Patient Information</DialogTitle>
             <DialogDescription>
-              Modify the patient's demographics and medical history.
+              Modify the patient's demographics, relative status, and medical history.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-6">
+          <div className="space-y-8">
 
             {/* ── Basic Demographics ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input id="name" name="name" defaultValue={patient.name} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="wardNumber">Ward / Bed Number</Label>
-                <Input id="wardNumber" name="wardNumber" defaultValue={patient.ward_number} required />
+                <Label htmlFor="roomNumber">Room Number</Label>
+                <Input id="roomNumber" name="roomNumber" defaultValue={patient.room_number} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="age">Age</Label>
@@ -189,7 +214,39 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 sm:col-span-2">
+
+              {/* Relatives Info */}
+              <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
+                <Select value={relativeStatus} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
+                  <SelectTrigger id="relativeStatus">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Known">Known</SelectItem>
+                    <SelectItem value="Unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {relativeStatus === 'Known' && (
+                <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                  <Label htmlFor="relativeVisits" className="text-blue-700 dark:text-blue-400">Visits per 3 months</Label>
+                  <Select value={relativeVisits} onValueChange={(val) => setRelativeVisits(val || "")}>
+                    <SelectTrigger id="relativeVisits">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.5">0.5</SelectItem>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "More than 12"].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2 md:col-span-2 border-t pt-4">
                 <Label htmlFor="category">Category (Follow-up Level)</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val as PatientCategory)}>
                   <SelectTrigger id="category">
@@ -204,34 +261,52 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
               </div>
             </div>
 
-            <hr className="my-2 border-slate-200 dark:border-slate-800" />
-
+            <hr className="border-border" />
+            
             {/* ── Medical History ── */}
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Medical History</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="pastSurgeries">Past Surgeries</Label>
-                <Textarea id="pastSurgeries" name="pastSurgeries" defaultValue={patient.past_surgeries || ""} className="resize-none min-h-24" placeholder="List past surgeries..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="chronicDiseases">Chronic Diseases</Label>
-                <Textarea id="chronicDiseases" name="chronicDiseases" defaultValue={patient.chronic_diseases || ""} className="resize-none min-h-24" placeholder="DM, HTN, etc..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="medicalDrugs">Internal Medical Drugs</Label>
-                <Textarea id="medicalDrugs" name="medicalDrugs" defaultValue={patient.medical_drugs || ""} className="resize-none min-h-24" placeholder="Current medications..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="psychDrugs">Psychiatric Drugs</Label>
-                <Textarea id="psychDrugs" name="psychDrugs" defaultValue={patient.psych_drugs || ""} className="resize-none min-h-24" placeholder="Current psych medications..." />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="allergies" className="text-destructive font-bold">Allergies</Label>
-                <Textarea id="allergies" name="allergies" defaultValue={patient.allergies || ""} className="resize-none min-h-24 border-destructive/30 focus-visible:ring-destructive" placeholder="List known allergies..." />
+            <div>
+              <h3 className="text-lg font-bold mb-4">Medical History</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <DiseaseListInput 
+                  diseases={chronicDiseases} 
+                  onChange={setChronicDiseases} 
+                />
+                
+                <StringListInput 
+                  label="Past Surgeries" 
+                  items={pastSurgeries} 
+                  onChange={setPastSurgeries}
+                  presetList={COMMON_SURGERIES}
+                />
+
+                <DrugListInput 
+                  label="Internal Medical Drugs" 
+                  category="Internal" 
+                  drugs={medicalDrugs} 
+                  onChange={setMedicalDrugs} 
+                />
+                
+                <DrugListInput 
+                  label="Psychiatric Drugs" 
+                  category="Psych" 
+                  drugs={psychDrugs} 
+                  onChange={setPsychDrugs} 
+                />
+
+                <div className="md:col-span-2">
+                  <StringListInput 
+                    label="Allergies" 
+                    items={allergies} 
+                    onChange={setAllergies}
+                    isDanger={true}
+                  />
+                </div>
+
               </div>
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="mt-8 gap-2">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting} className="bg-teal-600 hover:bg-teal-700 text-white">
               {isSubmitting ? "Updating..." : "Update Patient"}

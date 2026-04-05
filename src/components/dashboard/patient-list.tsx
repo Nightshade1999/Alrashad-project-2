@@ -20,9 +20,9 @@ export interface PatientRow {
   id: string
   name: string
   age: number
-  ward_number: string
+  room_number: string
   category: string
-  chronic_diseases: string | null
+  chronic_diseases: any[] | null
   lastHba1c: number | null
   lastHb: number | null
   lastVisit: string | null
@@ -32,9 +32,31 @@ export interface PatientRow {
   lastPr: number | null
   lastSpo2: number | null
   lastTemp: number | null
+  // death info
+  date_of_death?: string | null
+  cause_of_death?: string | null
+  previous_category?: string | null
 }
 
 type SortKey = 'name' | 'age' | 'chronic_diseases' | 'lastHba1c' | 'lastHb' | 'lastVisit' | 'overdue'
+
+function parseJSONArray(field: any): any[] {
+  if (Array.isArray(field)) return field;
+  if (typeof field === 'string') {
+    try {
+      const parsed = JSON.parse(field);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function getAbbrev(name: string) {
+  const match = name.match(/\(([^)]+)\)/);
+  return match ? match[1] : name;
+}
 
 function SortIcon({ col, active, dir }: { col: string; active: boolean; dir: 'asc' | 'desc' }) {
   if (!active) return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/50 inline-block" />
@@ -80,12 +102,14 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return patients.filter(p =>
-      !q ||
+    return patients.filter(p => {
+      const diseasesArr = parseJSONArray(p.chronic_diseases)
+      const diseasesStr = diseasesArr.map((d: any) => d.name).join(', ').toLowerCase();
+      return !q ||
       p.name.toLowerCase().includes(q) ||
-      p.ward_number.toLowerCase().includes(q) ||
-      (p.chronic_diseases ?? '').toLowerCase().includes(q)
-    )
+      p.room_number.toLowerCase().includes(q) ||
+      diseasesStr.includes(q)
+    })
   }, [search, patients])
 
   const toggleSelectAll = () => {
@@ -170,7 +194,10 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
       switch (sortCol) {
         case 'name': va = a.name; vb = b.name; break
         case 'age': va = a.age; vb = b.age; break
-        case 'chronic_diseases': va = a.chronic_diseases ?? ''; vb = b.chronic_diseases ?? ''; break
+        case 'chronic_diseases': 
+          va = parseJSONArray(a.chronic_diseases).map((d: any) => d.name).join(', ')
+          vb = parseJSONArray(b.chronic_diseases).map((d: any) => d.name).join(', ')
+          break
         case 'lastHba1c': va = a.lastHba1c ?? -1; vb = b.lastHba1c ?? -1; break
         case 'lastHb': va = a.lastHb ?? -1; vb = b.lastHb ?? -1; break
         case 'lastVisit':
@@ -207,7 +234,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, bed, or disease..."
+            placeholder="Search by name, ward, or disease..."
             className="pl-10 h-11 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-teal-500"
           />
         </div>
@@ -253,7 +280,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-          <div className="hidden xl:grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr auto' }}>
+          <div className="hidden xl:grid items-center gap-4 px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700" style={{ gridTemplateColumns: '32px 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 110px' }}>
             <button 
               onClick={toggleSelectAll} 
               className="text-muted-foreground hover:text-teal-600 transition-colors p-1"
@@ -270,6 +297,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
             <SortableHeader label="Hb" col="lastHb" {...headerProps} />
             <SortableHeader label="Last Visit" col="lastVisit" {...headerProps} />
             <SortableHeader label="Status" col="overdue" {...headerProps} />
+            <div className="w-[110px]" /> {/* Spacer for Actions column */}
           </div>
 
           {/* Rows */}
@@ -301,7 +329,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                     {/* Main desktop grid row */}
                     <div
                       className="grid items-center gap-4 px-5 py-4"
-                      style={{ gridTemplateColumns: 'min-content 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr auto' }}
+                      style={{ gridTemplateColumns: '32px 2fr 0.6fr 2fr 0.8fr 0.7fr 1.4fr 1fr 110px' }}
                   >
                     <div className="p-1 -m-1" onClick={e => { e.stopPropagation(); toggleSelect(p.id) }}>
                       {selectedIds.has(p.id) 
@@ -321,14 +349,16 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                           </span>
                           <ExternalLink className="h-3 w-3 mt-1 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
                         </div>
-                        <span className="text-xs font-mono text-muted-foreground">{p.ward_number}</span>
+                        <span className="text-xs font-mono text-muted-foreground">Room: {p.room_number}</span>
                       </div>
                     </div>
 
                     <span className="text-sm text-slate-700 dark:text-slate-300">{p.age}y</span>
 
-                    <span className="text-sm text-slate-600 dark:text-slate-400 truncate" title={p.chronic_diseases ?? ''}>
-                      {p.chronic_diseases || <span className="text-muted-foreground italic text-xs">None</span>}
+                    <span className="text-sm text-slate-600 dark:text-slate-400 truncate" dir="auto" title={parseJSONArray(p.chronic_diseases).map((d: any) => d.name).join('، ')}>
+                      {(parseJSONArray(p.chronic_diseases).length > 0) ? (
+                        parseJSONArray(p.chronic_diseases).map((d: any) => getAbbrev(d.name)).join('، ')
+                      ) : <span className="text-muted-foreground italic text-xs">None</span>}
                     </span>
 
                     <span className={`text-sm font-medium tabular-nums ${p.lastHba1c != null && p.lastHba1c > 6.5 ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-700 dark:text-slate-300'}`}>
@@ -406,7 +436,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                             <span className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{p.age}y</span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground">Bed: {p.ward_number}</span>
+                            <span className="text-xs font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-muted-foreground">Room: {p.room_number}</span>
                             <OverdueTag />
                           </div>
                         </div>
@@ -419,8 +449,10 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 px-8">
                       <div>
                         <p className="text-[10px] uppercase font-bold text-muted-foreground">Conditions</p>
-                        <p className="text-xs text-slate-700 dark:text-slate-300 truncate" title={p.chronic_diseases ?? ''}>
-                          {p.chronic_diseases || <span className="text-muted-foreground italic text-xs">None</span>}
+                        <p className="text-xs text-slate-700 dark:text-slate-300 truncate" title={parseJSONArray(p.chronic_diseases).map((d: any) => d.name).join(', ')}>
+                          {(parseJSONArray(p.chronic_diseases).length > 0) ? (
+                            parseJSONArray(p.chronic_diseases).map((d: any) => getAbbrev(d.name)).join(', ')
+                          ) : <span className="text-muted-foreground italic text-xs">None</span>}
                         </p>
                       </div>
                       <div>

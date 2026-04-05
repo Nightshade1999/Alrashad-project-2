@@ -1,4 +1,15 @@
-export type PatientCategory = 'High Risk' | 'Close Follow-up' | 'Normal';
+export type PatientCategory = 'High Risk' | 'Close Follow-up' | 'Normal' | 'Deceased/Archive';
+
+export interface MedicalDrugParams {
+  name: string;
+  dosage: string;
+  frequency: string;
+}
+
+export interface ChronicDiseaseParams {
+  name: string;
+  type: 'preset' | 'other';
+}
 
 export interface Database {
   public: {
@@ -8,22 +19,71 @@ export interface Database {
           id: string;
           user_id: string;
           ward_number: string;
+          ward_name: string;
           name: string;
           age: number;
           gender: string;
           category: PatientCategory;
           province: string | null;
           education_level: string | null;
-          past_surgeries: string | null;
-          chronic_diseases: string | null;
-          psych_drugs: string | null;
-          medical_drugs: string | null;
-          allergies: string | null;
+          relative_status: 'Known' | 'Unknown';
+          relative_visits: string | null;
+          date_of_death: string | null;
+          cause_of_death: string | null;
+          past_surgeries: string[];
+          chronic_diseases: ChronicDiseaseParams[];
+          psych_drugs: MedicalDrugParams[];
+          medical_drugs: MedicalDrugParams[];
+          allergies: string[];
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['patients']['Row'], 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Database['public']['Tables']['patients']['Insert']>;
+        Insert: {
+          id?: string;
+          user_id: string;
+          ward_number: string;
+          ward_name: string;
+          name: string;
+          age: number;
+          gender: string;
+          category: PatientCategory;
+          province?: string | null;
+          education_level?: string | null;
+          relative_status?: 'Known' | 'Unknown';
+          relative_visits?: string | null;
+          date_of_death?: string | null;
+          cause_of_death?: string | null;
+          past_surgeries?: string[];
+          chronic_diseases?: ChronicDiseaseParams[];
+          psych_drugs?: MedicalDrugParams[];
+          medical_drugs?: MedicalDrugParams[];
+          allergies?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          ward_number?: string;
+          ward_name?: string;
+          name?: string;
+          age?: number;
+          gender?: string;
+          category?: PatientCategory;
+          province?: string | null;
+          education_level?: string | null;
+          relative_status?: 'Known' | 'Unknown';
+          relative_visits?: string | null;
+          date_of_death?: string | null;
+          cause_of_death?: string | null;
+          past_surgeries?: string[];
+          chronic_diseases?: ChronicDiseaseParams[];
+          psych_drugs?: MedicalDrugParams[];
+          medical_drugs?: MedicalDrugParams[];
+          allergies?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
       };
       visits: {
         Row: {
@@ -64,11 +124,20 @@ export interface Database {
         Row: {
           user_id: string;
           ward_name: string;
+          doctor_name: string | null;
+          role: 'admin' | 'user';
+          specialty: 'internal_medicine' | 'psychiatry' | string;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at'>;
-        Update: Partial<Database['public']['Tables']['user_profiles']['Insert']>;
+        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at' | 'specialty' | 'doctor_name'> & { specialty?: string; doctor_name?: string };
+        Update: {
+          user_id?: string;
+          ward_name?: string;
+          doctor_name?: string | null;
+          role?: 'admin' | 'user';
+          specialty?: string;
+        };
       };
     };
   };

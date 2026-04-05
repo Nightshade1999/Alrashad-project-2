@@ -4,7 +4,7 @@ import { DeletePatientButton } from '@/components/patient/delete-button'
 
 export interface PatientSummary {
   id: string;
-  bedNumber: string;
+  roomNumber: string;
   name: string;
   age: number;
   gender: string;
@@ -24,7 +24,7 @@ export function PatientCard({ patient }: { patient: PatientSummary }) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5 bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 px-2.5 py-1 rounded-lg text-sm font-bold font-mono border border-teal-200 dark:border-teal-800">
               <BedDouble className="h-3.5 w-3.5" />
-              {patient.bedNumber}
+              {patient.roomNumber}
             </div>
             <span className="text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
               {patient.age}y · {patient.gender === 'Male' ? 'M' : 'F'}

@@ -135,3 +135,18 @@
     @apply min-h-12 min-w-12;
   }
 }
+
+/* AI Clinical Research Prose Styling */
+.prose h1 { @apply text-3xl font-black mb-6 mt-8 italic text-slate-900 dark:text-white; }
+.prose h2 { @apply text-2xl font-black mb-4 mt-8 text-slate-800 dark:text-slate-100 underline decoration-indigo-500/30; }
+.prose h3 { @apply text-xl font-black mb-3 mt-6 text-indigo-600 dark:text-indigo-400; }
+.prose p { @apply mb-4 leading-relaxed text-slate-600 dark:text-slate-300; }
+.prose ul { @apply list-disc pl-8 mb-6 space-y-3; }
+.prose ol { @apply list-decimal pl-8 mb-6 space-y-3; }
+.prose li { @apply pl-2 font-medium; }
+.prose strong { @apply font-black text-slate-900 dark:text-indigo-300; }
+.prose blockquote { @apply border-l-8 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 px-8 py-6 rounded-r-[2rem] my-8 font-bold text-indigo-900 dark:text-indigo-200; }
+.prose table { @apply w-full border-collapse my-8 text-sm shadow-sm rounded-2xl overflow-hidden; }
+.prose th { @apply bg-indigo-600 text-white p-4 text-left font-black uppercase tracking-widest border-b border-indigo-700; }
+.prose td { @apply p-4 border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50; }
+.prose hr { @apply border-slate-200 dark:border-slate-800 my-12 border-2 border-dashed; }

@@ -5,7 +5,6 @@ import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -25,7 +24,9 @@ import {
 import { createClient } from "@/lib/supabase"
 import { queueMutation } from "@/lib/offline-sync"
 import { toast } from "sonner"
-import type { PatientCategory } from "@/types/database.types"
+import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
+import { COMMON_SURGERIES } from "@/lib/medical-dictionary"
+import { DrugListInput, DiseaseListInput, StringListInput } from "./medical-inputs"
 
 const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
@@ -52,6 +53,17 @@ export function AddPatientModal() {
   const [category, setCategory] = useState<PatientCategory>("Normal")
   const [province, setProvince] = useState("")
   const [educationLevel, setEducationLevel] = useState("")
+  
+  // Relatives State
+  const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>('Unknown')
+  const [relativeVisits, setRelativeVisits] = useState("")
+
+  // Arrays State
+  const [pastSurgeries, setPastSurgeries] = useState<string[]>([])
+  const [chronicDiseases, setChronicDiseases] = useState<ChronicDiseaseParams[]>([])
+  const [medicalDrugs, setMedicalDrugs] = useState<MedicalDrugParams[]>([])
+  const [psychDrugs, setPsychDrugs] = useState<MedicalDrugParams[]>([])
+  const [allergies, setAllergies] = useState<string[]>([])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -60,11 +72,17 @@ export function AddPatientModal() {
       return
     }
 
+    if (category === 'Normal' && chronicDiseases.length >= 2) {
+      const confirmNormal = window.confirm("This patient has 2 or more chronic diseases. Standard protocol places them in 'Close Follow-up' or 'High Risk'.\n\nAre you sure you want to categorize them as 'Normal Follow-up'?")
+      if (!confirmNormal) {
+        return
+      }
+    }
+
     setIsSubmitting(true)
     const supabase = createClient()
     const formData = new FormData(e.currentTarget)
 
-    // Get the current user — required for RLS user_id column
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       toast.error("You must be logged in to add a patient.")
@@ -72,25 +90,44 @@ export function AddPatientModal() {
       return
     }
 
-    const payload = {
+    // Fetch user's ward from their profile to tag the patient
+    const { data: profile } = await (supabase.from('user_profiles') as any)
+      .select('ward_name')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!profile) {
+      toast.error("User profile not found. Contact administrator.")
+      setIsSubmitting(false)
+      return
+    }
+
+    const payload: any = {
       user_id: user.id,
+      ward_name: (profile as any).ward_name,
       name: formData.get('name') as string,
-      ward_number: formData.get('wardNumber') as string,
+      room_number: formData.get('roomNumber') as string,
       age: parseInt(formData.get('age') as string),
-      gender: gender,
-      category: category,
+      gender,
+      category,
       province: province || null,
       education_level: educationLevel || null,
-      past_surgeries: formData.get('pastSurgeries') as string || null,
-      chronic_diseases: formData.get('chronicDiseases') as string || null,
-      medical_drugs: formData.get('medicalDrugs') as string || null,
-      psych_drugs: formData.get('psychDrugs') as string || null,
-      allergies: formData.get('allergies') as string || null,
+      relative_status: relativeStatus,
+      relative_visits: relativeStatus === 'Known' ? relativeVisits || null : null,
+      past_surgeries: pastSurgeries,
+      chronic_diseases: chronicDiseases,
+      medical_drugs: medicalDrugs,
+      psych_drugs: psychDrugs,
+      allergies: allergies,
+    }
+
+    if (category === 'High Risk') {
+      payload.high_risk_date = new Date().toISOString()
     }
 
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine) {
-        // @ts-ignore - Supabase type mismatch in this environment
+        // @ts-ignore
         const { error } = await (supabase.from('patients') as any).insert([payload])
         if (error) throw error
         toast.success("Patient added successfully!")
@@ -99,11 +136,7 @@ export function AddPatientModal() {
         toast.success("Saved offline. Will sync when reconnected.")
       }
       setOpen(false)
-      // Reset dropdowns
-      setGender("")
-      setCategory("Normal")
-      setProvince("")
-      setEducationLevel("")
+      resetForm()
     } catch (error) {
       console.error(error)
       toast.error("Failed to add patient")
@@ -112,31 +145,45 @@ export function AddPatientModal() {
     }
   }
 
+  const resetForm = () => {
+    setGender("")
+    setCategory("Normal")
+    setProvince("")
+    setEducationLevel("")
+    setRelativeStatus('Unknown')
+    setRelativeVisits("")
+    setPastSurgeries([])
+    setChronicDiseases([])
+    setMedicalDrugs([])
+    setPsychDrugs([])
+    setAllergies([])
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="inline-flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 rounded-md w-full sm:w-auto h-14 px-8 text-lg font-semibold shadow-md whitespace-nowrap transition-colors">
         <Plus className="h-6 w-6 mr-2" />
         Add New Patient
       </DialogTrigger>
-      <DialogContent className="sm:max-w-3xl h-[90vh] sm:h-auto overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl w-[95vw] sm:w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto p-4 sm:p-6 mx-auto rounded-2xl">
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-primary">Add New Patient</DialogTitle>
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl text-primary font-bold">Add New Patient</DialogTitle>
             <DialogDescription>
-              Enter the patient's demographics and medical history here.
+              Enter the patient's demographics, relative status, and medical history here.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
+          <div className="space-y-8">
 
             {/* ── Basic Demographics ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input id="name" name="name" placeholder="Name" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="wardNumber">Ward / Bed Number</Label>
-                <Input id="wardNumber" name="wardNumber" placeholder="e.g. B12" required />
+                <Label htmlFor="roomNumber">Room Number</Label>
+                <Input id="roomNumber" name="roomNumber" placeholder="e.g. B12" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="age">Age</Label>
@@ -180,7 +227,39 @@ export function AddPatientModal() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              
+              {/* Relatives Info */}
+              <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
+                <Select value={relativeStatus} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
+                  <SelectTrigger id="relativeStatus">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Known">Known</SelectItem>
+                    <SelectItem value="Unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {relativeStatus === 'Known' && (
+                <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                  <Label htmlFor="relativeVisits" className="text-blue-700 dark:text-blue-400">Visits per 3 months</Label>
+                  <Select value={relativeVisits} onValueChange={(val) => setRelativeVisits(val || "")}>
+                    <SelectTrigger id="relativeVisits">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.5">0.5</SelectItem>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "More than 12"].map((num) => (
+                        <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2 md:col-span-2 border-t pt-4">
                 <Label htmlFor="category">Category (Follow-up Level)</Label>
                 <Select value={category} onValueChange={(val) => setCategory(val as PatientCategory)}>
                   <SelectTrigger id="category">
@@ -195,34 +274,52 @@ export function AddPatientModal() {
               </div>
             </div>
 
-            <hr className="my-2 border-border" />
-
             {/* ── Medical History ── */}
-            <h3 className="text-lg font-medium">Medical History</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="pastSurgeries">Past Surgeries</Label>
-                <Textarea id="pastSurgeries" name="pastSurgeries" className="resize-none min-h-24" placeholder="List past surgeries..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="chronicDiseases">Chronic Diseases</Label>
-                <Textarea id="chronicDiseases" name="chronicDiseases" className="resize-none min-h-24" placeholder="DM, HTN, etc..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="medicalDrugs">Internal Medical Drugs</Label>
-                <Textarea id="medicalDrugs" name="medicalDrugs" className="resize-none min-h-24" placeholder="Current medications..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="psychDrugs">Psychiatric Drugs</Label>
-                <Textarea id="psychDrugs" name="psychDrugs" className="resize-none min-h-24" placeholder="Current psych medications..." />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="allergies" className="text-destructive">Allergies</Label>
-                <Textarea id="allergies" name="allergies" className="resize-none min-h-24 border-destructive/50 focus-visible:ring-destructive" placeholder="List known allergies..." />
+            <hr className="border-border" />
+            
+            <div>
+              <h3 className="text-lg font-bold mb-4">Medical History</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <DiseaseListInput 
+                  diseases={chronicDiseases} 
+                  onChange={setChronicDiseases} 
+                />
+                
+                <StringListInput 
+                  label="Past Surgeries" 
+                  items={pastSurgeries} 
+                  onChange={setPastSurgeries}
+                  presetList={COMMON_SURGERIES}
+                />
+
+                <DrugListInput 
+                  label="Internal Medical Drugs" 
+                  category="Internal" 
+                  drugs={medicalDrugs} 
+                  onChange={setMedicalDrugs} 
+                />
+                
+                <DrugListInput 
+                  label="Psychiatric Drugs" 
+                  category="Psych" 
+                  drugs={psychDrugs} 
+                  onChange={setPsychDrugs} 
+                />
+
+                <div className="md:col-span-2">
+                  <StringListInput 
+                    label="Allergies" 
+                    items={allergies} 
+                    onChange={setAllergies}
+                    isDanger={true}
+                  />
+                </div>
+
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-8">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save Patient"}

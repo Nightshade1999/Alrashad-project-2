@@ -96,7 +96,7 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden">
+      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl flex flex-col max-h-[95dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-950/20">
           <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export function AddInvestigationModal({ patientId, variant = "button" }: { patie
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 shrink min-h-0 space-y-5">
           <div>
             <Label htmlFor="inv-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</Label>
             <Input id="inv-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1.5" />

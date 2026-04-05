@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
-import Papa from 'papaparse'
+import { exportPatientsToCSV } from '@/lib/export-utils'
 import { toast } from 'sonner'
 
 export function ExportButton() {
@@ -17,7 +17,7 @@ export function ExportButton() {
       
       const { data, error } = await supabase
         .from('patients')
-        .select('*')
+        .select('*, investigations(*)')
       
       if (error) throw error
       
@@ -26,18 +26,7 @@ export function ExportButton() {
         return
       }
 
-      const csv = Papa.unparse(data)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.setAttribute('href', url)
-      link.setAttribute('download', `patients-export-${new Date().toISOString().split('T')[0]}.csv`)
-      link.style.visibility = 'hidden'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      
+      await exportPatientsToCSV(data)
       toast.success("Export successful!")
     } catch (error) {
       console.error('Export error:', error)

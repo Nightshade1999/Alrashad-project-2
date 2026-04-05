@@ -17,11 +17,22 @@ interface Tip {
   text: string
 }
 
+function toSearchStr(val: any): string {
+  if (!val) return ''
+  if (typeof val === 'string') {
+    try { val = JSON.parse(val) } catch { return val.toLowerCase() }
+  }
+  if (Array.isArray(val)) {
+    return val.map((v: any) => (typeof v === 'object' ? Object.values(v).join(' ') : String(v))).join(' ').toLowerCase()
+  }
+  return String(val).toLowerCase()
+}
+
 function generateTips(p: any): Tip[] {
   const tips: Tip[] = []
-  const conditions = (p.chronic_diseases || '').toLowerCase()
-  const psych = (p.psych_drugs || '').toLowerCase()
-  const medical = (p.medical_drugs || '').toLowerCase()
+  const conditions = toSearchStr(p.chronic_diseases)
+  const psych = toSearchStr(p.psych_drugs)
+  const medical = toSearchStr(p.medical_drugs)
   const hba1c = p.lastHba1c ?? p.investigations?.[0]?.hba1c
   const hb = p.lastHb ?? p.investigations?.[0]?.hb
 
@@ -52,8 +63,9 @@ function generateTips(p: any): Tip[] {
     tips.push({ emoji: '🩺', text: `Hb ${hb} — evaluate anaemia aetiology` })
 
   // Allergies
-  if (p.allergies)
-    tips.push({ emoji: '🚨', text: `Allergy alert: ${p.allergies} — confirm safe alternatives` })
+  const allergyStr = toSearchStr(p.allergies)
+  if (allergyStr)
+    tips.push({ emoji: '🚨', text: `Allergy alert: ${allergyStr} — confirm safe alternatives` })
 
   // Fallbacks
   if (tips.length === 0) {
@@ -68,9 +80,10 @@ function generateTips(p: any): Tip[] {
 
 interface AIAdviceSectionProps {
   patientData: any
+  aiEnabled: boolean
 }
 
-export function AIAdviceSection({ patientData }: AIAdviceSectionProps) {
+export function AIAdviceSection({ patientData, aiEnabled }: AIAdviceSectionProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -123,6 +136,22 @@ export function AIAdviceSection({ patientData }: AIAdviceSectionProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (!aiEnabled) {
+    return (
+      <div className="mt-8 p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center text-center space-y-4">
+        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
+          <BrainCircuit className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+        </div>
+        <div className="max-w-sm">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100">AI Advisor Restricted</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+            AI-powered clinical consultations are currently disabled for your account. Please contact your system administrator to enable these features.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

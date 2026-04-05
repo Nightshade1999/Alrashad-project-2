@@ -8,7 +8,7 @@ import Link from 'next/link'
 interface PatientSearchItem {
   id: string
   name: string
-  ward_number: string | null
+  room_number: string | null
   category: string
 }
 
@@ -22,7 +22,7 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
     const q = query.toLowerCase()
     return patients.filter(p => 
       p.name.toLowerCase().includes(q) || 
-      (p.ward_number?.toLowerCase().includes(q))
+      (p.room_number?.toLowerCase().includes(q))
     ).slice(0, 8)
   }, [query, patients])
 
@@ -41,7 +41,7 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
       <div className="relative">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search patients by name or bed..."
+          placeholder="Search patients by name or room..."
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -69,7 +69,7 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
                       <div className="font-bold text-slate-800 dark:text-slate-100 truncate">{p.name}</div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <BedDouble className="h-3 w-3" />
-                        <span>Bed {p.ward_number || 'N/A'}</span>
+                        <span>Room {p.room_number || 'N/A'}</span>
                         <span>•</span>
                         <span className={
                           p.category === 'High Risk' ? 'text-red-500 font-medium' :
@@ -89,7 +89,7 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
                 <Search className="h-5 w-5 text-slate-400" />
               </div>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No patients found matches "{query}"</p>
-              <p className="text-xs text-muted-foreground mt-1 text-balance px-4 text-center">Try searching for the exact full name or the ward/bed number.</p>
+              <p className="text-xs text-muted-foreground mt-1 text-balance px-4 text-center">Try searching for the exact full name or the room number.</p>
             </div>
           )}
         </div>

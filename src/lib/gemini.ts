@@ -5,11 +5,13 @@ const genAI = new GoogleGenerativeAI(apiKey)
 
 // User-requested priority: Pro > Thinking > Flash
 export const MODEL_PRIORITY = [
-  "gemini-2.5-pro",
+  "gemini-2.0-pro-exp-02-05", // Gemini 2.0 Pro
+  "gemini-2.5-pro", 
   "gemini-3-pro-preview",
   "gemini-2.0-flash-thinking-exp",
   "gemini-2.5-flash",
-  "gemini-flash-latest"
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-exp"
 ]
 
 export const getGenerativeModel = (modelName: string) => {

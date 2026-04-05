@@ -30,9 +30,14 @@ export function CategorySwitcher({ patientId, currentCategory }: CategorySwitche
     const supabase = createClient()
     
     try {
+      const updatePayload: any = { category: newCat }
+      if (newCat === 'High Risk') {
+        updatePayload.high_risk_date = new Date().toISOString()
+      }
+      
       // @ts-ignore - Supabase type inference has issues in this environment
       const { error } = await (supabase.from('patients') as any)
-        .update({ category: newCat })
+        .update(updatePayload)
         .eq('id', patientId)
 
       if (error) throw error
@@ -62,6 +67,7 @@ export function CategorySwitcher({ patientId, currentCategory }: CategorySwitche
           <SelectItem value="High Risk">🔴 High Risk</SelectItem>
           <SelectItem value="Close Follow-up">🟡 Close Follow-up</SelectItem>
           <SelectItem value="Normal">🟢 Normal Follow-up</SelectItem>
+          <SelectItem value="Deceased/Archive">⚫ Deceased/Archive</SelectItem>
         </SelectContent>
       </Select>
     </div>

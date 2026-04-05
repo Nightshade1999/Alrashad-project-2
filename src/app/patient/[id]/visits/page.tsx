@@ -19,7 +19,7 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
-  const { data: patient } = await supabase.from("patients").select("id, name, ward_number").eq("id", id).single()
+  const { data: patient } = await supabase.from("patients").select("id, name, room_number").eq("id", id).single()
   if (!patient) notFound()
 
   const { data: visits } = await supabase
@@ -40,7 +40,7 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Visit Notes</h1>
-            <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.ward_number}</p>
+            <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.room_number}</p>
           </div>
         </div>
         <AddVisitModal patientId={id} />

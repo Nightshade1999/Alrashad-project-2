@@ -6,6 +6,7 @@ import { LogOut, Stethoscope } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
 import { WardHeader } from '@/components/dashboard/ward-header'
+import { DoctorNameModal } from '@/components/dashboard/doctor-name-modal'
 import { Toaster } from '@/components/ui/sonner'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -23,8 +24,26 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const doctorName = user?.email?.split('@')[0] || 'Doctor'
-  const formattedName = doctorName.charAt(0).toUpperCase() + doctorName.slice(1)
+
+  // Try to get real doctor name from user_profiles
+  let displayName = 'Doctor'
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('doctor_name')
+      .eq('user_id', user?.id ?? '')
+      .single()
+    if (profile?.doctor_name) {
+      displayName = profile.doctor_name
+    } else {
+      // Fallback to email-based name
+      const emailName = user?.email?.split('@')[0] || 'Doctor'
+      displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1)
+    }
+  } catch {
+    const emailName = user?.email?.split('@')[0] || 'Doctor'
+    displayName = emailName.charAt(0).toUpperCase() + emailName.slice(1)
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-slate-100 dark:from-slate-950 dark:via-teal-950/20 dark:to-slate-900">
@@ -42,9 +61,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </div>
             <div className="flex flex-col">
               <WardHeader />
-              <span className="text-xs font-medium text-muted-foreground hover:text-teal-600 transition-colors">
-                Dr. {formattedName}
-              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                  Dr. {displayName}
+                </span>
+              </div>
             </div>
           </Link>
 
@@ -60,6 +82,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </div>
         </div>
       </header>
+
+      {/* Doctor Name Modal — shows on first sign-in if name not set */}
+      <DoctorNameModal />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full">

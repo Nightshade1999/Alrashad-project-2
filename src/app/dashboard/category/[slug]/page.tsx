@@ -40,13 +40,30 @@ const CATEGORY_MAP: Record<string, {
     iconColor: 'text-violet-600 dark:text-violet-400', dot: '🕐',
     description: 'All patients sorted by oldest last visit — review who needs attention first.',
   },
+  'archive': {
+    label: 'Archive (Deceased)', dbValue: 'Deceased/Archive', icon: AlertCircle, // We'll just reuse AlertCircle here since Skull isn't imported
+    gradient: 'from-slate-500 to-slate-700', lightBg: 'bg-slate-50 dark:bg-slate-900/20',
+    border: 'border-slate-200 dark:border-slate-700', iconBg: 'bg-slate-200 dark:bg-slate-800',
+    iconColor: 'text-slate-700 dark:text-slate-400', dot: '⚫',
+  },
+}
+
+function getDynamicAge(baseAge: number, timestampIso?: string): number {
+  if (!timestampIso) return baseAge;
+  const ts = new Date(timestampIso);
+  const now = new Date();
+  let diffYears = now.getFullYear() - ts.getFullYear();
+  if (now.getMonth() < ts.getMonth() || (now.getMonth() === ts.getMonth() && now.getDate() < ts.getDate())) {
+    diffYears--;
+  }
+  return baseAge + Math.max(0, diffYears);
 }
 
 async function fetchPatientRows(supabase: any, categoryDbValue: string | null): Promise<PatientRow[]> {
   // For pending follow-up, fetch all patients regardless of category
   const query = supabase
     .from('patients')
-    .select('id, name, age, ward_number, chronic_diseases, category')
+    .select('id, name, age, room_number, chronic_diseases, category, created_at, date_of_death, cause_of_death, previous_category')
     .order('created_at', { ascending: false })
 
   if (categoryDbValue && categoryDbValue !== 'ALL') {
@@ -59,17 +76,22 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
 
   const ids = patients.map((p: any) => p.id)
 
-  const { data: investigations } = await supabase
-    .from('investigations')
-    .select('patient_id, hba1c, hb, date')
-    .in('patient_id', ids)
-    .order('date', { ascending: false })
+  // Parallelize investigation and visit fetching
+  const [investigationsRes, visitsRes] = await Promise.all([
+    supabase
+      .from('investigations')
+      .select('patient_id, hba1c, hb, date')
+      .in('patient_id', ids)
+      .order('date', { ascending: false }),
+    supabase
+      .from('visits')
+      .select('patient_id, visit_date, bp_sys, bp_dia, pr, spo2, temp')
+      .in('patient_id', ids)
+      .order('visit_date', { ascending: false })
+  ])
 
-  const { data: visits } = await supabase
-    .from('visits')
-    .select('patient_id, visit_date, bp_sys, bp_dia, pr, spo2, temp')
-    .in('patient_id', ids)
-    .order('visit_date', { ascending: false })
+  const investigations = investigationsRes.data
+  const visits = visitsRes.data
 
   const latestInv: Record<string, { hba1c: number | null; hb: number | null }> = {}
   for (const inv of investigations ?? []) {
@@ -95,8 +117,8 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
   return patients.map((p: any) => ({
     id: p.id,
     name: p.name,
-    age: p.age,
-    ward_number: p.ward_number,
+    age: getDynamicAge(p.age, p.created_at),
+    room_number: p.room_number,
     chronic_diseases: p.chronic_diseases,
     category: p.category,
     lastHba1c: latestInv[p.id]?.hba1c ?? null,
@@ -107,6 +129,10 @@ async function fetchPatientRows(supabase: any, categoryDbValue: string | null): 
     lastPr: latestVisit[p.id]?.pr ?? null,
     lastSpo2: latestVisit[p.id]?.spo2 ?? null,
     lastTemp: latestVisit[p.id]?.temp ?? null,
+    // death info
+    date_of_death: p.date_of_death,
+    cause_of_death: p.cause_of_death,
+    previous_category: p.previous_category,
   }))
 }
 

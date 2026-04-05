@@ -19,7 +19,19 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
     const supabase = createClient()
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const doctorEmail = user?.email || ""
+
+      // Fetch doctor name + ward name from profile
+      let doctorName = ""
+      let wardName = ""
+      if (user) {
+        const { data: profile } = await (supabase as any)
+          .from('user_profiles')
+          .select('doctor_name, ward_name')
+          .eq('user_id', user.id)
+          .single()
+        doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || user.email?.split('@')[0] || "Ward Clinician"
+        wardName = profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
+      }
 
       // Fetch ALL history for this specific patient
       const { data: investigations } = await supabase
@@ -41,7 +53,7 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
         visits: visits || []
       }
 
-      await exportToWord([fullData], doctorEmail)
+      await exportToWord([fullData], doctorName, wardName)
       toast.success("Clinical summary exported to Word")
     } catch (err) {
       console.error(err)

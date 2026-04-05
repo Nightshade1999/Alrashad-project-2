@@ -31,7 +31,7 @@ export default async function InvestigationsPage({ params }: { params: Promise<{
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
-  const { data: patient } = await supabase.from("patients").select("id, name, ward_number").eq("id", id).single()
+  const { data: patient } = await supabase.from("patients").select("id, name, room_number").eq("id", id).single()
   if (!patient) notFound()
 
   const { data: investigations } = await supabase
@@ -52,7 +52,7 @@ export default async function InvestigationsPage({ params }: { params: Promise<{
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Investigations History</h1>
-            <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.ward_number}</p>
+            <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.room_number}</p>
           </div>
         </div>
         <AddInvestigationModal patientId={id} />
