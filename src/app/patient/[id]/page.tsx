@@ -122,67 +122,51 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
       
       {/* ── Deceased Banner ── */}
       {isDeceased && (
-        <div className="bg-slate-800 text-slate-100 p-4 rounded-xl flex items-center justify-between shadow-sm">
+        <div className="bg-slate-900 border border-slate-800 text-slate-100 p-3 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in-up">
           <div className="flex items-center gap-3">
-            <div className="bg-slate-700 p-2 rounded-lg">
-              <Cross className="h-5 w-5 text-slate-300" />
+            <div className="bg-slate-800 p-2 rounded-xl">
+              <Cross className="h-4 w-4 text-red-400" />
             </div>
             <div>
-              <h2 className="font-bold text-lg leading-tight text-white">Patient Archived (Deceased)</h2>
-              <p className="text-sm text-slate-300">
-                Date of Death: {patient.date_of_death ? format(parseISO(patient.date_of_death), 'dd MMM yyyy') : 'Unknown'}
-              </p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Classification</p>
+              <h2 className="font-bold text-sm leading-tight text-white">Patient Deceased</h2>
             </div>
           </div>
-          {patient.cause_of_death && (
-            <div className="text-right hidden sm:block">
-              <p className="text-xs uppercase text-slate-400 font-bold tracking-wider">Cause of Death</p>
-              <p className="text-sm font-medium max-w-xs truncate">{patient.cause_of_death}</p>
-            </div>
-          )}
-          <div className="ml-4 shrink-0">
+          <div className="shrink-0 scale-90">
              <RestorePatientButton patientId={patient.id} previousCategory={patient.previous_category} />
           </div>
         </div>
       )}
 
       {/* ── Top bar ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link href={`/dashboard/category/${
-            patient.category === 'High Risk' ? 'high-risk'
-            : patient.category === 'Close Follow-up' ? 'close-follow-up'
-            : patient.category === 'Deceased/Archive' ? 'archive'
-            : 'normal'
-          }`}>
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900" title="Back to Category">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link href="/dashboard">
-            <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900 text-teal-600 hover:text-teal-700 hover:bg-teal-50" title="Dashboard">
-              <Home className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className={`text-xl sm:text-2xl font-bold leading-tight truncate ${isDeceased ? 'text-slate-500 line-through decoration-slate-300 dark:decoration-slate-600' : 'text-slate-800 dark:text-slate-100'}`} dir="auto">
-              {patient.name}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-sm text-muted-foreground whitespace-nowrap">{patient.age}y · {patient.gender}</p>
-              <div className="h-1 w-1 rounded-full bg-slate-300" />
-              <p className="text-xs font-bold text-teal-600 uppercase tracking-tighter">Room {patient.room_number}</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard">
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl bg-white dark:bg-slate-900 shadow-sm border-slate-200">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div className="min-w-0">
+              <h1 className={`text-lg sm:text-xl font-black leading-tight truncate ${isDeceased ? 'text-slate-500 line-through' : 'text-slate-900 dark:text-white'}`} dir="auto">
+                {patient.name}
+              </h1>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                {patient.age}y · {patient.gender} · Room {patient.room_number}
+              </p>
             </div>
           </div>
+          {!isDeceased && (
+            <div className="shrink-0 scale-90 sm:scale-100 origin-right">
+              <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
+            </div>
+          )}
         </div>
         
-        {/* Actions - Structured Grid on Mobile for Better Arrangement */}
-        <div className="w-full sm:w-auto">
+        {/* Actions - Centered Flex for Neat Arrangement without Gaps */}
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1">
           {!isDeceased ? (
-            <div className="grid grid-cols-4 sm:flex sm:items-center gap-2 items-center">
-              <div className="col-span-4 sm:col-span-1">
-                <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
-              </div>
+            <>
               <AddVisitModal patientId={patient.id} variant="icon" />
               <AddInvestigationModal patientId={patient.id} variant="icon" />
               <ExportPatientButton patient={displayPatient} />
@@ -190,13 +174,13 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
               <EditPatientModal patient={patient} />
               <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
-            </div>
+            </>
           ) : (
-            <div className="grid grid-cols-3 sm:flex sm:items-center gap-2">
+            <>
               <ExportPatientButton patient={displayPatient} />
               <ShareAIPromptModal patient={displayPatient} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
-            </div>
+            </>
           )}
         </div>
       </div>
