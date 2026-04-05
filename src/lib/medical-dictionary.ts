@@ -29,35 +29,78 @@ export const GENERAL_SURGERIES = [
   "Thyroidectomy",
   "Gastrectomy",
   "Splenectomy",
-  "Tonsillectomy",
-  "Septoplasty",
-  "Adenoidectomy",
-  "Cataract Surgery",
-  "ORIF (Open Reduction Internal Fixation)",
-  "Total Knee Replacement",
-  "Total Hip Replacement",
-  "CABG (Coronary Artery Bypass Graft)",
-  "PCI (Stent Insertion)",
-  "Pacemaker Insertion",
-  "AV Fistula",
 ];
 
-export const FEMALE_SURGERIES = [
-  "Cesarean Section (C-Section)",
+export const ORTHO_SURGERIES = [
+  "ORIF (Fracture Fixation)",
+  "Total Knee Replacement",
+  "Total Hip Replacement",
+  "Arthroscopy",
+  "Amputation",
+  "Debridement",
+];
+
+export const OBGYN_SURGERIES = [
+  "Cesarean Section",
   "Hysterectomy",
   "Oophorectomy",
   "Myomectomy",
-  "D&C (Dilation & Curettage)",
+  "D&C",
   "Tubal Ligation",
-  "Mastectomy",
 ];
 
-export const MALE_SURGERIES = [
-  "Prostatectomy",
-  "TURP (Transurethral Resection of Prostate)",
-  "Circumcision",
-  "Orchidectomy",
+export const CVT_SURGERIES = [
+  "CABG",
+  "PCI (Stenting)",
+  "Pacemaker Insertion",
+  "AV Fistula",
+  "Valve Replacement",
 ];
+
+export const URO_SURGERIES = [
+  "Prostatectomy",
+  "TURP",
+  "Nephrectomy",
+  "Cystoscopy",
+  "Circumcision",
+];
+
+export const ENT_SURGERIES = [
+  "Tonsillectomy",
+  "Septoplasty",
+  "Adenoidectomy",
+  "Mastoidectomy",
+  "Myringotomy",
+];
+
+export const EYE_SURGERIES = [
+  "Cataract Surgery",
+  "Vitrectomy",
+  "LASIK",
+  "Glaucoma Surgery",
+];
+
+export const NEURO_SURGERIES = [
+  "Craniotomy",
+  "Spinal Fusion",
+  "VP Shunt Insertion",
+  "Discectomy",
+  "Laminectomy",
+];
+
+export const ALL_SURGERIES = [
+  ...GENERAL_SURGERIES,
+  ...ORTHO_SURGERIES,
+  ...OBGYN_SURGERIES,
+  ...CVT_SURGERIES,
+  ...URO_SURGERIES,
+  ...ENT_SURGERIES,
+  ...EYE_SURGERIES,
+  ...NEURO_SURGERIES,
+];
+
+export const FEMALE_SURGERIES = OBGYN_SURGERIES;
+export const MALE_SURGERIES = URO_SURGERIES;
 
 export const COMMON_ALLERGIES = [
   "Penicillins",

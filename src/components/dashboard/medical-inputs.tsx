@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { COMMON_DISEASES, COMMON_SURGERIES, DRUG_DICTIONARY, DrugDictionaryItem } from "@/lib/medical-dictionary"
+import { COMMON_DISEASES, ALL_SURGERIES, DRUG_DICTIONARY, DrugDictionaryItem } from "@/lib/medical-dictionary"
 import type { MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
 
 // --- DRUG INPUT ---

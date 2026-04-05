@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from 'react'
-import { COMMON_DISEASES, COMMON_SURGERIES } from '@/lib/medical-dictionary'
+import { COMMON_DISEASES, ALL_SURGERIES } from '@/lib/medical-dictionary'
 
 export type Measure = 'categorical' | 'continuous' | 'ordinal'
 
@@ -62,7 +62,7 @@ export function useVariableDiscovery(patients: any[]) {
     })
 
     // ── 4. Surgical History ──────────────────────────────────
-    const allSurgeries = new Set([...COMMON_SURGERIES, ...Array.from(observedSurgeries)])
+    const allSurgeries = new Set([...ALL_SURGERIES, ...Array.from(observedSurgeries)])
     Array.from(allSurgeries).sort().forEach(s => {
       vars.push({ id: `surgery_${s.replace(/\s+/g, '_')}`, label: s, type: 'categorical', group: '4. Surgical History' })
     })

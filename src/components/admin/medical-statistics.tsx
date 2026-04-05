@@ -13,7 +13,7 @@ import {
   Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell 
 } from 'recharts'
 import { runComplexAIStudyAction } from '@/app/actions/research-actions'
-import { COMMON_DISEASES, COMMON_SURGERIES } from '@/lib/medical-dictionary'
+import { COMMON_DISEASES, ALL_SURGERIES } from '@/lib/medical-dictionary'
 
 import { useVariableDiscovery, type Variable, type Measure } from '@/hooks/use-variable-discovery'
 
