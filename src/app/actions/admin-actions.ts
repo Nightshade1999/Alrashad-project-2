@@ -5,16 +5,19 @@ import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) {
+    throw new Error("Supabase Admin credentials missing")
+  }
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-  }
-)
+  })
+}
 
 /** Server-Side Helper to verify requesting user is an ADMIN. */
 async function verifyAdmin() {
@@ -56,7 +59,7 @@ export async function createUserAction(formData: FormData) {
   if (!email || !password) return { error: 'Email and password required' }
 
   // 1. Create auth user
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+  const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -68,7 +71,7 @@ export async function createUserAction(formData: FormData) {
   // then forcefully apply the requested role/ward settings.
   await new Promise(r => setTimeout(r, 1000))
   
-  const { error: profileError } = await (supabaseAdmin
+  const { error: profileError } = await (getSupabaseAdmin()
     .from('user_profiles') as any)
     .upsert({ 
       user_id: authData.user.id, 
@@ -94,7 +97,7 @@ export async function deleteUserAction(userId: string) {
   if (!userId) return { error: 'User ID required' }
 
   // Check if they have patients to avoid constraint errors
-  const { data: patients, error: patientError } = await supabaseAdmin
+  const { data: patients, error: patientError } = await getSupabaseAdmin()
     .from('patients')
     .select('id')
     .eq('user_id', userId)
@@ -105,10 +108,10 @@ export async function deleteUserAction(userId: string) {
   }
 
   // Delete profile first
-  await supabaseAdmin.from('user_profiles').delete().eq('user_id', userId)
+  await getSupabaseAdmin().from('user_profiles').delete().eq('user_id', userId)
   
   // Delete auth user
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  const { error } = await getSupabaseAdmin().auth.admin.deleteUser(userId)
   
   if (error) return { error: error.message }
   
@@ -124,7 +127,7 @@ export async function updateUserPasswordAction(userId: string, newPassword: stri
   }
   if (!userId || !newPassword) return { error: 'User ID and password required' }
 
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword })
+  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, { password: newPassword })
   
   if (error) return { error: error.message }
   return { success: true }
@@ -135,7 +138,7 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
 
   // Update email if provided
   if (email) {
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email })
+    const { error: authError } = await getSupabaseAdmin().auth.admin.updateUserById(userId, { email })
     if (authError) return { error: 'Failed to update email: ' + authError.message }
   }
 
@@ -148,7 +151,7 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
 
-    const { error: profError } = await (supabaseAdmin
+    const { error: profError } = await (getSupabaseAdmin()
       .from('user_profiles') as any)
       .update(updatePayload)
       .eq('user_id', userId)
@@ -170,7 +173,7 @@ export async function migratePatientsAction(fromUserId: string, toUserId: string
     return { error: 'Invalid user selections for migration' }
   }
 
-  const { data, error } = await supabaseAdmin.rpc('migrate_patients', {
+  const { data, error } = await getSupabaseAdmin().rpc('migrate_patients', {
     from_user: fromUserId,
     to_user: toUserId
   })
@@ -181,20 +184,20 @@ export async function migratePatientsAction(fromUserId: string, toUserId: string
 }
 
 export async function getDbSizeAction() {
-  const { data, error } = await supabaseAdmin.rpc('get_db_size')
+  const { data, error } = await getSupabaseAdmin().rpc('get_db_size')
   if (error) return { error: error.message }
   return { data }
 }
 
 export async function getAllUsersAction() {
-  const { data: users, error: authError } = await supabaseAdmin.auth.admin.listUsers()
+  const { data: users, error: authError } = await getSupabaseAdmin().auth.admin.listUsers()
   if (authError) return { error: authError.message, users: [] }
   
-  const { data: profiles, error: profError } = await (supabaseAdmin.from('user_profiles') as any).select('*')
+  const { data: profiles, error: profError } = await (getSupabaseAdmin().from('user_profiles') as any).select('*')
   if (profError) return { error: profError.message, users: [] }
 
   // Merge auth data with profile data
-  const combined = users.users.map(u => {
+  const combined = users.users.map((u: any) => {
     const prof = profiles?.find((p: any) => p.user_id === u.id)
     return {
       id: u.id,
@@ -214,11 +217,11 @@ export async function getAllUsersAction() {
 
 export async function getAllPatientsForAdminAction() {
     const [patientsRes, profilesRes] = await Promise.all([
-    supabaseAdmin
+    getSupabaseAdmin()
       .from('patients')
       .select('*, visits(*), investigations(*)')
       .order('created_at', { ascending: false }),
-    (supabaseAdmin
+    (getSupabaseAdmin()
       .from('user_profiles') as any)
       .select('user_id, ward_name')
   ])
