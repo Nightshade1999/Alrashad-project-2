@@ -118,7 +118,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
   const aiEnabled = userProfile?.ai_enabled ?? true
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto overflow-x-hidden px-1">
       
       {/* ── Deceased Banner ── */}
       {isDeceased && (
@@ -164,21 +164,23 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
               <Home className="h-4 w-4" />
             </Button>
           </Link>
-          <div className="min-w-0 ml-1">
+          <div className="min-w-0 flex-1">
             <h1 className={`text-xl sm:text-2xl font-bold leading-tight truncate ${isDeceased ? 'text-slate-500 line-through decoration-slate-300 dark:decoration-slate-600' : 'text-slate-800 dark:text-slate-100'}`} dir="auto">
               {patient.name}
             </h1>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <p className="text-sm text-muted-foreground">{patient.age} years old · {patient.gender}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm text-muted-foreground whitespace-nowrap">{patient.age}y · {patient.gender}</p>
+              <div className="h-1 w-1 rounded-full bg-slate-300" />
+              <p className="text-xs font-bold text-teal-600 uppercase tracking-tighter">Room {patient.room_number}</p>
             </div>
           </div>
         </div>
         
-        {/* Actions */}
-        {!isDeceased && (
-          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
-            <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
-            <div className="flex gap-2">
+        {/* Actions - Scrollable on mobile to prevent layout zooming */}
+        <div className="w-full sm:w-auto overflow-x-auto pb-2 -mb-2 no-scrollbar">
+          {!isDeceased ? (
+            <div className="flex items-center gap-2 min-w-max pr-4">
+              <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
               <AddVisitModal patientId={patient.id} variant="icon" />
               <AddInvestigationModal patientId={patient.id} variant="icon" />
               <ExportPatientButton patient={displayPatient} />
@@ -187,16 +189,14 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
               <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
             </div>
-          </div>
-        )}
-        
-        {isDeceased && (
-            <div className="flex gap-2 w-full sm:w-auto">
+          ) : (
+            <div className="flex items-center gap-2 min-w-max pr-4">
               <ExportPatientButton patient={displayPatient} />
               <ShareAIPromptModal patient={displayPatient} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
             </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Demographics + Medical Info ── */}

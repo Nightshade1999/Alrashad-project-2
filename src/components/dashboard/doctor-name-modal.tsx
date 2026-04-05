@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Stethoscope, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +20,8 @@ export function DoctorNameModal() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   useEffect(() => {
     checkDoctorName()
@@ -37,21 +40,30 @@ export function DoctorNameModal() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // 2. Check Database for a "default" name
+      // 1. Check Database
       const { data } = await (supabase as any)
         .from('user_profiles')
         .select('doctor_name')
         .eq('user_id', user.id)
         .single()
 
-      // If we are here, there is NO sessionName. 
-      // ALWAYS show the modal if no sessionName exists (at new sign in)
-      // to handle the "account may be used by more than one doctor" case.
-      setOpen(true)
+      const dbName = data?.doctor_name || ""
+      if (dbName) setName(dbName)
+
+      // 2. Decide whether to open
+      const isNewLogin = searchParams.get('login') === 'true'
       
-      // But pre-fill with the database value if it exists
-      if (data?.doctor_name) {
-        setName(data.doctor_name)
+      if (!dbName || isNewLogin) {
+        setOpen(true)
+        // Clean up URL if visible
+        if (isNewLogin) {
+           const newUrl = window.location.pathname
+           window.history.replaceState({}, '', newUrl)
+        }
+      } else {
+        // If we have a DB name and NOT a new login, just set session and stay closed
+        sessionStorage.setItem('wardManager_doctorName', dbName)
+        setOpen(false)
       }
     } catch {
       setOpen(true)
