@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, User, BedDouble, ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
+import { convertArabicNumbers } from '@/lib/utils'
 
 interface PatientSearchItem {
   id: string
@@ -19,7 +20,8 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
 
   const filteredPatients = useMemo(() => {
     if (!query.trim()) return []
-    const q = query.toLowerCase()
+    const convertedQuery = convertArabicNumbers(query.toLowerCase())
+    const q = convertedQuery.toLowerCase()
     return patients.filter(p => 
       p.name.toLowerCase().includes(q) || 
       (p.room_number?.toLowerCase().includes(q))
@@ -43,7 +45,7 @@ export function DashboardSearch({ patients }: { patients: PatientSearchItem[] })
         <Input
           placeholder="Search patients by name or room..."
           value={query}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             setQuery(e.target.value)
             setIsOpen(true)
           }}
