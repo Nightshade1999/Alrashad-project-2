@@ -25,7 +25,7 @@ import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
-import { COMMON_SURGERIES } from "@/lib/medical-dictionary"
+import { COMMON_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
 import { DrugListInput, DiseaseListInput, StringListInput } from "../dashboard/medical-inputs"
 
 const IRAQ_PROVINCES = [
@@ -299,6 +299,7 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
                     label="Allergies" 
                     items={allergies} 
                     onChange={setAllergies}
+                    presetList={COMMON_ALLERGIES}
                     isDanger={true}
                   />
                 </div>

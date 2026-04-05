@@ -35,6 +35,14 @@ export const COMMON_SURGERIES = [
   "Thyroidectomy",
 ];
 
+export const COMMON_ALLERGIES = [
+  "No known drug allergy",
+  "Unknown",
+  "Pencillin",
+  "cephalosporin",
+  "Sulfa",
+];
+
 export interface DrugDictionaryItem {
   id: string;
   name: string;

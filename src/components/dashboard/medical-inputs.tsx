@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, X } from "lucide-react"
+import { Plus, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -78,8 +78,9 @@ export function DrugListInput({ label, category, drugs, onChange }: DrugListInpu
               onChange={(e) => setName(e.target.value)} 
               placeholder="e.g. Amlodipine"
               list={`dict-${category}`}
-              className="h-8 text-sm"
+              className="h-8 text-sm pr-7"
             />
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <datalist id={`dict-${category}`}>
               {filteredDict.map(d => <option key={d.id} value={d.name} />)}
             </datalist>
@@ -87,13 +88,16 @@ export function DrugListInput({ label, category, drugs, onChange }: DrugListInpu
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Dosage</Label>
-          <Input 
-            value={dosage} 
-            onChange={(e) => setDosage(e.target.value)} 
-            placeholder="e.g. 5mg" 
-            className="h-8 text-sm"
-            list={`dosages-${name}`}
-          />
+          <div className="relative">
+            <Input 
+              value={dosage} 
+              onChange={(e) => setDosage(e.target.value)} 
+              placeholder="e.g. 5mg" 
+              className="h-8 text-sm pr-7"
+              list={`dosages-${name}`}
+            />
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
           <datalist id={`dosages-${name}`}>
             {filteredDict.find(d => d.name === name)?.standardDosages.map(dose => (
                <option key={dose} value={dose} />
@@ -103,13 +107,16 @@ export function DrugListInput({ label, category, drugs, onChange }: DrugListInpu
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Freq</Label>
           <div className="flex gap-2">
-            <Input 
-              value={frequency} 
-              onChange={(e) => setFrequency(e.target.value)} 
-              placeholder="e.g. OD" 
-              className="h-8 text-sm"
-              list="freq-list"
-            />
+            <div className="relative flex-1">
+              <Input 
+                value={frequency} 
+                onChange={(e) => setFrequency(e.target.value)} 
+                placeholder="e.g. OD" 
+                className="h-8 text-sm pr-7"
+                list="freq-list"
+              />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
             <Button type="button" size="sm" variant="secondary" className="h-8 px-2" onClick={handleAdd}>
               <Plus className="h-4 w-4" />
             </Button>
@@ -253,19 +260,24 @@ export function StringListInput({ label, items, onChange, presetList, placeholde
       )}
 
       <div className="flex gap-2">
-        <Input 
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          placeholder={placeholder || "Add item..."}
-          className="h-8 text-sm"
-          list={presetList ? `preset-${label.replace(/\s+/g, '')}` : undefined}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-        />
+        <div className="relative flex-1">
+          <Input 
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            placeholder={placeholder || "Add item..."}
+            className="h-8 text-sm pr-7"
+            list={presetList ? `preset-${label.replace(/\s+/g, '')}` : undefined}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+          />
+          {presetList && (
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          )}
+        </div>
         {presetList && (
           <datalist id={`preset-${label.replace(/\s+/g, '')}`}>
             {presetList.map(p => <option key={p} value={p} />)}
