@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col selection:bg-teal-100 dark:selection:bg-teal-900/30">
         {children}
         <Toaster richColors position="bottom-right" />
+        <SpeedInsights />
       </body>
     </html>
   );

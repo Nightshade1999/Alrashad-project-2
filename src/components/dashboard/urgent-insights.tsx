@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button"
 import { getUrgentInsights } from "@/app/actions/dashboard-actions"
 import ReactMarkdown from "react-markdown"
 
-export function UrgentInsights() {
+export function UrgentInsights({ aiEnabled = true }: { aiEnabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [insights, setInsights] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  if (!aiEnabled) return null;
 
   const handleAnalyze = async () => {
     setLoading(true)

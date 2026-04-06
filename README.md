@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ward Manager - Clinical Operations Hub
 
-## Getting Started
+A professional-grade medical ward management system built with Next.js, Supabase, and Google Gemini AI. Features real-time patient monitoring, clinical research tools, and AI-powered safety insights.
 
-First, run the development server:
+## 🚀 Getting Started
 
+### 1. Project Setup
 ```bash
+# Install dependencies
+npm install
+
+# Run the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Configuration
+Create a `.env.local` file in the root directory and provide the following keys:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key (Required for Admin Analytics)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# AI Service Configuration
+GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
+```
 
-## Learn More
+## 🛠 Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Real-time Patient List**: Categorized by risk Level (High Risk, Close Follow-up, Normal).
+- **Clinical Hub**: Comprehensive medical dictionary (Surgeries, Chronic Diseases, Drug Families).
+- **AI Safety Monitor**: Scans ward data for critical alerts using Gemini Pro.
+- **Biostatistics Suite**: Built-in T-Test, Chi-Square, and Pearson Correlation for medical research.
+- **Offline Support**: Full PWA capabilities with background synchronization.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔒 Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Row Level Security (RLS)**: Patients and records are protected by strict Supabase policies.
+- **Ward Isolation**: Doctors only see data from their assigned medical ward.
+- **Service Role Protection**: Global statistics are only accessible via the Service Role key in the administrative dashboard.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📱 Mobile Optimized
+Designed for clinical use on iOS and Android with notch support, auto-zoom prevention, and Arabic digit sanitization.

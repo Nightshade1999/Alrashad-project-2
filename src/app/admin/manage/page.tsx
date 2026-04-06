@@ -61,12 +61,42 @@ export default async function AdminManagePage() {
         aiEnabled={aiEnabled}
       />
       {errorMessage && (
-        <div className="mt-8 p-6 bg-red-50 border-2 border-red-200 text-red-700 rounded-3xl flex items-start gap-4 shadow-sm animate-pulse">
-          <AlertCircle className="h-6 w-6 mt-1 flex-shrink-0" />
-          <div>
-            <h4 className="font-extrabold text-lg">System Configuration Issue</h4>
-            <p className="font-medium opacity-90">{errorMessage}</p>
-            <p className="text-xs mt-4 font-bold uppercase underline">Important: Research and Global Statistics require the Service Role Key for cross-user reporting.</p>
+        <div className="mt-12 overflow-hidden relative rounded-[2.5rem] bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800/40 p-8 shadow-xl shadow-amber-900/5 transition-all animate-scale-in">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <AlertCircle className="h-32 w-32 text-amber-600 rotate-12" />
+          </div>
+          
+          <div className="relative flex flex-col md:flex-row gap-6 items-start">
+            <div className="p-4 rounded-3xl bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 shadow-sm">
+              <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            
+            <div className="flex-1 space-y-4">
+              <div>
+                <h4 className="text-xl font-black text-amber-900 dark:text-amber-100 tracking-tight">System Configuration Required</h4>
+                <p className="text-amber-700 dark:text-amber-300 font-medium leading-relaxed max-w-2xl mt-2">
+                  To access cross-ward statistics and system-wide research, you must configure the administrative service credentials in your environment.
+                </p>
+              </div>
+
+              <div className="bg-white/40 dark:bg-black/20 rounded-2xl p-4 border border-amber-200/50 dark:border-amber-800/30">
+                <p className="text-xs font-black uppercase tracking-widest text-amber-600 mb-2">Technical Details</p>
+                <code className="text-xs font-mono bg-amber-100/50 dark:bg-amber-900/30 px-2 py-1 rounded block overflow-x-auto whitespace-nowrap">
+                  {errorMessage}
+                </code>
+              </div>
+
+              <div className="flex flex-wrap gap-4 pt-2">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-200/40 dark:bg-amber-800/20 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Check .env.local File
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-200/40 dark:bg-amber-800/20 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Verify SUPABASE_SERVICE_ROLE_KEY
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

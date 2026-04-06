@@ -121,7 +121,7 @@ export default async function DashboardPage() {
       <DashboardSearch patients={patients || []} />
 
       {/* AI Safety Monitor */}
-      <UrgentInsights />
+      <UrgentInsights aiEnabled={profile?.ai_enabled ?? true} />
 
       {/* Category Cards / Admin View */}
       {isAdmin ? (
