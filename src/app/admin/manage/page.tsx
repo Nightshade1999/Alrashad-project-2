@@ -1,4 +1,4 @@
-import { getAllUsersAction, getDbSizeAction, getAllPatientsForAdminAction } from '@/app/actions/admin-actions'
+import { getAllUsersAction, getDbSizeAction, getAllPatientsForAdminAction, getWardSettingsAction } from '@/app/actions/admin-actions'
 import WardManagementClient from './ward-management-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -17,14 +17,16 @@ export default async function AdminManagePage() {
   let users: any[] = []
   let dbSizeMB = 'Error'
   let patientsData: any[] = []
+  let wardSettingsData: any[] = []
   let errorMessage: string | null = null
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (hasServiceKey) {
-    const [usersRes, dbSizeRes, patientsRes] = await Promise.all([
+    const [usersRes, dbSizeRes, patientsRes, wardSettingsRes] = await Promise.all([
       getAllUsersAction(),
       getDbSizeAction(),
-      getAllPatientsForAdminAction()
+      getAllPatientsForAdminAction(),
+      getWardSettingsAction()
     ])
     
     if (usersRes.users) users = usersRes.users
@@ -36,6 +38,10 @@ export default async function AdminManagePage() {
       errorMessage = `Database Fetch Error: ${patientsRes.error}`
     } else if (patientsRes.patients) {
       patientsData = patientsRes.patients
+    }
+    
+    if (wardSettingsRes.settings) {
+      wardSettingsData = wardSettingsRes.settings
     }
   } else {
     errorMessage = "CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables (.env). Administrators cannot see global data without it."
@@ -57,6 +63,7 @@ export default async function AdminManagePage() {
         initialUsers={users} 
         dbSizeMB={dbSizeMB} 
         patientsData={patientsData} 
+        wardSettingsData={wardSettingsData}
         hasServiceKey={hasServiceKey}
         aiEnabled={aiEnabled}
       />

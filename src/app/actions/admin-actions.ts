@@ -55,6 +55,7 @@ export async function createUserAction(formData: FormData) {
   const specialty = formData.get('specialty') as string || 'psychiatry'
   const aiEnabled = formData.get('ai_enabled') === 'true'
   const canSeeWardPatients = formData.get('can_see_ward_patients') === 'true'
+  const gender = formData.get('gender') as 'Male' | 'Female' | null
 
   if (!email || !password) return { error: 'Email and password required' }
 
@@ -78,6 +79,7 @@ export async function createUserAction(formData: FormData) {
       role, 
       ward_name: wardName,
       specialty,
+      gender,
       ai_enabled: aiEnabled,
       can_see_ward_patients: canSeeWardPatients
     })
@@ -133,7 +135,7 @@ export async function updateUserPasswordAction(userId: string, newPassword: stri
   return { success: true }
 }
 
-export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, canSeeWardPatients?: boolean) {
+export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null) {
   if (!userId) return { error: 'User ID required' }
 
   // Update email if provided
@@ -148,6 +150,7 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (wardName) updatePayload.ward_name = wardName
     if (role) updatePayload.role = role
     if (specialty) updatePayload.specialty = specialty
+    if (gender !== undefined) updatePayload.gender = gender
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
 
@@ -207,6 +210,7 @@ export async function getAllUsersAction() {
       role: prof?.role || 'user',
       ward_name: prof?.ward_name || 'Unassigned',
       specialty: prof?.specialty || 'psychiatry',
+      gender: prof?.gender || null,
       ai_enabled: prof?.ai_enabled ?? true,
       can_see_ward_patients: prof?.can_see_ward_patients ?? false
     }
@@ -239,4 +243,62 @@ export async function getAllPatientsForAdminAction() {
   })
 
   return { patients: patientsWithWards }
+}
+
+export async function getWardSettingsAction() {
+  const { data, error } = await getSupabaseAdmin().from('ward_settings').select('*')
+  if (error) return { error: error.message, settings: [] }
+  return { settings: data }
+}
+
+export async function upsertWardSettingAction(wardName: string, gender: 'Male' | 'Female' | null) {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+  
+  if (!wardName) return { error: 'Ward name required' }
+  const { error } = await (getSupabaseAdmin().from('ward_settings') as any).upsert({ 
+    ward_name: wardName, 
+    gender 
+  }, { onConflict: 'ward_name' })
+  
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
+export async function searchAllPatientsAction(query: string) {
+  if (!query.trim()) return { patients: [] }
+  
+  try {
+    // Try admin client first (bypasses RLS, searches all wards)
+    const adminDb = getSupabaseAdmin()
+    const { data, error } = await adminDb
+      .from('patients')
+      .select('id, name, age, room_number, ward_name, category, is_in_er')
+      .ilike('name', `%${query}%`)
+      .limit(10)
+
+    if (error) {
+      console.error('Global search admin error:', error.message)
+      return { patients: [], error: error.message }
+    }
+    return { patients: data || [] }
+  } catch (err: any) {
+    console.error('Global search fallback:', err?.message)
+    // Fallback: use the regular server client (RLS-scoped)
+    try {
+      const cookieStore = await cookies()
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { cookies: { getAll: () => cookieStore.getAll() } }
+      )
+      const { data } = await supabase
+        .from('patients')
+        .select('id, name, age, room_number, ward_name, category, is_in_er')
+        .ilike('name', `%${query}%`)
+        .limit(10)
+      return { patients: data || [] }
+    } catch {
+      return { patients: [] }
+    }
+  }
 }

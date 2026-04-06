@@ -35,6 +35,11 @@ export interface Database {
           psych_drugs: MedicalDrugParams[];
           medical_drugs: MedicalDrugParams[];
           allergies: string[];
+          is_in_er: boolean;
+          er_admission_date: string | null;
+          er_admission_doctor: string | null;
+          er_chief_complaint: string | null;
+          er_history: any[] | null;
           created_at: string;
           updated_at: string;
         };
@@ -58,6 +63,11 @@ export interface Database {
           psych_drugs?: MedicalDrugParams[];
           medical_drugs?: MedicalDrugParams[];
           allergies?: string[];
+          is_in_er?: boolean;
+          er_admission_date?: string | null;
+          er_admission_doctor?: string | null;
+          er_chief_complaint?: string | null;
+          er_history?: any[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -81,6 +91,11 @@ export interface Database {
           psych_drugs?: MedicalDrugParams[];
           medical_drugs?: MedicalDrugParams[];
           allergies?: string[];
+          is_in_er?: boolean;
+          er_admission_date?: string | null;
+          er_admission_doctor?: string | null;
+          er_chief_complaint?: string | null;
+          er_history?: any[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -127,16 +142,41 @@ export interface Database {
           doctor_name: string | null;
           role: 'admin' | 'user';
           specialty: 'internal_medicine' | 'psychiatry' | string;
+          gender: 'Male' | 'Female' | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at' | 'specialty' | 'doctor_name'> & { specialty?: string; doctor_name?: string };
+        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at' | 'specialty' | 'doctor_name' | 'gender'> & { specialty?: string; doctor_name?: string; gender?: 'Male' | 'Female' | null };
         Update: {
           user_id?: string;
           ward_name?: string;
           doctor_name?: string | null;
           role?: 'admin' | 'user';
           specialty?: string;
+          gender?: 'Male' | 'Female' | null;
+        };
+      };
+      ward_settings: {
+        Row: {
+          id: string;
+          ward_name: string;
+          gender: 'Male' | 'Female' | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          ward_name: string;
+          gender?: 'Male' | 'Female' | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          ward_name?: string;
+          gender?: 'Male' | 'Female' | null;
+          created_at?: string;
+          updated_at?: string;
         };
       };
     };

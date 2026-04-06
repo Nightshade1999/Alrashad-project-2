@@ -1,26 +1,29 @@
 "use client"
 
 import { useState } from 'react'
-import { Users, Activity, BarChart3, Settings, ShieldAlert, TrendingUp } from 'lucide-react'
+import { Users, Activity, BarChart3, Settings, ShieldAlert, TrendingUp, Shield } from 'lucide-react'
 import { UserManagement } from '@/components/admin/user-management'
 import { DoctorPerformance } from '@/components/admin/doctor-performance'
 import { MedicalStatistics } from '@/components/admin/medical-statistics'
 import { WardAnalytics } from '@/components/admin/ward-analytics'
+import { WardSettings } from '@/components/admin/ward-settings'
 
 export default function WardManagementClient({
   initialUsers,
   dbSizeMB,
   patientsData,
+  wardSettingsData,
   hasServiceKey,
   aiEnabled
 }: {
   initialUsers: any[]
   dbSizeMB: string
   patientsData: any[]
+  wardSettingsData: any[]
   hasServiceKey: boolean
   aiEnabled: boolean
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards'>('users')
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in-up">
@@ -91,6 +94,16 @@ export default function WardManagementClient({
         >
           <BarChart3 className="h-4 w-4 shrink-0" /> Medical Research
         </button>
+        <button
+          onClick={() => setActiveTab('wards')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'wards' 
+              ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Shield className="h-4 w-4 shrink-0" /> Ward Setup
+        </button>
       </div>
 
       {/* Service Role Error Warning */}
@@ -125,6 +138,7 @@ export default function WardManagementClient({
         {activeTab === 'performance' && <DoctorPerformance users={initialUsers} patients={patientsData} />}
         {activeTab === 'analytics' && <WardAnalytics patients={patientsData} />}
         {activeTab === 'research' && <MedicalStatistics patients={patientsData} aiEnabled={aiEnabled} />}
+        {activeTab === 'wards' && <WardSettings settings={wardSettingsData} users={initialUsers} />}
       </div>
     </div>
   )

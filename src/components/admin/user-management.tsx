@@ -18,6 +18,7 @@ export function UserManagement({ users }: { users: any[] }) {
   const [specialty, setSpecialty] = useState('psychiatry')
   const [wardName, setWardName] = useState('')
   const [toUserId, setToUserId] = useState('')
+  const [gender, setGender] = useState<'Male' | 'Female' | ''>('')
   const [aiEnabled, setAiEnabled] = useState(true)
   const [canSeeWardPatients, setCanSeeWardPatients] = useState(false)
 
@@ -29,6 +30,7 @@ export function UserManagement({ users }: { users: any[] }) {
       setRole(user.role)
       setWardName(user.ward_name)
       setSpecialty(user.specialty || 'psychiatry')
+      setGender(user.gender || '')
       setAiEnabled(user.ai_enabled ?? true)
       setCanSeeWardPatients(user.can_see_ward_patients ?? false)
     } else {
@@ -37,6 +39,7 @@ export function UserManagement({ users }: { users: any[] }) {
       setRole('user')
       setSpecialty('psychiatry')
       setWardName('')
+      setGender('')
       setAiEnabled(true)
       setCanSeeWardPatients(false)
     }
@@ -59,6 +62,7 @@ export function UserManagement({ users }: { users: any[] }) {
     formData.append('specialty', specialty)
     formData.append('ai_enabled', String(aiEnabled))
     formData.append('can_see_ward_patients', String(canSeeWardPatients))
+    if (gender) formData.append('gender', gender)
 
     const res = await createUserAction(formData)
     setIsRefreshing(false)
@@ -69,7 +73,7 @@ export function UserManagement({ users }: { users: any[] }) {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsRefreshing(true)
-    const res = await updateUserDetailsAction(selectedUser.id, email, wardName, role, specialty, aiEnabled, canSeeWardPatients)
+    const res = await updateUserDetailsAction(selectedUser.id, email, wardName, role, specialty, aiEnabled, canSeeWardPatients, gender || null)
     setIsRefreshing(false)
     if (res?.error) alert(res.error)
     else closeModal()
@@ -151,7 +155,7 @@ export function UserManagement({ users }: { users: any[] }) {
                         {u.role}
                       </span>
                       <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-                        {u.specialty === 'internal_medicine' ? 'IM Resident' : 'Psych Resident'}
+                        {u.specialty === 'internal_medicine' ? 'IM Resident' : 'Psych Resident'} {u.gender ? `(${u.gender})` : ''}
                       </span>
                       {u.ai_enabled ? (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1 uppercase tracking-tighter">
@@ -246,6 +250,15 @@ export function UserManagement({ users }: { users: any[] }) {
                   <div>
                     <label className="block text-sm font-semibold mb-1">Assigned Ward</label>
                     <input type="text" value={wardName} onChange={e => setWardName(e.target.value)} placeholder="e.g. ICU - General" required className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Gender</label>
+                    <select value={gender} onChange={e => setGender(e.target.value as any)} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
+                      <option value="">-- Not Set --</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
                   </div>
 
                   <div className="pt-2 flex flex-col gap-2">

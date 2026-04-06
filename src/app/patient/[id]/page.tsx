@@ -9,6 +9,7 @@ import {
 import { DeletePatientButton } from "@/components/patient/delete-button"
 import { EditPatientModal } from "@/components/patient/edit-patient-modal"
 import { DeclareDeathModal } from "@/components/patient/declare-death-modal"
+import { MoveToErModal } from "@/components/patient/move-to-er-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
 import { ExportPatientButton } from "@/components/patient/export-button"
 import { AIAdviceSection } from "@/components/patient/ai-advice-section"
@@ -138,6 +139,21 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
         </div>
       )}
 
+      {/* ── ER Banner ── */}
+      {!isDeceased && patient.is_in_er && (
+        <div className="bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/50 p-3 rounded-2xl flex items-center justify-between shadow-sm animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="bg-rose-100 dark:bg-rose-900/60 p-2 rounded-xl">
+              <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-400">Current Status</p>
+              <h2 className="font-bold text-sm leading-tight text-rose-800 dark:text-rose-100">Currently in ER Ward</h2>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between w-full">
@@ -173,6 +189,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
               <ShareAIPromptModal patient={displayPatient} />
               <EditPatientModal patient={patient} />
               <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} />
+              <MoveToErModal patientId={patient.id} isEr={patient.is_in_er} />
               <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
             </>
           ) : (
@@ -453,6 +470,39 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
       </div>
 
       {!isDeceased && <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />}
+      
+      {/* ── ER History ── */}
+      {patient.er_history && Array.isArray(patient.er_history) && patient.er_history.length > 0 && (
+        <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden mt-8 max-w-3xl mx-auto">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/40">
+            <Activity className="h-4 w-4 text-rose-500" />
+            <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Emergency Room History</h2>
+          </div>
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {patient.er_history.map((record: any, idx: number) => (
+              <div key={idx} className="p-4 flex flex-col sm:flex-row sm:justify-between gap-2">
+                 <div>
+                   <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                     Admitted: {format(parseISO(record.admission_date), 'dd MMM yyyy, HH:mm')}
+                   </p>
+                   <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">
+                     Discharged: {record.discharge_date ? format(parseISO(record.discharge_date), 'dd MMM yyyy, HH:mm') : 'Unknown'}
+                   </p>
+                   <p className="text-xs flex items-center gap-1 mt-2">
+                     <span className="text-slate-400">Transferred by:</span>
+                     <span className="font-semibold text-slate-700 dark:text-slate-300">{record.doctor || 'Unknown'}</span>
+                   </p>
+                 </div>
+                 <div className="sm:text-right">
+                   <span className="inline-block px-2 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 text-[10px] font-black uppercase tracking-wider rounded">Chief Complaint</span>
+                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-1 sm:max-w-[200px]">{record.chief_complaint || 'N/A'}</p>
+                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
     </div>
   )
 }
