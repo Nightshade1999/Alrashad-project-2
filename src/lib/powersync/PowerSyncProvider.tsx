@@ -39,16 +39,18 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         // Watch for auth changes to connect/disconnect dynamically
         supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('PowerSync Auth Event:', event, !!session);
           if (session) {
             try {
+              console.log('PowerSync Attempting connection...');
               await powerSync.connect(connector);
-              console.log('PowerSync reconnected on auth change');
+              console.log('PowerSync Connected Successfully');
             } catch (e) {
-              console.error('PowerSync reconnect failed:', e);
+              console.error('PowerSync Connection Failed:', e);
             }
           } else {
+            console.warn('PowerSync: No session found, disconnecting...');
             await powerSync.disconnect();
-            console.log('PowerSync disconnected on logout');
           }
         });
 
