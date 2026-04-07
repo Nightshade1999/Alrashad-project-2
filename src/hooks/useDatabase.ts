@@ -62,7 +62,7 @@ export function useDatabase() {
       },
       get: async (id: string) => {
         if (isOfflineMode && ps) {
-          return ps.get('SELECT * FROM patients WHERE id = ?', [id]) as Promise<Patient>;
+          return ps.get('SELECT * FROM patients WHERE id = ?', [id]) as unknown as Patient;
         } else {
           const { data } = await supabase.from('patients').select('*').eq('id', id).single();
           return data as Patient;

@@ -9,11 +9,7 @@ import { createClient } from '@/lib/supabase';
 const PowerSyncContext = createContext<PowerSyncDatabase | null>(null);
 
 export const usePowerSync = () => {
-  const context = useContext(PowerSyncContext);
-  if (!context) {
-    throw new Error('usePowerSync must be used within a PowerSyncProvider');
-  }
-  return context;
+  return useContext(PowerSyncContext);
 };
 
 export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
