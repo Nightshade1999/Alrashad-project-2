@@ -29,14 +29,22 @@ export function OfflineDashboard() {
     loadData();
   }, [isOfflineMode]);
 
+  const myWardName = profile?.ward_name ?? null;
   const isAdmin = profile?.role === 'admin';
-  
+
+  // For non-admins, scope the count to their assigned ward only
+  const scopedList = isAdmin || !myWardName
+    ? patientList
+    : patientList.filter(p => p.ward_name === myWardName);
+
   const counts = {
-    'High Risk': patientList.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
-    'Close Follow-up': patientList.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
-    'Normal': patientList.filter(p => p.category === 'Normal' && !p.is_in_er).length,
-    total: patientList.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length,
+    'High Risk': scopedList.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
+    'Close Follow-up': scopedList.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
+    'Normal': scopedList.filter(p => p.category === 'Normal' && !p.is_in_er).length,
+    // Total = ward patients + ER patients for this ward (both admitted locations)
+    total: scopedList.filter(p => p.category !== 'Deceased/Archive').length,
   };
+
 
   if (loading) {
      return <div className="animate-pulse space-y-4">
