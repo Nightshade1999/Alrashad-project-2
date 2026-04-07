@@ -186,3 +186,47 @@ export async function deleteReminderAction(id: string) {
   revalidatePath('/admin/manage')
   return { success: true }
 }
+
+export async function updateReminderAction(id: string, payload: {
+  notes?: string
+  reminder_date?: string
+  target_specialty?: string
+  target_gender?: string | null
+}) {
+  const supabase = await getSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // 1. Fetch current reminder to check ownership and status
+  const { data: reminder, error: fetchError } = await (supabase.from('reminders') as any)
+    .select('created_by, status')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !reminder) return { error: "Reminder not found" }
+  
+  // 2. Security Check: Only creator can edit, and only if pending
+  if (reminder.created_by !== user.id) {
+    // Check if admin
+    const { data: profile } = await (supabase.from('user_profiles') as any).select('role').eq('user_id', user.id).single()
+    if (profile?.role !== 'admin') return { error: "Only the creator or an admin can edit this reminder" }
+  }
+
+  if (reminder.status !== 'pending') {
+    return { error: "Only pending reminders can be edited" }
+  }
+
+  // 3. Perform update
+  const { error } = await (supabase.from('reminders') as any)
+    .update({
+      ...payload,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/dashboard')
+  revalidatePath('/admin/manage')
+  return { success: true }
+}
