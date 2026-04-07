@@ -127,7 +127,7 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
     else if (vId.startsWith('vital_')) {
        const vitalKey = vId.replace('vital_', '')
        if (Array.isArray(p.visits) && p.visits.length > 0) {
-         const sortedVisits = [...p.visits].sort((a,b) => new Date(p.visit_date).getTime() - new Date(a.visit_date).getTime())
+         const sortedVisits = [...p.visits].sort((a,b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())
          for (const visit of sortedVisits) {
            if (visit[vitalKey] !== undefined && visit[vitalKey] !== null) {
              patientVal = parseFloat(visit[vitalKey])

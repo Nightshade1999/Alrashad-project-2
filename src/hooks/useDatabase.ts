@@ -57,7 +57,7 @@ export function useDatabase() {
           let query = supabase.from('patients').select('*').neq('category', 'Deceased/Archive');
           if (wardName) query = query.eq('ward_name', wardName);
           const { data } = await query;
-          return data as Patient[];
+          return (data as unknown as Patient[]) || [];
         }
       },
       get: async (id: string) => {
@@ -65,7 +65,7 @@ export function useDatabase() {
           return await ps.get('SELECT * FROM patients WHERE id = ?', [id]) as unknown as Patient;
         } else {
           const { data } = await supabase.from('patients').select('*').eq('id', id).single();
-          return data as Patient;
+          return data as unknown as Patient;
         }
       },
       insert: async (data: any) => {
@@ -106,7 +106,7 @@ export function useDatabase() {
           
           return ps.execute(`UPDATE patients SET ${fields}, updated_at = ? WHERE id = ?`, [new Date().toISOString(), id]);
         } else {
-          return supabase.from('patients').update(data).eq('id', id);
+          return (supabase.from('patients') as any).update(data).eq('id', id);
         }
       }
     },
@@ -116,7 +116,7 @@ export function useDatabase() {
           return ps.getAll('SELECT * FROM visits WHERE patient_id = ? ORDER BY visit_date DESC', [patientId]);
         } else {
           const { data } = await supabase.from('visits').select('*').eq('patient_id', patientId).order('visit_date', { ascending: false });
-          return data as Visit[];
+          return (data as unknown as Visit[]) || [];
         }
       },
       insert: async (data: any) => {
@@ -134,7 +134,7 @@ export function useDatabase() {
           return ps.getAll('SELECT * FROM investigations WHERE patient_id = ? ORDER BY date DESC', [patientId]);
         } else {
           const { data } = await supabase.from('investigations').select('*').eq('patient_id', patientId).order('date', { ascending: false });
-          return data as Investigation[];
+          return (data as unknown as Investigation[]) || [];
         }
       },
       insert: async (data: any) => {
