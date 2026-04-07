@@ -10,31 +10,28 @@ export function SyncStatus() {
     connected: boolean;
     hasSynced: boolean;
     lastSyncedAt: Date | null;
+    isSyncing: boolean;
   }>({
     connected: false,
     hasSynced: false,
-    lastSyncedAt: null
+    lastSyncedAt: null,
+    isSyncing: false
   });
 
   useEffect(() => {
     if (!ps) return;
 
-    const updateStatus = () => {
-      if (!ps.currentStatus) return;
+    // Use the statusStream for reactive, real-time updates in v1.x
+    const subscription = ps.statusStream.subscribe((currentStatus) => {
       setStatus({
-        connected: ps.currentStatus.connected,
-        hasSynced: !!ps.currentStatus.hasSynced,
-        lastSyncedAt: ps.currentStatus.lastSyncedAt || null
+        connected: currentStatus.connected,
+        hasSynced: !!currentStatus.hasSynced,
+        lastSyncedAt: currentStatus.lastSyncedAt || null,
+        isSyncing: currentStatus.dataFlowStatus?.downloading === true || currentStatus.dataFlowStatus?.uploading === true
       });
-    };
-
-    updateStatus();
-    // PowerSync uses an event emitter pattern for status changes
-    const l = ps.registerListener({
-      statusChanged: updateStatus
     });
-    
-    return () => l?.();
+
+    return () => subscription.unsubscribe();
   }, [ps]);
 
   if (!ps) return null;
@@ -46,7 +43,9 @@ export function SyncStatus() {
           ? 'bg-white/90 dark:bg-slate-900/80 border-slate-100 dark:border-slate-800'
           : 'bg-amber-50/90 dark:bg-amber-950/80 border-amber-200 dark:border-amber-800'
       }`}>
-        {status.connected ? (
+        {status.isSyncing ? (
+          <RefreshCcw className="h-4 w-4 text-teal-500 animate-spin" />
+        ) : status.connected ? (
           <Cloud className="h-4 w-4 text-emerald-500" />
         ) : (
           <CloudOff className="h-4 w-4 text-amber-500" />
@@ -54,16 +53,16 @@ export function SyncStatus() {
 
         <div className="flex flex-col">
           <span className={`text-[10px] font-black uppercase tracking-widest ${
-            status.connected ? 'text-emerald-600' : 'text-amber-600'
+            status.isSyncing ? 'text-teal-600' : status.connected ? 'text-emerald-600' : 'text-amber-600'
           }`}>
-            {status.connected ? (status.hasSynced ? 'Safe & Synced' : 'Syncing...') : 'Offline Mode'}
+            {status.isSyncing ? 'Syncing...' : status.connected ? (status.hasSynced ? 'Safe & Synced' : 'Ready') : 'Offline Mode'}
           </span>
           <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 tabular-nums">
-            {status.lastSyncedAt ? `Last update: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for initial sync...'}
+            {status.lastSyncedAt ? `Updated: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Initializing sync...'}
           </span>
         </div>
 
-        {status.connected && status.hasSynced && (
+        {status.connected && status.hasSynced && !status.isSyncing && (
           <div className="ml-1 opacity-100 transition-opacity">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
           </div>
