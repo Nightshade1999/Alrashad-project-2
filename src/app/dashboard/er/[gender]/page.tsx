@@ -7,11 +7,15 @@ import { Button } from '@/components/ui/button'
 export const dynamic = 'force-dynamic'
 
 export default async function GenderErPage({ params }: { params: Promise<{ gender: string }> }) {
-  const { gender } = await params
+  const { gender: rawGender } = await params
   
-  // Validate gender to be Male or Female
-  if (gender !== 'Male' && gender !== 'Female') {
-    return <div className="p-8 text-center text-red-500 font-bold">Invalid ER specified.</div>
+  // Normalize gender to 'Male' or 'Female' (case-insensitive)
+  const gender = rawGender.toLowerCase() === 'male' ? 'Male' : 
+                 rawGender.toLowerCase() === 'female' ? 'Female' : 
+                 null
+
+  if (!gender) {
+    return <div className="p-8 text-center text-red-500 font-bold">Invalid ER specified: {rawGender}</div>
   }
 
   const cookieStore = await cookies()
@@ -51,8 +55,8 @@ export default async function GenderErPage({ params }: { params: Promise<{ gende
       {/* Top Bar */}
       <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <Link href="/dashboard/er">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
         <div>

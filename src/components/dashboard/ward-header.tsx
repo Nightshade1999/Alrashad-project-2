@@ -1,24 +1,25 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { Edit2, Check, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { syncProfileWardAction } from '@/app/actions/admin-actions'
 import { createClient } from '@/lib/supabase'
 
 const DEFAULT_WARD_NAME = "Internal Medicine - Psych Ward"
 
 export function WardHeader() {
-  const [isEditing, setIsEditing] = useState(false)
   const [wardName, setWardName] = useState(DEFAULT_WARD_NAME)
-  const [editValue, setEditValue] = useState("")
+  const [doctorName, setDoctorName] = useState("")
+  const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [showSwitcher, setShowSwitcher] = useState(false)
+  const switcherRef = useRef<HTMLDivElement>(null)
 
-  // Load ward name from Supabase on mount (cross-device, per user account)
+  // Load profile from Supabase on mount
   useEffect(() => {
     setMounted(true)
-    const loadWardName = async () => {
+    const loadProfile = async () => {
       try {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -26,95 +27,104 @@ export function WardHeader() {
 
         const { data } = await supabase
           .from('user_profiles')
-          .select('ward_name')
+          .select('ward_name, accessible_wards, doctor_name')
           .eq('user_id', user.id)
           .single()
 
         const profileData = data as any
-        if (profileData?.ward_name) {
-          setWardName(profileData.ward_name)
+        if (profileData?.ward_name) setWardName(profileData.ward_name)
+        if (profileData?.accessible_wards) setAccessibleWards(profileData.accessible_wards)
+        if (profileData?.doctor_name) {
+          setDoctorName(profileData.doctor_name)
+        } else {
+          const emailName = user.email?.split('@')[0] || 'Doctor'
+          setDoctorName(emailName.charAt(0).toUpperCase() + emailName.slice(1))
         }
-      } catch {
-        // Silently fall back to default — DB might not have migration yet
+      } catch { }
+    }
+    loadProfile()
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
+        setShowSwitcher(false)
       }
     }
-    loadWardName()
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const startEditing = () => {
-    setEditValue(wardName)
-    setIsEditing(true)
-    setTimeout(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }, 50)
-  }
-
-  const saveEdit = async () => {
-    const newName = editValue.trim()
-    if (!newName) {
-      setIsEditing(false)
+  const handleWardSwitch = async (newWard: string) => {
+    if (newWard === wardName) {
+      setShowSwitcher(false)
       return
     }
-    setWardName(newName)
-    setIsEditing(false)
-
-    // Persist to Supabase (upsert so it creates the profile if missing)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      await (supabase
-        .from('user_profiles') as any)
-        .upsert({ user_id: user.id, ward_name: newName }, { onConflict: 'user_id' })
-    } catch (err) {
-      console.error('Failed to save ward name:', err)
-    }
+    setIsSyncing(true)
+    const res = await syncProfileWardAction(newWard)
+    if (res?.error) alert(res.error)
+    else window.location.reload()
   }
 
-  const cancelEdit = () => {
-    setIsEditing(false)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') saveEdit()
-    if (e.key === 'Escape') cancelEdit()
-  }
 
   if (!mounted) {
-    return <div className="h-9 w-64 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-md" />
-  }
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <Input
-          ref={inputRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => setTimeout(saveEdit, 100)}
-          className="h-9 w-[250px] sm:w-[350px] font-bold text-lg"
-        />
-        <Button variant="ghost" size="icon" onClick={saveEdit} className="h-9 w-9 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
-          <Check className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={cancelEdit} className="h-9 w-9 text-muted-foreground hover:bg-muted/50">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-    )
+    return <div className="h-10 w-48 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-md" />
   }
 
   return (
-    <div className="flex items-center gap-2 group cursor-pointer transition-opacity" onClick={startEditing}>
-      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-primary">
-        {wardName}
-      </h1>
-      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
-      </Button>
+    <div className="flex flex-col">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50 uppercase">
+          Dr. {doctorName}
+        </h1>
+      </div>
+
+      {/* Ward Switcher / Display */}
+      <div className="relative mt-0.5" ref={switcherRef}>
+        <div 
+          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-transparent transition-all ${
+            accessibleWards.length > 1 
+              ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-900/50' 
+              : 'bg-transparent'
+          }`}
+          onClick={accessibleWards.length > 1 ? () => setShowSwitcher(!showSwitcher) : undefined}
+        >
+          <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
+            {wardName}
+          </span>
+          {accessibleWards.length > 1 && (
+            <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-300 ${showSwitcher ? 'rotate-180' : ''}`} />
+          )}
+        </div>
+
+      {/* Switcher Dropdown */}
+      {showSwitcher && (
+        <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-2 animate-in fade-in slide-in-from-top-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 p-2 border-b border-slate-100 dark:border-slate-800 mb-2">Switch Active Ward</p>
+          <div className="space-y-1">
+            {accessibleWards.map((w: string) => (
+              <button
+                key={w}
+                disabled={isSyncing}
+                onClick={() => handleWardSwitch(w)}
+                className={`w-full text-left px-3 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                  w === wardName 
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {w}
+                {w === wardName && <Check className="h-4 w-4" />}
+                {isSyncing && w !== wardName && <RefreshCw className="h-3 w-3 animate-spin opacity-0" />}
+              </button>
+            ))}
+          </div>
+          {isSyncing && (
+            <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-2xl flex items-center justify-center backdrop-blur-[1px]">
+              <RefreshCw className="h-6 w-6 text-indigo-600 animate-spin" />
+            </div>
+          )}
+        </div>
+      )}
+      </div>
     </div>
   )
 }

@@ -59,15 +59,24 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
   return baseAge + Math.max(0, diffYears);
 }
 
-async function fetchPatientRows(supabase: any, categoryDbValue: string | null): Promise<PatientRow[]> {
+async function fetchPatientRows(supabase: any, categoryDbValue: string | null, targetWard: string | null): Promise<PatientRow[]> {
   // For pending follow-up, fetch all patients regardless of category
-  const query = supabase
+  let query = supabase
     .from('patients')
-    .select('id, name, age, room_number, chronic_diseases, category, created_at, date_of_death, cause_of_death, previous_category')
+    .select('id, name, age, room_number, chronic_diseases, category, is_in_er, created_at, date_of_death, cause_of_death, previous_category')
     .order('created_at', { ascending: false })
 
+  // Always exclude ER patients from standard follow-up categories
+  if (categoryDbValue !== 'Deceased/Archive') {
+    query.eq('is_in_er', false)
+  }
+
   if (categoryDbValue && categoryDbValue !== 'ALL') {
-    query.eq('category', categoryDbValue)
+    query = query.eq('category', categoryDbValue)
+  }
+
+  if (targetWard) {
+    query = query.eq('ward_name', targetWard)
   }
 
   const { data: patients } = await query
@@ -148,7 +157,15 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
-  const rows = await fetchPatientRows(supabase, category.dbValue)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role, ward_name')
+    .eq('user_id', user?.id)
+    .single()
+
+  const targetWard = profile?.role === 'admin' ? null : (profile?.ward_name || null)
+  const rows = await fetchPatientRows(supabase, category.dbValue, targetWard)
   const Icon = category.icon
   const isPending = slug === 'pending-follow-up'
 
@@ -159,11 +176,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${category.gradient}`} />
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-white dark:bg-slate-900">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
             <div className={`p-3 rounded-xl ${category.iconBg}`}>
               <Icon className={`h-6 w-6 ${category.iconColor}`} />
             </div>

@@ -1,4 +1,5 @@
 import { getAllUsersAction, getDbSizeAction, getAllPatientsForAdminAction, getWardSettingsAction } from '@/app/actions/admin-actions'
+import { redirect } from 'next/navigation'
 import WardManagementClient from './ward-management-client'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -47,13 +48,20 @@ export default async function AdminManagePage() {
     errorMessage = "CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables (.env). Administrators cannot see global data without it."
   }
 
-  // Fetch current user profile for AI permission check
+  // 1. Fetch current user profile for role verification
   const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) redirect('/login')
+
   const { data: userProfile } = await supabase
     .from('user_profiles')
-    .select('ai_enabled')
-    .eq('user_id', authUser?.id)
+    .select('role, ai_enabled')
+    .eq('user_id', authUser.id)
     .single()
+
+  // 2. Strict Role Check: Bounce non-admins out immediately
+  if (userProfile?.role !== 'admin') {
+    redirect('/dashboard?error=admin_only')
+  }
 
   const aiEnabled = userProfile?.ai_enabled ?? true
 

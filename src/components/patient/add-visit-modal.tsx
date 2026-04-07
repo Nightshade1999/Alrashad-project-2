@@ -11,11 +11,23 @@ import { createClient } from '@/lib/supabase'
 import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
 import { convertArabicNumbers } from '@/lib/utils'
+import { addVisitAction } from '@/app/actions/patient-actions'
 
-export function AddVisitModal({ patientId, variant = "button" }: { patientId: string, variant?: "button" | "icon" }) {
+export function AddVisitModal({ 
+  patientId, 
+  variant = "button", 
+  isEr = false,
+  disabled = false
+}: { 
+  patientId: string; 
+  variant?: "button" | "icon"; 
+  isEr?: boolean;
+  disabled?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [time, setTime] = useState(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
   const [notes, setNotes] = useState('')
   const [bpSys, setBpSys] = useState('')
   const [bpDia, setBpDia] = useState('')
@@ -32,12 +44,14 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
     const payload = {
       patient_id: patientId,
       visit_date: date,
+      visit_time: time,
       exam_notes: notes.trim(),
       bp_sys: bpSys ? parseInt(convertArabicNumbers(bpSys)) : null,
       bp_dia: bpDia ? parseInt(convertArabicNumbers(bpDia)) : null,
       pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
       spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
       temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
+      is_er: isEr
     }
 
     // ── Offline path ──────────────────────────────────────────
@@ -55,19 +69,13 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
 
     // ── Online path ───────────────────────────────────────────
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { toast.error('Not authenticated'); return }
-
-      // @ts-ignore - Supabase type mismatch in this environment
-      const { error } = await (supabase.from('visits') as any).insert({
-        ...payload,
-        doctor_id: user.id,
-      })
-      if (error) throw error
+      const response = await addVisitAction(payload)
+      if (response.error) throw new Error(response.error)
+      
       toast.success('Visit note saved')
       setOpen(false)
       setNotes('')
+      // router.refresh() is likely redundant now because of revalidatePath, but safe to keep
       router.refresh()
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save visit')
@@ -83,6 +91,7 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
           onClick={() => setOpen(true)} 
           variant="outline" 
           size="icon" 
+          disabled={disabled}
           className="h-10 w-10 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
           title="Add Visit Note"
         >
@@ -91,7 +100,7 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
       )
     }
     return (
-      <Button onClick={() => setOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10">
+      <Button onClick={() => setOpen(true)} disabled={disabled} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10">
         <Plus className="h-4 w-4 mr-2" /> Add Visit
       </Button>
     )
@@ -116,9 +125,15 @@ export function AddVisitModal({ patientId, variant = "button" }: { patientId: st
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 shrink min-h-0">
-          <div>
-            <Label htmlFor="visit-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Date</Label>
-            <Input id="visit-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1.5" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="visit-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Date</Label>
+              <Input id="visit-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1.5" />
+            </div>
+            <div>
+              <Label htmlFor="visit-time" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Time</Label>
+              <Input id="visit-time" type="time" value={time} onChange={e => setTime(e.target.value)} required className="mt-1.5" />
+            </div>
           </div>
           {/* Vital Parameters Section */}
           <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">

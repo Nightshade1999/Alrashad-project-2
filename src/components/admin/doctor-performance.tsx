@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo } from 'react'
-import { Activity, Stethoscope, AlertCircle, FileText, CheckCircle2, Clock } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Activity, Stethoscope, AlertCircle, FileText, CheckCircle2, Clock, Search } from 'lucide-react'
 
 export function DoctorPerformance({ users, patients }: { users: any[], patients: any[] }) {
+  const [searchTerm, setSearchTerm] = useState('')
   
   const performanceMetrics = useMemo(() => {
     if (!users || !patients) return []
@@ -70,16 +71,33 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
     })
   }, [users, patients])
 
+  const filteredMetrics = useMemo(() => {
+    return performanceMetrics.filter(m => 
+      m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.ward_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [performanceMetrics, searchTerm])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Activity className="h-5 w-5 text-teal-500" /> Doctor Performance Matrix
         </h2>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input 
+            type="text"
+            placeholder="Search doctor or ward..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all w-64 shadow-sm"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {performanceMetrics.map((perf) => (
+        {filteredMetrics.map((perf) => (
           <div key={perf.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
             
             {/* Status Indicator */}
@@ -166,9 +184,11 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
           </div>
         ))}
 
-        {performanceMetrics.length === 0 && (
-           <div className="col-span-full p-8 text-center text-slate-500 border border-dashed rounded-xl">
-             No doctor performance data available.
+        {filteredMetrics.length === 0 && (
+           <div className="col-span-full p-12 text-center text-slate-500 border border-dashed rounded-3xl bg-slate-50/50 dark:bg-slate-900/10">
+             <Search className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+             <p className="font-bold">No performance data matches your search.</p>
+             <p className="text-xs text-slate-400 mt-1">Try a different name or ward.</p>
            </div>
         )}
       </div>

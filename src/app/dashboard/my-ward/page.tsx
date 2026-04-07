@@ -62,19 +62,6 @@ const CATEGORIES = [
     dot: '🕐',
     isPlaceholder: true
   },
-  {
-    slug: 'deceased',
-    label: 'Archive / Deceased',
-    dbValue: 'Deceased/Archive',
-    icon: AlertCircle,
-    gradient: 'from-slate-500 to-slate-700',
-    lightBg: 'bg-slate-50 dark:bg-slate-900',
-    border: 'border-slate-200 dark:border-slate-800',
-    iconBg: 'bg-slate-100 dark:bg-slate-800',
-    iconColor: 'text-slate-600 dark:text-slate-400',
-    countColor: 'text-slate-700 dark:text-slate-300',
-    dot: '📁',
-  },
 ]
 
 export default async function MyWardPage() {
@@ -85,22 +72,27 @@ export default async function MyWardPage() {
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
+  const { data: authData } = await supabase.auth.getUser()
+  const user = authData?.user
+
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('*')
-    .single()
+    .eq('user_id', user?.id)
+    .maybeSingle()
     
   const { data: patients } = await supabase
     .from('patients')
     .select('id, name, room_number, category, is_in_er')
     .eq('ward_name', profile?.ward_name || '')
-    .eq('is_in_er', false)
 
   const counts = {
-    'High Risk': patients?.filter(p => p.category === 'High Risk').length ?? 0,
-    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up').length ?? 0,
-    'Normal': patients?.filter(p => p.category === 'Normal').length ?? 0,
-    total: patients?.length ?? 0,
+    'High Risk': patients?.filter(p => p.category === 'High Risk' && !p.is_in_er).length ?? 0,
+    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length ?? 0,
+    'Normal': patients?.filter(p => p.category === 'Normal' && !p.is_in_er).length ?? 0,
+    'ER Patients': patients?.filter(p => p.is_in_er).length ?? 0,
+    'Deceased/Archive': patients?.filter(p => p.category === 'Deceased/Archive').length ?? 0,
+    total: patients?.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length ?? 0,
   }
 
   return (
@@ -158,6 +150,62 @@ export default async function MyWardPage() {
           )
         })}
       </div>
+
+      {/* Archive / Deceased Section */}
+      <Link href="/dashboard/category/archive">
+        <div className="group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-6 cursor-pointer transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-slate-200 dark:bg-slate-800/80">
+                <AlertCircle className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚫</span>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Archived / Deceased</h3>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Access clinical records for patients who have been discharged or declared deceased.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
+                {counts['Deceased/Archive']}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Records</div>
+            </div>
+          </div>
+        </div>
+      </Link>
+      
+      {/* ── ER Patients Section ── */}
+      <Link href="/dashboard/er">
+        <div className="group relative rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-6 cursor-pointer transition-all hover:shadow-md mt-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-rose-100 dark:bg-rose-900/60">
+                <AlertCircle className="h-6 w-6 text-rose-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🚑</span>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">ER Patients</h3>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Patients from {profile?.ward_name || 'your ward'} currently receiving emergency care.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-rose-600 dark:text-rose-400">
+                {counts['ER Patients']}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Current in ER</div>
+            </div>
+          </div>
+        </div>
+      </Link>
     </div>
   )
 }

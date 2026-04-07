@@ -9,8 +9,16 @@ import { format, parseISO, formatDistanceToNow } from "date-fns"
 
 export const dynamic = 'force-dynamic'
 
-export default async function VisitsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VisitsPage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ id: string }>,
+  searchParams: Promise<{ filter?: string }>
+}) {
   const { id } = await params
+  const { filter } = await searchParams
+  const isErFilter = (await searchParams).filter === 'er'
 
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -22,28 +30,42 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
   const { data: patient } = await supabase.from("patients").select("id, name, room_number").eq("id", id).single()
   if (!patient) notFound()
 
-  const { data: visits } = await supabase
+  // Fetch all doctor profiles to map doctor_id to name safely
+  const { data: profiles } = await supabase.from("user_profiles").select("user_id, doctor_name")
+  const doctorMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.doctor_name || 'Unknown']))
+
+  let query = supabase
     .from("visits")
     .select("*")
     .eq("patient_id", id)
     .order("visit_date", { ascending: false })
+    .order("created_at", { ascending: false })
+
+  if (isErFilter) {
+    query = query.eq('is_er', true)
+  }
+  // Remove the 'else' part so to show EVERYTHING in ward view (Ward + ER)
+
+  const { data: visits } = await query
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link href={`/patient/${id}`}>
+          <Link href={isErFilter ? `/patient/${id}?view=er` : `/patient/${id}?view=ward`}>
             <Button variant="outline" size="icon" className="h-10 w-10 bg-white dark:bg-slate-900">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Visit Notes</h1>
+            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+              {isErFilter ? 'ER Visit Notes' : 'Ward Visit Notes'}
+            </h1>
             <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.room_number}</p>
           </div>
         </div>
-        <AddVisitModal patientId={id} />
+        <AddVisitModal patientId={id} isEr={isErFilter} />
       </div>
 
       {visits && visits.length > 0 ? (
@@ -55,8 +77,13 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
                 <div className="flex items-center gap-2">
                   <Clock className={`h-4 w-4 ${i === 0 ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                   <span className={`font-semibold text-sm ${i === 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                    {format(parseISO(visit.visit_date), 'dd MMMM yyyy')}
+                    {format(parseISO(visit.visit_date), 'dd MMM yyyy, HH:mm')}
                   </span>
+                  {visit.is_er && (
+                    <span className="text-[10px] bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">
+                      ER
+                    </span>
+                  )}
                   {i === 0 && (
                     <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-medium">
                       Latest
@@ -99,6 +126,15 @@ export default async function VisitsPage({ params }: { params: Promise<{ id: str
                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                   {visit.exam_notes || <span className="italic text-muted-foreground">No notes recorded</span>}
                 </p>
+                  <div className="flex items-center justify-end gap-1.5 mt-4 opacity-20 hover:opacity-100 transition-opacity cursor-default select-none group">
+                    <span className="h-[0.5px] w-6 bg-slate-400 group-hover:bg-slate-600 transition-colors"></span>
+                    <span className="text-[8px] font-serif italic uppercase tracking-[0.2em] text-slate-500">
+                      Physician Signed:
+                    </span>
+                    <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-100">
+                      Dr. {doctorMap[visit.doctor_id] || 'Unknown'}
+                    </span>
+                  </div>
               </div>
             </div>
           ))}

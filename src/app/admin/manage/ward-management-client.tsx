@@ -1,12 +1,14 @@
 "use client"
 
 import { useState } from 'react'
-import { Users, Activity, BarChart3, Settings, ShieldAlert, TrendingUp, Shield } from 'lucide-react'
+import { Users, Activity, BarChart3, Settings, ShieldAlert, TrendingUp, Shield, Calendar } from 'lucide-react'
 import { UserManagement } from '@/components/admin/user-management'
 import { DoctorPerformance } from '@/components/admin/doctor-performance'
 import { MedicalStatistics } from '@/components/admin/medical-statistics'
 import { WardAnalytics } from '@/components/admin/ward-analytics'
 import { WardSettings } from '@/components/admin/ward-settings'
+import { ReminderArchive } from '@/components/admin/reminder-archive'
+import { NavigationButtons } from '@/components/layout/navigation-buttons'
 
 export default function WardManagementClient({
   initialUsers,
@@ -23,24 +25,27 @@ export default function WardManagementClient({
   hasServiceKey: boolean
   aiEnabled: boolean
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards' | 'reminders'>('users')
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in-up">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
-              <Settings className="h-6 w-6" />
+        <div className="flex items-center gap-2">
+          <NavigationButtons />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                <Settings className="h-6 w-6" />
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
+                Ward Management
+              </h1>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
-              Ward Management
-            </h1>
+            <p className="text-lg text-slate-500 dark:text-slate-400 ml-12">
+              Control center, doctor performance, and research analytics.
+            </p>
           </div>
-          <p className="text-lg text-slate-500 dark:text-slate-400 ml-12">
-            Control center, doctor performance, and research analytics.
-          </p>
         </div>
         
         {/* Storage Pill */}
@@ -95,6 +100,16 @@ export default function WardManagementClient({
           <BarChart3 className="h-4 w-4 shrink-0" /> Medical Research
         </button>
         <button
+          onClick={() => setActiveTab('reminders')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'reminders' 
+              ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Calendar className="h-4 w-4 shrink-0" /> Reminders Archive
+        </button>
+        <button
           onClick={() => setActiveTab('wards')}
           className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
             activeTab === 'wards' 
@@ -134,10 +149,20 @@ export default function WardManagementClient({
 
       {/* Tab Content */}
       <div className="mt-8">
-        {activeTab === 'users' && <UserManagement users={initialUsers} />}
+        {activeTab === 'users' && (
+          <UserManagement 
+            users={initialUsers} 
+            wardNames={Array.from(new Set([
+              ...initialUsers.map(u => u.ward_name),
+              ...wardSettingsData.map(s => s.ward_name),
+              ...patientsData.map(p => p.ward_name)
+            ])).filter(Boolean).sort()} 
+          />
+        )}
         {activeTab === 'performance' && <DoctorPerformance users={initialUsers} patients={patientsData} />}
         {activeTab === 'analytics' && <WardAnalytics patients={patientsData} />}
         {activeTab === 'research' && <MedicalStatistics patients={patientsData} aiEnabled={aiEnabled} />}
+        {activeTab === 'reminders' && <ReminderArchive />}
         {activeTab === 'wards' && <WardSettings settings={wardSettingsData} users={initialUsers} />}
       </div>
     </div>

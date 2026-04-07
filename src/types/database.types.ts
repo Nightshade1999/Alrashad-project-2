@@ -39,6 +39,8 @@ export interface Database {
           er_admission_date: string | null;
           er_admission_doctor: string | null;
           er_chief_complaint: string | null;
+          er_admission_notes: string | null;
+          er_treatment: MedicalDrugParams[] | null;
           er_history: any[] | null;
           created_at: string;
           updated_at: string;
@@ -67,6 +69,8 @@ export interface Database {
           er_admission_date?: string | null;
           er_admission_doctor?: string | null;
           er_chief_complaint?: string | null;
+          er_admission_notes?: string | null;
+          er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
           created_at?: string;
           updated_at?: string;
@@ -95,6 +99,8 @@ export interface Database {
           er_admission_date?: string | null;
           er_admission_doctor?: string | null;
           er_chief_complaint?: string | null;
+          er_admission_notes?: string | null;
+          er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
           created_at?: string;
           updated_at?: string;
@@ -112,8 +118,9 @@ export interface Database {
           pr: number | null;
           spo2: number | null;
           temp: number | null;
+          is_er: boolean;
         };
-        Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'visit_date'>;
+        Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'visit_date'> & { visit_date?: string };
         Update: Partial<Database['public']['Tables']['visits']['Insert']>;
       };
       investigations: {
@@ -131,8 +138,9 @@ export interface Database {
           tsb: number | null;
           hba1c: number | null;
           rbs: number | null;
+          is_er: boolean;
         };
-        Insert: Omit<Database['public']['Tables']['investigations']['Row'], 'id' | 'date'>;
+        Insert: Omit<Database['public']['Tables']['investigations']['Row'], 'id' | 'date'> & { date?: string };
         Update: Partial<Database['public']['Tables']['investigations']['Insert']>;
       };
       user_profiles: {

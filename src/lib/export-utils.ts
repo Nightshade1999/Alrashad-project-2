@@ -2,6 +2,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Page
 import ExcelJS from "exceljs"
 import Papa from "papaparse"
 import { format, parseISO } from "date-fns"
+import { isLabAbnormal } from "./utils"
 
 /** Safely parse a Supabase JSONB field that may arrive as a JSON string or already-parsed array. */
 function parseArr(val: any): any[] {
@@ -117,12 +118,20 @@ export async function exportPatientsToCSV(patients: any[]) {
 
     // Format all labs into a single readable string
     const labHistory = invs.map((inv: any) => {
+      const otherLabsFormat = Array.isArray(inv.other_labs) ? inv.other_labs.map((o:any)=>`${o.name}:${o.value}`) : [];
       const parts = [
         inv.hba1c ? `HbA1c:${inv.hba1c}%` : null,
         inv.hb ? `Hb:${inv.hb}` : null,
-        inv.s_creatinine ? `s.Cr:${inv.s_creatinine}` : null,
+        inv.wbc ? `WBC:${inv.wbc}` : null,
+        inv.s_creatinine ? `Cr:${inv.s_creatinine}` : null,
         inv.s_urea ? `Urea:${inv.s_urea}` : null,
-        inv.rbs ? `RBS:${inv.rbs}` : null
+        inv.ast ? `AST:${inv.ast}` : null,
+        inv.alt ? `ALT:${inv.alt}` : null,
+        inv.tsb ? `TSB:${inv.tsb}` : null,
+        inv.esr ? `ESR:${inv.esr}` : null,
+        inv.crp ? `CRP:${inv.crp}` : null,
+        inv.rbs ? `RBS:${inv.rbs}` : null,
+        ...otherLabsFormat
       ].filter(Boolean)
       return `${format(parseISO(inv.date), "yyyy-MM-dd")}: [${parts.join(", ")}]`
     }).join(" | ")
@@ -180,259 +189,346 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
   const dynamicWardName = wardName.toUpperCase()
 
   const sections = patients.map((p, index) => {
-    const children: any[] = [
-      new Paragraph({
-        children: [
-          new TextRun({ text: dynamicWardName, bold: true, size: 36, color: "0D9488" }),
-        ],
-        alignment: AlignmentType.LEFT,
-        spacing: { before: 200 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({ text: `Attending Doctor: Dr. ${doctorName}`, size: 22, color: "64748B", italics: true }),
-        ],
-        alignment: AlignmentType.LEFT,
-        spacing: { after: 600 },
-      }),
+    const isER = p.is_in_er || false;
 
-      new Paragraph({
-        children: [
-          new TextRun({ text: p.name, bold: true, size: 48, color: "1E293B" }),
-        ],
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({ text: `CLINICAL SUMMARY · ${format(new Date(), "dd MMMM yyyy")}`, size: 18, color: "94A3B8" }),
-        ],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 800 },
-      }),
+    const visitsForDoc = (p.visits || []).filter((v: any) => isER ? v.is_er : !v.is_er);
+    visitsForDoc.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
+    const targetVisit = visitsForDoc.length > 0 ? visitsForDoc[0] : (p.visits?.[0] || null);
 
-      new Paragraph({
-        children: [new TextRun({ text: "PATIENT DEMOGRAPHICS", bold: true, size: 24, color: "0D9488" })],
-        spacing: { after: 200 },
-      }),
-      
-      new Paragraph({
-        children: [
-          new TextRun({ text: "Age: ", bold: true, size: 20, color: "334155" }),
-          new TextRun({ text: `${p.age} Years`, size: 20, color: "000000" }),
-          new TextRun({ text: "   |   Gender: ", bold: true, size: 20, color: "334155" }),
-          new TextRun({ text: p.gender || "N/A", size: 20, color: "000000" }),
-        ],
-        spacing: { after: 120 }
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({ text: "Ward/Bed: ", bold: true, size: 20, color: "334155" }),
-          new TextRun({ text: p.ward_number || "N/A", size: 20, color: "000000" }),
-          new TextRun({ text: "   |   Category: ", bold: true, size: 20, color: "334155" }),
-          new TextRun({ text: p.category || "Normal", color: p.category === 'Deceased/Archive' ? '64748B' : p.category === 'High Risk' ? 'EF4444' : '0D9488', bold: true, size: 20 }),
-        ],
-        spacing: { after: 200 },
-      }),
+    let docLabs = (p.investigations || []).filter((inv: any) => isER ? inv.is_er : !inv.is_er);
+    if (docLabs.length === 0 && p.investigations?.length > 0) docLabs = [p.investigations[0]];
 
-      ...(p.category === 'Deceased/Archive' ? [
-        new Paragraph({
-          children: [new TextRun({ text: "POST-MORTEM INFORMATION", bold: true, size: 20, color: "EF4444" })],
-          spacing: { before: 200, after: 120 }
-        }),
-        new Paragraph({
+    const noteLines = targetVisit ? (targetVisit.exam_notes || "").split("\n").length : 1;
+    const admissionNoteLines = (p.er_admission_notes || "").split("\n").length;
+    const medsCount = parseArr(p.medical_drugs).length + parseArr(p.psych_drugs).length;
+    const erTxCount = parseArr(p.er_treatment).length;
+
+    const projectedLines = 6 +
+      Math.max(5 + medsCount, isER ? 6 + admissionNoteLines : 8) +
+      Math.max(5, 2 + noteLines) +
+      (isER ? 2 + erTxCount : 0) +
+      2 + Math.min(5, docLabs.length);
+
+    let fontSizeOffset = 0;
+    let limitLabs = false;
+    const threshold = isER ? 34 : 48;
+    if (projectedLines > threshold) {
+       fontSizeOffset = 2;
+       if (projectedLines > (threshold + 12)) limitLabs = true;
+    }
+
+    const sz = (baseValue: number) => Math.max(16, baseValue - fontSizeOffset);
+    const themeColor = isER ? "BE123C" : "0F172A";
+    const secondaryColor = "0D9488";
+
+    const children: any[] = [];
+
+    const noBorders = {
+      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+      left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+      insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE },
+    };
+
+    // ═══════════════════════════════════════
+    // 1. HEADER
+    // ═══════════════════════════════════════
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `Dr. ${doctorName}`, bold: true, size: sz(28), color: secondaryColor })],
+      alignment: AlignmentType.LEFT,
+      spacing: { before: 200 },
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: isER ? "CLINICAL SUMMARY & EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY",
+        bold: true, size: sz(36), color: "1E293B"
+      })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 400 },
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: format(new Date(), "dd MMMM yyyy"), size: sz(18), color: "94A3B8" })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 },
+    }));
+
+    // ═══════════════════════════════════════
+    // 2. DEMOGRAPHICS | CONTEXT (same for both)
+    // ═══════════════════════════════════════
+    children.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: noBorders,
+      rows: [
+        new TableRow({
           children: [
-            new TextRun({ text: "Date & Time of Death: ", bold: true, size: 18, color: "000000" }),
-            new TextRun({ text: p.date_of_death ? format(parseISO(p.date_of_death), "dd MMMM yyyy (HH:mm)") : "Unknown", size: 18 }),
-          ],
-          spacing: { after: 120 }
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({ text: "Official Cause of Death: ", bold: true, size: 18, color: "000000" }),
-            new TextRun({ text: p.cause_of_death || "Not specified", size: 18, italics: true }),
-          ],
-          spacing: { after: 300 }
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.TOP,
+              margins: { right: 200 },
+              children: [
+                new Paragraph({ children: [new TextRun({ text: "I. PATIENT DEMOGRAPHICS", bold: true, size: sz(20), color: secondaryColor })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "Name: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.name, bold: true, size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Province / Edu: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: `${p.province || "N/A"} / ${p.education_level || "N/A"}`, size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Age / Gender: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: `${p.age}y / ${p.gender}`, size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Primary Ward: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.ward_name || wardName || "General Ward", size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Chronic Diseases:", bold: true, size: sz(18), color: "64748B" })], spacing: { after: 40 } }),
+                new Paragraph({ children: [new TextRun({ text: formatDiseases(p.chronic_diseases), size: sz(18), italics: true })], spacing: { after: 120 } }),
+              ]
+            }),
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              verticalAlign: VerticalAlign.TOP,
+              margins: { left: 200 },
+              shading: { fill: isER ? "FFF1F2" : "F8FAFC" },
+              children: isER ? [
+                new Paragraph({ children: [new TextRun({ text: "II. ER ADMISSION NOTE", bold: true, size: sz(20), color: themeColor })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "Adm. Date: ", bold: true, size: sz(18) }), new TextRun({ text: p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM HH:mm") : "N/A", size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ children: [new TextRun({ text: "Referring Doctor: ", bold: true, size: sz(18) }), new TextRun({ text: `Dr. ${p.er_admission_doctor || "Unknown"}`, size: sz(18) })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "CHIEF COMPLAINT:", bold: true, size: sz(18), color: themeColor })], spacing: { after: 40 } }),
+                new Paragraph({ children: [new TextRun({ text: `"${p.er_chief_complaint || 'None recorded'}"`, size: sz(18), bold: true, italics: true })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "ADMISSION NOTES:", bold: true, size: sz(18) })], spacing: { after: 40 } }),
+                ...(p.er_admission_notes || "No admission notes.").split("\n").map((line: string) =>
+                  new Paragraph({ children: [new TextRun({ text: line, size: sz(18) })], spacing: { after: 40 } })
+                )
+              ] : [
+                new Paragraph({ children: [new TextRun({ text: "II. LONG-TERM MEDICAL HISTORY", bold: true, size: sz(20), color: themeColor })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "Surgical History:", bold: true, size: sz(18), color: "64748B" })], spacing: { after: 40 } }),
+                new Paragraph({ children: [new TextRun({ text: parseArr(p.past_surgeries).join(", ") || "No surgical history recorded.", size: sz(18) })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "Known Allergies:", bold: true, size: sz(18), color: "BE123C" })], spacing: { after: 40 } }),
+                new Paragraph({ children: [new TextRun({ text: parseArr(p.allergies).join(", ") || "None recorded", size: sz(18), bold: parseArr(p.allergies).length > 0 })], spacing: { after: 120 } }),
+                new Paragraph({ children: [new TextRun({ text: "Relative Contact:", bold: true, size: sz(18), color: "64748B" })], spacing: { after: 40 } }),
+                new Paragraph({ children: [new TextRun({ text: p.relative_status === 'Known' ? `Family known (${p.relative_visits || '0'} visits / 3mo)` : "No family contact recorded.", size: sz(18) })], spacing: { after: 80 } }),
+              ]
+            }),
+          ]
         })
-      ] : []),
-
-      new Paragraph({
-        children: [new TextRun({ text: "", size: 1 })], // Spacer
-        spacing: { after: 200 },
-        border: { bottom: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } }
-      }),
-
-      new Paragraph({
-        children: [new TextRun({ text: "MEDICAL HISTORY & PHARMACOTHERAPY", bold: true, size: 24, color: "0D9488" })],
-        spacing: { before: 600, after: 200 },
-      }),
-      new Paragraph({
-        children: [
-          new TextRun({ text: "Chronic Diseases: ", bold: true, size: 20, color: "000000" }),
-          new TextRun({ text: formatDiseases(p.chronic_diseases), size: 20, color: "000000" }),
-        ],
-        spacing: { after: 300 },
-      }),
-    ]
-
-    // Pharmacology Paragraphs
-    const medDrugsList = formatDrugs(p.medical_drugs);
-    const psychDrugsList = formatDrugs(p.psych_drugs);
-
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Internal Medical Treatment:", bold: true, size: 20, color: "0D9488" })],
-      spacing: { before: 200, after: 120 }
+      ]
     }));
 
-    if (medDrugsList.length > 0) {
-      medDrugsList.forEach((drug: string) => {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `• ${drug}`, size: 20 })],
-          indent: { left: 400 },
-          spacing: { after: 60 }
-        }));
-      });
-    } else {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: "None recorded", size: 20, italics: true, color: "64748B" })],
-        indent: { left: 400 },
-        spacing: { after: 120 }
+    children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
+
+    // ═══════════════════════════════════════
+    // WARD: 3. MEDICATIONS (side-by-side Medical | Psych) then 4. VITALS | PROGRESS then 5. LABS
+    // ER:   3. VITALS | PROGRESS then 4. ER TREATMENT then 5. LABS
+    // ═══════════════════════════════════════
+
+    if (!isER) {
+      // ── WARD SECTION III: Two-Column Medications ──
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        rows: [
+          new TableRow({
+            children: [
+              // LEFT: Medical Medications
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { right: 200 },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "III. ONGOING MEDICAL TREATMENT", bold: true, size: sz(20), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(parseArr(p.medical_drugs).length > 0
+                    ? parseArr(p.medical_drugs).map((d: any) =>
+                        new Paragraph({ children: [new TextRun({ text: `• ${d.name || d} ${d.dosage || ""} — ${d.frequency || ""}`, size: sz(18) })], indent: { left: 140 }, spacing: { after: 40 } })
+                      )
+                    : [new Paragraph({ children: [new TextRun({ text: "No medical medications.", size: sz(18), italics: true })], indent: { left: 140 } })]
+                  )
+                ]
+              }),
+              // RIGHT: Psych Medications
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { left: 200 },
+                shading: { fill: "F0FDFA" },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "III. ONGOING PSYCHIATRIC TREATMENT", bold: true, size: sz(20), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(parseArr(p.psych_drugs).length > 0
+                    ? parseArr(p.psych_drugs).map((d: any) =>
+                        new Paragraph({ children: [new TextRun({ text: `• ${d.name || d} ${d.dosage || ""} — ${d.frequency || ""}`, size: sz(18) })], indent: { left: 140 }, spacing: { after: 40 } })
+                      )
+                    : [new Paragraph({ children: [new TextRun({ text: "No psychiatric medications.", size: sz(18), italics: true })], indent: { left: 140 } })]
+                  )
+                ]
+              }),
+            ]
+          })
+        ]
       }));
-    }
 
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Psychiatric Treatment:", bold: true, size: 20, color: "7C3AED" })],
-      spacing: { before: 200, after: 120 }
-    }));
+      children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
 
-    if (psychDrugsList.length > 0) {
-      psychDrugsList.forEach((drug: string) => {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `• ${drug}`, size: 20 })],
-          indent: { left: 400 },
-          spacing: { after: 60 }
-        }));
-      });
-    } else {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: "None recorded", size: 20, italics: true, color: "64748B" })],
-        indent: { left: 400 },
-        spacing: { after: 120 }
+      // ── WARD SECTION IV: Vitals | Progress ──
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { right: 200 },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "IV. VITALS", bold: true, size: sz(18), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(targetVisit ? [
+                    new Paragraph({ children: [new TextRun({ text: "BP: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.bp_sys ? `${targetVisit.bp_sys}/${targetVisit.bp_dia || '?'}` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "PR: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.pr ? `${targetVisit.pr} bpm` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "SpO2: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.spo2 ? `${targetVisit.spo2}%` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "Temp: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.temp ? `${targetVisit.temp}°C` : "N/A", size: sz(22) })], }),
+                  ] : [new Paragraph({ children: [new TextRun({ text: "No current vitals.", size: sz(22), italics: true })] })])
+                ]
+              }),
+              new TableCell({
+                width: { size: 70, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { left: 200 },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "V. LATEST CLINICAL PROGRESS EVALUATION", bold: true, size: sz(18), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(targetVisit ?
+                    (targetVisit.exam_notes || "").split("\n").map((line: string) =>
+                      new Paragraph({ children: [new TextRun({ text: line, size: sz(22) })], spacing: { after: 40 } })
+                    )
+                  : [new Paragraph({ children: [new TextRun({ text: "No follow-up clinical notes recorded.", size: sz(22), italics: true })] })])
+                ]
+              }),
+            ]
+          })
+        ]
       }));
-    }
 
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "Clinical investigations", bold: true, size: 24, color: "0D9488" })],
-      spacing: { before: 600, after: 200 },
-    }))
-
-    const invList = p.investigations || [];
-    if (invList.length > 0) {
-      invList.forEach((inv: any) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `Lab Date: ${format(parseISO(inv.date), "dd MMM yyyy")}`, bold: true, size: 22, color: "0D9488" }),
-          ],
-          spacing: { before: 240, after: 120 },
-          border: { bottom: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } }
-        }));
-
-        const labData = [];
-        if (inv.wbc) labData.push(`WBC: ${inv.wbc}`);
-        if (inv.hb) labData.push(`Hb: ${inv.hb}`);
-        if (inv.hba1c) labData.push(`HbA1c: ${inv.hba1c}%`);
-        if (inv.rbs) labData.push(`RBS: ${inv.rbs}`);
-        if (inv.s_creatinine) labData.push(`S.Cr: ${inv.s_creatinine}`);
-        if (inv.s_urea) labData.push(`Urea: ${inv.s_urea}`);
-        if (inv.ast || inv.alt) labData.push(`AST/ALT: ${inv.ast || "-"}/${inv.alt || "-"}`);
-        if (inv.tsb) labData.push(`TSB: ${inv.tsb}`);
-
-        if (labData.length > 0) {
-          children.push(new Paragraph({
-            children: [
-              new TextRun({ text: labData.join("   |   "), size: 20, color: "334155" })
-            ],
-            spacing: { before: 60, after: 60 },
-            indent: { left: 300 }
-          }));
-        }
-
-        if (inv.notes && inv.notes.trim() !== "") {
-          children.push(new Paragraph({
-            children: [
-              new TextRun({ text: "Notes: ", bold: true, size: 18, color: "64748B" }),
-              new TextRun({ text: inv.notes, size: 18, color: "64748B", italics: true })
-            ],
-            spacing: { before: 60, after: 100 },
-            indent: { left: 300 }
-          }));
-        }
-      });
     } else {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: "No comprehensive clinical investigation data found.", italics: true, color: "64748B", size: 18 })],
-      }))
-    }
-
-    children.push(new Paragraph({
-      children: [new TextRun({ text: "CLINICAL PROGRESS NOTES", bold: true, size: 24, color: "0D9488" })],
-      spacing: { before: 600, after: 200 },
-    }))
-
-    const visitsToPrint = (invList.length > 5 || (p.visits?.length || 0) > 3) 
-      ? (p.visits?.slice(0, 1) || []) 
-      : (p.visits || [])
-
-    if (visitsToPrint.length > 0) {
-      visitsToPrint.forEach((v: any) => {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `Visit Date: ${format(parseISO(v.visit_date), "dd MMM yyyy")}`, bold: true, size: 20, color: "334155" })],
-          spacing: { before: 200 },
-        }))
-
-        // Vitals Row in Word
-        if (v.bp_sys || v.pr || v.spo2 || v.temp) {
-          children.push(new Paragraph({
+      // ── ER SECTION III/IV: Vitals | Progress (same as before) ──
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: noBorders,
+        rows: [
+          new TableRow({
             children: [
-              new TextRun({ text: "VITALS: ", bold: true, size: 18, color: "0D9488" }),
-              new TextRun({ 
-                text: [
-                  v.bp_sys ? `BP: ${v.bp_sys}/${v.bp_dia || '?'}` : null,
-                  v.pr ? `PR: ${v.pr}bpm` : null,
-                  v.spo2 ? `SpO2: ${v.spo2}%` : null,
-                  v.temp ? `Temp: ${v.temp}°C` : null,
-                ].filter(Boolean).join("  |  "),
-                size: 18,
-                color: "334155"
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { right: 200 },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "III. VITALS", bold: true, size: sz(18), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(targetVisit ? [
+                    new Paragraph({ children: [new TextRun({ text: "BP: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.bp_sys ? `${targetVisit.bp_sys}/${targetVisit.bp_dia || '?'}` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "PR: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.pr ? `${targetVisit.pr} bpm` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "SpO2: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.spo2 ? `${targetVisit.spo2}%` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
+                    new Paragraph({ children: [new TextRun({ text: "Temp: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.temp ? `${targetVisit.temp}°C` : "N/A", size: sz(22) })], }),
+                  ] : [new Paragraph({ children: [new TextRun({ text: "No current vitals.", size: sz(22), italics: true })] })])
+                ]
+              }),
+              new TableCell({
+                width: { size: 70, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign.TOP,
+                margins: { left: 200 },
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: "IV. EMERGENCY CLINICAL EVALUATION", bold: true, size: sz(18), color: secondaryColor })], spacing: { after: 120 } }),
+                  ...(targetVisit ?
+                    (targetVisit.exam_notes || "").split("\n").map((line: string) =>
+                      new Paragraph({ children: [new TextRun({ text: line, size: sz(22) })], spacing: { after: 40 } })
+                    )
+                  : [new Paragraph({ children: [new TextRun({ text: "No follow-up clinical notes recorded.", size: sz(22), italics: true })] })])
+                ]
+              }),
+            ]
+          })
+        ]
+      }));
+
+      children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
+
+      // ── ER SECTION V: Emergency Treatment (banner style) ──
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "V. EMERGENCY PHARMACOLOGICAL TREATMENT", bold: true, size: sz(20), color: "FFFFFF" })],
+        shading: { fill: themeColor },
+        spacing: { before: 120, after: 120 },
+        indent: { left: 120 }
+      }));
+
+      const erMeds = parseArr(p.er_treatment);
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                children: erMeds.length > 0
+                ? erMeds.map((t: any) =>
+                    new Paragraph({ children: [new TextRun({ text: `• ${t.name} ${t.dosage || ""} — ${t.frequency || ""}`, bold: true, size: sz(22) })], indent: { left: 240 }, spacing: { before: 60, after: 60 } })
+                  )
+                : [new Paragraph({ children: [new TextRun({ text: "No emergency treatment recorded.", size: sz(22), italics: true })], indent: { left: 240 } })]
               })
-            ],
-            spacing: { before: 100, after: 100 },
-            indent: { left: 400 },
-          }))
-        }
-        
-        // Preserve original formatting by splitting into paragraphs
-        const noteLines = (v.exam_notes || "No clinical exam notes recorded.").split("\n")
-        noteLines.forEach((line: string) => {
-          children.push(new Paragraph({
-            children: [new TextRun({ text: line, size: 20 })],
-            border: {
-              left: { color: "0D9488", size: 18, style: BorderStyle.SINGLE },
-            },
-            shading: { fill: "F8FAFC" },
-            indent: { left: 400 },
-            spacing: { before: 42, after: 42 },
-          }))
-        })
-      })
-      if ((p.visits?.length || 0) > visitsToPrint.length) {
+            ]
+          })
+        ]
+      }));
+    }
+
+    children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
+
+    // ═══════════════════════════════════════
+    // LAST: LAB VALUES (same for both)
+    // ═══════════════════════════════════════
+    children.push(new Paragraph({
+      children: [new TextRun({ text: isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS", bold: true, size: sz(20), color: secondaryColor })],
+      spacing: { after: 120 },
+      border: { bottom: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } }
+    }));
+
+    docLabs.sort((a: any, b: any) => {
+      const d1 = new Date(b.date || b.created_at).getTime();
+      const d2 = new Date(a.date || a.created_at).getTime();
+      return (isNaN(d1) ? 0 : d1) - (isNaN(d2) ? 0 : d2);
+    });
+
+    const labsToPrint = limitLabs ? docLabs.slice(0, 1) : docLabs.slice(0, 6);
+
+    if (labsToPrint.length > 0) {
+      labsToPrint.forEach((inv: any) => {
+        const labEntries: any[] = [
+          { key: 'hb', label: 'Hb', val: inv.hb },
+          { key: 'wbc', label: 'WBC', val: inv.wbc },
+          { key: 's_creatinine', label: 'Cr', val: inv.s_creatinine },
+          { key: 's_urea', label: 'Urea', val: inv.s_urea },
+          { key: 'ast', label: 'AST', val: inv.ast },
+          { key: 'alt', label: 'ALT', val: inv.alt },
+          { key: 'rbs', label: 'RBS', val: inv.rbs },
+          { key: 'tsb', label: 'TSB', val: inv.tsb },
+          { key: 'hba1c', label: 'HbA1c', val: inv.hba1c },
+          { key: 'esr', label: 'ESR', val: inv.esr },
+          { key: 'crp', label: 'CRP', val: inv.crp },
+        ];
+
+        const otherLabs = Array.isArray(inv.other_labs) ? inv.other_labs : [];
+        otherLabs.forEach((o: any) => { labEntries.push({ key: o.name, label: o.name, val: o.value }); });
+
+        const activeLabs = labEntries.filter((l: any) => l.val !== null && l.val !== undefined && l.val !== "");
+        const labRuns: any[] = [];
+        activeLabs.forEach((lab: any, idx: number) => {
+          const isAbnormal = isLabAbnormal(lab.key, lab.val);
+          labRuns.push(new TextRun({ text: `${lab.label}: `, size: sz(18), bold: true, color: "64748B" }));
+          labRuns.push(new TextRun({
+             text: `${lab.val}${idx < activeLabs.length - 1 ? " | " : ""}`,
+             size: sz(18), bold: isAbnormal, color: isAbnormal ? "DC2626" : "1E293B"
+          }));
+        });
+
+        const dateStr = inv.date || inv.created_at || new Date().toISOString();
         children.push(new Paragraph({
-          children: [new TextRun({ text: `(Earlier visits truncated for clinical summary length)`, italics: true, size: 16, color: "94A3B8" })],
-        }))
-      }
+          children: [
+            new TextRun({ text: `${format(parseISO(dateStr), isER ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy")}  -->  `, bold: true, size: sz(18), color: secondaryColor }),
+            ...labRuns
+          ],
+          indent: { left: 240 },
+          spacing: { after: 120 }
+        }));
+      });
     } else {
       children.push(new Paragraph({
-        children: [new TextRun({ text: "No visit history records found in this account.", italics: true, color: "64748B", size: 18 })],
-      }))
+        children: [new TextRun({ text: "No lab investigations found.", size: sz(16), italics: true, color: "64748B" })],
+        indent: { left: 240 }
+      }));
     }
 
     if (index < patients.length - 1) {

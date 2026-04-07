@@ -56,8 +56,16 @@ export async function createUserAction(formData: FormData) {
   const aiEnabled = formData.get('ai_enabled') === 'true'
   const canSeeWardPatients = formData.get('can_see_ward_patients') === 'true'
   const gender = formData.get('gender') as 'Male' | 'Female' | null
+  const accessibleWardsStr = formData.get('accessible_wards') as string // JSON array string
+  let accessibleWards: string[] = []
+  try { if (accessibleWardsStr) accessibleWards = JSON.parse(accessibleWardsStr) } catch {}
 
   if (!email || !password) return { error: 'Email and password required' }
+  
+  // Ensure primary ward is in accessible list
+  if (wardName && !accessibleWards.includes(wardName)) {
+    accessibleWards.push(wardName)
+  }
 
   // 1. Create auth user
   const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
@@ -81,7 +89,8 @@ export async function createUserAction(formData: FormData) {
       specialty,
       gender,
       ai_enabled: aiEnabled,
-      can_see_ward_patients: canSeeWardPatients
+      can_see_ward_patients: canSeeWardPatients,
+      accessible_wards: accessibleWards
     })
 
   if (profileError) return { error: 'Auth succeeded but profile update failed: ' + profileError.message }
@@ -135,7 +144,7 @@ export async function updateUserPasswordAction(userId: string, newPassword: stri
   return { success: true }
 }
 
-export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null) {
+export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null, accessibleWards?: string[]) {
   if (!userId) return { error: 'User ID required' }
 
   // Update email if provided
@@ -153,13 +162,40 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (gender !== undefined) updatePayload.gender = gender
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
+    if (accessibleWards !== undefined) {
+      updatePayload.accessible_wards = accessibleWards
+      // Ensure primary ward is ALWAYS in accessible_wards
+      if (wardName && !accessibleWards.includes(wardName)) {
+        updatePayload.accessible_wards = [...accessibleWards, wardName]
+      }
+    }
 
+    // 1. Fetch current profile to check if ward is changing
+    const { data: currentProf } = await (getSupabaseAdmin()
+      .from('user_profiles') as any)
+      .select('ward_name')
+      .eq('user_id', userId)
+      .single()
+
+    const isWardChanging = wardName && currentProf?.ward_name !== wardName
+
+    // 2. Perform Profile Update
     const { error: profError } = await (getSupabaseAdmin()
       .from('user_profiles') as any)
       .update(updatePayload)
       .eq('user_id', userId)
 
     if (profError) return { error: 'Failed to update user profile: ' + profError.message }
+
+    // 3. IF WARD CHANGED: Migrate all patients to the new ward!
+    if (isWardChanging) {
+      const { error: migError } = await getSupabaseAdmin()
+        .from('patients')
+        .update({ ward_name: wardName })
+        .eq('user_id', userId)
+      
+      if (migError) console.error('Patient migration failed during ward change:', migError)
+    }
   }
 
   revalidatePath('/admin/manage')
@@ -212,7 +248,8 @@ export async function getAllUsersAction() {
       specialty: prof?.specialty || 'psychiatry',
       gender: prof?.gender || null,
       ai_enabled: prof?.ai_enabled ?? true,
-      can_see_ward_patients: prof?.can_see_ward_patients ?? false
+      can_see_ward_patients: prof?.can_see_ward_patients ?? false,
+      accessible_wards: prof?.accessible_wards || (prof?.ward_name ? [prof.ward_name] : [])
     }
   })
 
@@ -261,6 +298,50 @@ export async function upsertWardSettingAction(wardName: string, gender: 'Male' |
   }, { onConflict: 'ward_name' })
   
   if (error) return { error: error.message }
+  revalidatePath('/admin/manage')
+  return { success: true }
+}
+
+export async function deleteWardSettingAction(wardName: string) {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+  
+  if (!wardName) return { error: 'Ward name required' }
+  const { error } = await getSupabaseAdmin()
+    .from('ward_settings')
+    .delete()
+    .eq('ward_name', wardName)
+  
+  if (error) return { error: error.message }
+  revalidatePath('/admin/manage')
+  return { success: true }
+}
+
+export async function syncWardSettingsAction() {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+
+  // 1. Get all unique ward names from user_profiles
+  const { data: profiles, error: profError } = await (getSupabaseAdmin()
+    .from('user_profiles') as any)
+    .select('ward_name')
+  
+  if (profError) return { error: profError.message }
+  
+  const activeWards = Array.from(new Set(profiles?.map((p: any) => p.ward_name).filter(Boolean)))
+
+  // 2. Delete from ward_settings if not in activeWards
+  // Note: if activeWards is empty, we delete all settings.
+  const query = getSupabaseAdmin()
+    .from('ward_settings')
+    .delete()
+  
+  if (activeWards.length > 0) {
+    query.not('ward_name', 'in', `(${activeWards.join(',')})`)
+  }
+
+  const { error: deleteError } = await query
+  if (deleteError) return { error: deleteError.message }
+
+  revalidatePath('/admin/manage')
   return { success: true }
 }
 
@@ -301,4 +382,56 @@ export async function searchAllPatientsAction(query: string) {
       return { patients: [] }
     }
   }
+}
+
+export async function syncProfileWardAction(newWardName: string) {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Authentication required' }
+
+  // Update CURRENT user_profile ward_name
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ ward_name: newWardName })
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function repairWardDiscrepanciesAction() {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+
+  // 1. Fetch all current user profiles
+  const { data: profiles, error: profError } = await (getSupabaseAdmin()
+    .from('user_profiles') as any)
+    .select('user_id, ward_name')
+  
+  if (profError) return { error: profError.message }
+
+  // 2. Reconciliation: For each profile, ensure their patients match their CURRENT ward_name
+  let totalMigrated = 0
+  for (const prof of profiles) {
+    const { data: migData, error: migError } = await getSupabaseAdmin()
+      .from('patients')
+      .update({ ward_name: prof.ward_name })
+      .eq('user_id', prof.user_id)
+      .neq('ward_name', prof.ward_name)
+      .select()
+    
+    if (migError) console.error(`Failed repair for user ${prof.user_id}:`, migError)
+    else if (migData) totalMigrated += migData.length
+  }
+
+  revalidatePath('/admin/manage')
+  return { success: true, count: totalMigrated }
 }

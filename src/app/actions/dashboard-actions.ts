@@ -75,3 +75,21 @@ ${summary}
 
   throw new Error(`Failed to generate insights: ${lastError?.message || "Unknown error"}`)
 }
+
+export async function updateErTreatmentAction(patientId: string, treatments: any[]) {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  const { error } = await supabase
+    .from('patients')
+    .update({ er_treatment: treatments })
+    .eq('id', patientId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+

@@ -13,11 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { convertArabicNumbers } from "@/lib/utils"
+import { 
+  movePatientToErAction, 
+  returnPatientToWardAction, 
+  addVisitAction, 
+  addInvestigationAction 
+} from "@/app/actions/patient-actions"
 
-export function MoveToErModal({ patientId, isEr }: { patientId: string, isEr: boolean }) {
+export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId: string, isEr: boolean, disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
@@ -57,35 +62,18 @@ export function MoveToErModal({ patientId, isEr }: { patientId: string, isEr: bo
   const handleReturnToWard = async () => {
     setIsSubmitting(true)
     try {
-      const supabase = createClient()
+      const response = await returnPatientToWardAction(patientId)
+      if (response.error) throw new Error(response.error)
       
-      // Fetch current ER details to save to history
-      const { data: p } = await (supabase.from('patients') as any).select('er_admission_date, er_admission_doctor, er_chief_complaint, er_history').eq('id', patientId).single()
-      
-      let newHistory = Array.isArray(p?.er_history) ? [...p.er_history] : []
-      if (p?.er_admission_date) {
-        newHistory.push({
-          admission_date: p.er_admission_date,
-          discharge_date: new Date().toISOString(),
-          doctor: p.er_admission_doctor,
-          chief_complaint: p.er_chief_complaint
-        })
-      }
-
-      const { error } = await (supabase.from('patients') as any)
-        .update({ 
-          is_in_er: false,
-          er_admission_date: null,
-          er_admission_doctor: null,
-          er_chief_complaint: null,
-          er_history: newHistory
-        })
-        .eq('id', patientId)
-
-      if (error) throw error
       toast.success("Patient returned to standard Ward.")
       setOpen(false)
-      router.refresh()
+      
+      // Use router.replace to avoid the 'dead' profile page in history
+      if (response.gender) {
+        router.replace(`/dashboard/er/${response.gender}`)
+      } else {
+        router.replace('/dashboard/er')
+      }
     } catch (err: any) {
       console.error(err)
       toast.error(`Return Failed: ${err.message || 'Unknown error'}`)
@@ -96,78 +84,48 @@ export function MoveToErModal({ patientId, isEr }: { patientId: string, isEr: bo
 
   const handleMoveToEr = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chiefComplaint.trim()) {
-      toast.error("Chief complaint is required")
-      return
-    }
+    if (!chiefComplaint.trim()) { toast.error("Chief complaint is required"); return }
 
     setIsSubmitting(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
+      // 1. Update Patient Status via Server Action
+      const moveRes = await movePatientToErAction({
+        patient_id: patientId,
+        chief_complaint: chiefComplaint.trim(),
+        admission_notes: examNotes.trim()
+      })
+      if (moveRes.error) throw new Error(moveRes.error)
 
-      // Fetch user profile for doctor name
-      const { data: profile } = await (supabase.from('user_profiles') as any).select('doctor_name, email').eq('user_id', user.id).single()
-      const doctorIdentifier = profile?.doctor_name || profile?.email || 'Unknown Doctor'
-      
       const nowIso = new Date().toISOString()
       
-      // 1. Update Patient
-      const { error: patientError } = await (supabase.from('patients') as any)
-        .update({ 
-          is_in_er: true,
-          er_admission_date: nowIso,
-          er_admission_doctor: doctorIdentifier,
-          er_chief_complaint: chiefComplaint.trim()
-        })
-        .eq('id', patientId)
-
-      if (patientError) throw patientError
-
-      // 2. Create Visit Note (Optional depending on inputs, but usually good to have if notes/vitals provided)
-      let visitId = null
+      // 2. Create Visit Note (if vitals/notes provided)
       if (examNotes.trim() || bpSys || pr || temp || spo2) {
-        const { data: visitData, error: visitError } = await (supabase.from('visits') as any).insert({
+        await addVisitAction({
           patient_id: patientId,
-          doctor_id: user.id,
           visit_date: nowIso.split('T')[0],
+          visit_time: nowIso.split('T')[1].slice(0, 5),
           exam_notes: examNotes.trim() || "ER Admission Note",
           bp_sys: bpSys ? parseInt(convertArabicNumbers(bpSys)) : null,
           bp_dia: bpDia ? parseInt(convertArabicNumbers(bpDia)) : null,
           pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
           spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
           temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
-        }).select('id').single()
-        
-        if (visitError) throw visitError
-        visitId = visitData.id
+          is_er: true,
+        })
       }
 
       // 3. Create Investigation if Labs provided
       if (wbc || hb || sCreatinine || rbs) {
-        if (!visitId) {
-           // We need a visit_id for investigations usually, let's create a stub visit if one wasn't made
-           const { data: vData, error: vErr } = await (supabase.from('visits') as any).insert({
-             patient_id: patientId,
-             doctor_id: user.id,
-             visit_date: nowIso.split('T')[0],
-             exam_notes: "ER Admission Triggered Labs"
-           }).select('id').single()
-           if (vErr) throw vErr
-           visitId = vData.id
-        }
-
-        const { error: labError } = await (supabase.from('investigations') as any).insert({
+        await addInvestigationAction({
           patient_id: patientId,
-          visit_id: visitId,
           date: nowIso.split('T')[0],
+          time: nowIso.split('T')[1].slice(0, 5),
           wbc: wbc ? parseFloat(convertArabicNumbers(wbc)) : null,
           hb: hb ? parseFloat(convertArabicNumbers(hb)) : null,
           s_creatinine: sCreatinine ? parseFloat(convertArabicNumbers(sCreatinine)) : null,
           rbs: rbs ? parseFloat(convertArabicNumbers(rbs)) : null,
+          is_er: true,
         })
-        if (labError) throw labError
       }
 
       toast.success("Patient moved to ER Ward with details.")
@@ -188,7 +146,7 @@ export function MoveToErModal({ patientId, isEr }: { patientId: string, isEr: bo
         variant="outline" 
         size="sm" 
         onClick={handleReturnToWard}
-        disabled={isSubmitting}
+        disabled={isSubmitting || disabled}
         className="h-9 px-3 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
       >
         <ArrowLeftCircle className="h-3.5 w-3.5 text-indigo-600" />
@@ -203,6 +161,7 @@ export function MoveToErModal({ patientId, isEr }: { patientId: string, isEr: bo
         variant="outline" 
         size="sm" 
         onClick={() => setOpen(true)}
+        disabled={disabled}
         className="h-9 px-3 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
       >
         <AlertCircle className="h-3.5 w-3.5 text-rose-500" />

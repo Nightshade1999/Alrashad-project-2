@@ -28,11 +28,25 @@ export function DrugListInput({ label, category, drugs, onChange }: DrugListInpu
   const [name, setName] = useState("")
   const [dosage, setDosage] = useState("")
   const [frequency, setFrequency] = useState("")
+  const [duplicateWarning, setDuplicateWarning] = useState(false)
 
   const filteredDict = DRUG_DICTIONARY.filter(d => d.category === category)
 
   const handleAdd = () => {
     if (!name) return;
+    
+    // Prevent duplicate entries where both drug name and dosage match exactly
+    const isDuplicate = drugs.some(d => 
+      d.name.trim().toLowerCase() === name.trim().toLowerCase() && 
+      d.dosage.trim().toLowerCase() === (dosage || "Unknown").trim().toLowerCase()
+    );
+    
+    if (isDuplicate) {
+      setDuplicateWarning(true)
+      setTimeout(() => setDuplicateWarning(false), 3000)
+      return;
+    }
+    
     onChange([...drugs, { name, dosage: dosage || "Unknown", frequency: frequency || "Daily" }])
     setName("")
     setDosage("")
@@ -44,8 +58,11 @@ export function DrugListInput({ label, category, drugs, onChange }: DrugListInpu
   }
 
   return (
-    <div className="space-y-3 p-3 border rounded-md bg-slate-50 dark:bg-slate-900/50">
-      <Label className="font-semibold">{label}</Label>
+    <div className="space-y-3 p-3 border rounded-md bg-slate-50 dark:bg-slate-900/50 relative">
+      <div className="flex items-center justify-between">
+        <Label className="font-semibold">{label}</Label>
+        {duplicateWarning && <span className="text-[10px] font-bold text-amber-500 animate-pulse bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">Already Added</span>}
+      </div>
       
       {/* Current List */}
       {drugs.length > 0 && (

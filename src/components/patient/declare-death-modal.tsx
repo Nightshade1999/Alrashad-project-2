@@ -19,7 +19,7 @@ import {
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export function DeclareDeathModal({ patientId, currentCategory }: { patientId: string, currentCategory: string }) {
+export function DeclareDeathModal({ patientId, currentCategory, disabled = false }: { patientId: string, currentCategory: string, disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
@@ -104,7 +104,7 @@ export function DeclareDeathModal({ patientId, currentCategory }: { patientId: s
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900" />}>
+      <DialogTrigger render={<Button disabled={disabled} variant="outline" size="sm" className="h-9 px-3 gap-2 border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900" />}>
         <Skull className="h-3.5 w-3.5" />
         Declare Death
       </DialogTrigger>

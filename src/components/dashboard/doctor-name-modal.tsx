@@ -19,6 +19,7 @@ import { toast } from "sonner"
 export function DoctorNameModal() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
+  const [gender, setGender] = useState<'Male' | 'Female'>('Male')
   const [isSaving, setIsSaving] = useState(false)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -28,9 +29,9 @@ export function DoctorNameModal() {
   }, [])
 
   const checkDoctorName = async () => {
-    // 1. Check Session Storage first (for the "new sign in" requirement)
-    const sessionName = sessionStorage.getItem('wardManager_doctorName')
-    if (sessionName) {
+    // Force the modal if the current session doesn't have a name yet
+    const sessionFlag = sessionStorage.getItem('wardManager_sessionActive')
+    if (sessionFlag === 'true') {
       setOpen(false)
       return
     }
@@ -40,31 +41,22 @@ export function DoctorNameModal() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // 1. Check Database
+      // We still fetch the name from the DB as a default suggestion
       const { data } = await (supabase as any)
         .from('user_profiles')
         .select('doctor_name')
         .eq('user_id', user.id)
         .single()
 
-      const dbName = data?.doctor_name || ""
-      if (dbName) setName(dbName)
-
-      // 2. Decide whether to open
-      const isNewLogin = searchParams.get('login') === 'true'
-      
-      if (!dbName || isNewLogin) {
-        setOpen(true)
-        // Clean up URL if visible
-        if (isNewLogin) {
-           const newUrl = window.location.pathname
-           window.history.replaceState({}, '', newUrl)
-        }
-      } else {
-        // If we have a DB name and NOT a new login, just set session and stay closed
-        sessionStorage.setItem('wardManager_doctorName', dbName)
-        setOpen(false)
+      if (data?.doctor_name) {
+        setName(data.doctor_name)
       }
+      if (data?.gender && (data.gender === 'Male' || data.gender === 'Female')) {
+        setGender(data.gender)
+      }
+      
+      // Always open the modal on every "fresh" session
+      setOpen(true)
     } catch {
       setOpen(true)
     }
@@ -86,17 +78,17 @@ export function DoctorNameModal() {
       await (supabase as any)
         .from('user_profiles')
         .upsert(
-          { user_id: user.id, doctor_name: trimmed },
+          { 
+            user_id: user.id, 
+            doctor_name: trimmed,
+            gender: gender 
+          },
           { onConflict: 'user_id' }
         )
 
-      // Store in Session Storage (for current session)
-      sessionStorage.setItem('wardManager_doctorName', trimmed)
-      // Also store in localStorage for persistence across browser restarts if needed, 
-      // but the user specifically asked for "every new sign in" 
-      // so we rely on sessionStorage primarily.
-      localStorage.setItem('wardManager_doctorName', trimmed)
-
+      // Set session flag so it doesn't pop up again until the browser is closed or refreshed
+      sessionStorage.setItem('wardManager_sessionActive', 'true')
+      
       toast.success(`Session started as Dr. ${trimmed}!`)
       setOpen(false)
       // Force a refresh to update layout header
@@ -130,6 +122,7 @@ export function DoctorNameModal() {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="doctorName" className="text-sm font-semibold">
               Doctor Full Name
@@ -140,13 +133,38 @@ export function DoctorNameModal() {
               onChange={(e) => setName(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="e.g. Ahmed Safaa"
-              className="h-12 text-base"
+              className="h-12 text-base rounded-xl"
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">
-              This stamps your identity on visits, investigations, and exports.
+          </div>
+
+          {/* Gender */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">
+              Your Gender
+            </Label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+              {['Male', 'Female'].map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGender(g as any)}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    gender === g 
+                      ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  }`}
+                >
+                   {gender === g && <div className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse" />}
+                   {g}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground italic px-1">
+              * This settings ensures your clinical identity is correctly stamped.
             </p>
           </div>
+        </div>
 
           <Button
             onClick={handleSave}
@@ -160,7 +178,6 @@ export function DoctorNameModal() {
               </>
             )}
           </Button>
-        </div>
       </DialogContent>
     </Dialog>
   )

@@ -75,29 +75,39 @@ export default async function DashboardPage() {
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
-  // Fetch user profile safely using * to avoid schema cache errors
-  const { data: profile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .maybeSingle()
-
   const { data: authData, error: authError } = await supabase.auth.getUser()
+  const user = authData?.user
+
+  // Fetch current user's profile specifically to avoid ambiguity with global visibility
+  const { data: profile, error: profileError } = user 
+    ? await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null, error: null }
 
   if (profileError) {
     console.error('Supabase profile fetch error:', profileError)
   }
 
-  const { data: patients } = await supabase
-    .from('patients')
-    .select('id, name, room_number, category')
-
   const isAdmin = profile?.role === 'admin'
 
+  let patientQuery = supabase
+    .from('patients')
+    .select('id, name, room_number, category, is_in_er')
+
+  if (!isAdmin && profile?.ward_name) {
+    patientQuery = patientQuery.eq('ward_name', profile.ward_name)
+  }
+
+  const { data: patients } = await patientQuery
+
   const counts = {
-    'High Risk': patients?.filter(p => p.category === 'High Risk').length ?? 0,
-    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up').length ?? 0,
-    'Normal': patients?.filter(p => p.category === 'Normal').length ?? 0,
-    total: patients?.length ?? 0,
+    'High Risk': patients?.filter(p => p.category === 'High Risk' && !p.is_in_er).length ?? 0,
+    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length ?? 0,
+    'Normal': patients?.filter(p => p.category === 'Normal' && !p.is_in_er).length ?? 0,
+    total: patients?.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length ?? 0,
   }
 
   return (

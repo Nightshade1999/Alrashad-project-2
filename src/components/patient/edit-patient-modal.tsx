@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,10 +65,12 @@ interface EditPatientModalProps {
     psych_drugs: MedicalDrugParams[]
     allergies: string[]
     high_risk_date?: string | null
+    is_referred?: boolean
   }
+  disabled?: boolean
 }
 
-export function EditPatientModal({ patient }: EditPatientModalProps) {
+export function EditPatientModal({ patient, disabled = false }: EditPatientModalProps) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [gender, setGender] = useState(patient.gender)
@@ -86,6 +88,22 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
   const [allergies, setAllergies] = useState<string[]>(patient.allergies || [])
 
   const router = useRouter()
+
+  useEffect(() => {
+    if (open) {
+      setGender(patient.gender)
+      setCategory(patient.category)
+      setProvince(patient.province || "")
+      setEducationLevel(patient.education_level || "")
+      setRelativeStatus(patient.relative_status || 'Unknown')
+      setRelativeVisits(patient.relative_visits || "")
+      setPastSurgeries(patient.past_surgeries || [])
+      setChronicDiseases(patient.chronic_diseases || [])
+      setMedicalDrugs(patient.medical_drugs || [])
+      setPsychDrugs(patient.psych_drugs || [])
+      setAllergies(patient.allergies || [])
+    }
+  }, [open, patient])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -147,11 +165,12 @@ export function EditPatientModal({ patient }: EditPatientModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-2">
-          <Pencil className="h-3.5 w-3.5" />
-          Edit Info
-        </span>
+      <DialogTrigger 
+        disabled={disabled}
+        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-2"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        Edit Info
       </DialogTrigger>
       <DialogContent className="sm:max-w-4xl w-[95vw] sm:w-full max-h-[95dvh] sm:max-h-[90dvh] overflow-y-auto p-4 sm:p-6 mx-auto rounded-2xl">
         <form onSubmit={handleSubmit}>
