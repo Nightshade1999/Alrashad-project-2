@@ -139,6 +139,7 @@ export interface Database {
           hba1c: number | null;
           rbs: number | null;
           is_er: boolean;
+          doctor_name?: string | null;
         };
         Insert: Omit<Database['public']['Tables']['investigations']['Row'], 'id' | 'date'> & { date?: string };
         Update: Partial<Database['public']['Tables']['investigations']['Insert']>;
@@ -151,18 +152,16 @@ export interface Database {
           role: 'admin' | 'user';
           specialty: 'internal_medicine' | 'psychiatry' | string;
           gender: 'Male' | 'Female' | null;
+          ai_enabled: boolean;
+          offline_mode_enabled: boolean;
+          is_admin: boolean;
+          can_see_ward_patients: boolean;
+          accessible_wards: string[];
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at' | 'specialty' | 'doctor_name' | 'gender'> & { specialty?: string; doctor_name?: string; gender?: 'Male' | 'Female' | null };
-        Update: {
-          user_id?: string;
-          ward_name?: string;
-          doctor_name?: string | null;
-          role?: 'admin' | 'user';
-          specialty?: string;
-          gender?: 'Male' | 'Female' | null;
-        };
+        Insert: Omit<Database['public']['Tables']['user_profiles']['Row'], 'created_at' | 'updated_at' | 'specialty' | 'doctor_name' | 'gender' | 'ai_enabled' | 'offline_mode_enabled' | 'is_admin' | 'can_see_ward_patients' | 'accessible_wards'> & { specialty?: string; doctor_name?: string; gender?: 'Male' | 'Female' | null; ai_enabled?: boolean; offline_mode_enabled?: boolean; is_admin?: boolean; can_see_ward_patients?: boolean; accessible_wards?: string[] };
+        Update: Partial<Database['public']['Tables']['user_profiles']['Insert']>;
       };
       ward_settings: {
         Row: {
@@ -187,6 +186,23 @@ export interface Database {
           updated_at?: string;
         };
       };
+      system_settings: {
+        Row: {
+          id: number;
+          global_offline_enabled: boolean;
+          see_all_patients: boolean;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['system_settings']['Row']>;
+        Update: Partial<Database['public']['Tables']['system_settings']['Insert']>;
+      };
     };
   };
 }
+
+export type Patient = Database['public']['Tables']['patients']['Row'];
+export type Visit = Database['public']['Tables']['visits']['Row'];
+export type Investigation = Database['public']['Tables']['investigations']['Row'];
+export type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
+export type SystemSetting = Database['public']['Tables']['system_settings']['Row'];
+export type CRUDOperation = 'INSERT' | 'UPDATE' | 'DELETE' | 'UPSERT';

@@ -6,6 +6,7 @@ import { ArrowLeft, ClipboardList, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddVisitModal } from "@/components/patient/add-visit-modal"
 import { format, parseISO, formatDistanceToNow } from "date-fns"
+import { DeleteRecordButton } from "@/components/patient/delete-record-button"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,13 +31,15 @@ export default async function VisitsPage({
   const { data: patient } = await supabase.from("patients").select("id, name, room_number").eq("id", id).single()
   if (!patient) notFound()
 
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+
   // Fetch all doctor profiles to map doctor_id to name safely
   const { data: profiles } = await supabase.from("user_profiles").select("user_id, doctor_name")
   const doctorMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.doctor_name || 'Unknown']))
 
   let query = supabase
     .from("visits")
-    .select("*")
+    .select("*, created_at")
     .eq("patient_id", id)
     .order("visit_date", { ascending: false })
     .order("created_at", { ascending: false })
@@ -90,9 +93,20 @@ export default async function VisitsPage({
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(parseISO(visit.visit_date), { addSuffix: true })}
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDistanceToNow(parseISO(visit.visit_date), { addSuffix: true })}
+                  </span>
+                  {currentUser && (
+                    <DeleteRecordButton 
+                      recordId={visit.id}
+                      table="visits"
+                      creatorId={visit.doctor_id}
+                      createdAt={visit.created_at}
+                      currentUserId={currentUser.id}
+                    />
+                  )}
+                </div>
               </div>
               <div className="px-5 py-4 space-y-3">
                 {(visit.bp_sys || visit.pr || visit.spo2 || visit.temp) && (

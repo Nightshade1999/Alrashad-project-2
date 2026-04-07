@@ -6,6 +6,7 @@ import { ArrowLeft, FlaskConical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddInvestigationModal } from "@/components/patient/add-investigation-modal"
 import { format, parseISO } from "date-fns"
+import { DeleteRecordButton } from "@/components/patient/delete-record-button"
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,8 @@ export default async function InvestigationsPage({
 
   const { data: patient } = await supabase.from("patients").select("id, name, room_number").eq("id", id).single()
   if (!patient) notFound()
+
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
 
   let query = supabase
     .from("investigations")
@@ -102,7 +105,8 @@ export default async function InvestigationsPage({
                     </th>
                   ))}
                   <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground min-w-[200px]">Other & Custom</th>
-                  <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Administered By</th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Administered By</th>
+                  <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -142,16 +146,24 @@ export default async function InvestigationsPage({
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-right whitespace-nowrap text-[9px] text-muted-foreground/40 italic font-serif">
-                      <div className="flex items-center justify-end gap-1.5 mt-2 opacity-20 hover:opacity-100 transition-opacity cursor-default select-none group">
-                        <span className="h-[0.5px] w-6 bg-slate-400 group-hover:bg-slate-600 transition-colors"></span>
-                        <span className="text-[8px] font-serif italic uppercase tracking-[0.2em] text-slate-500">
-                          Verified By:
-                        </span>
-                        <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-100">
-                          Dr. {inv.doctor_name || (inv.visit_id && visitToDoctorMap[inv.visit_id]) || 'Unknown Clinician'}
-                        </span>
+                    <td className="px-5 py-3.5 text-right flex items-center justify-end gap-2">
+                      <div className="flex flex-col items-end opacity-40 hover:opacity-100 transition-opacity cursor-default select-none group min-w-[120px]">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <span className="text-[8px] font-serif italic uppercase tracking-[0.2em] text-slate-500">Verified By:</span>
+                          <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-100 whitespace-nowrap">
+                            Dr. {inv.doctor_name || (inv.visit_id && visitToDoctorMap[inv.visit_id]) || 'Unknown'}
+                          </span>
+                        </div>
                       </div>
+                      {currentUser && (
+                        <DeleteRecordButton 
+                          recordId={inv.id}
+                          table="investigations"
+                          creatorId={inv.doctor_id}
+                          createdAt={inv.created_at}
+                          currentUserId={currentUser.id}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}

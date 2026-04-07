@@ -54,6 +54,7 @@ export async function createUserAction(formData: FormData) {
   const wardName = formData.get('ward_name') as string || 'General Ward'
   const specialty = formData.get('specialty') as string || 'psychiatry'
   const aiEnabled = formData.get('ai_enabled') === 'true'
+  const offlineModeEnabled = formData.get('offline_mode_enabled') === 'true'
   const canSeeWardPatients = formData.get('can_see_ward_patients') === 'true'
   const gender = formData.get('gender') as 'Male' | 'Female' | null
   const accessibleWardsStr = formData.get('accessible_wards') as string // JSON array string
@@ -89,6 +90,7 @@ export async function createUserAction(formData: FormData) {
       specialty,
       gender,
       ai_enabled: aiEnabled,
+      offline_mode_enabled: offlineModeEnabled,
       can_see_ward_patients: canSeeWardPatients,
       accessible_wards: accessibleWards
     })
@@ -144,7 +146,7 @@ export async function updateUserPasswordAction(userId: string, newPassword: stri
   return { success: true }
 }
 
-export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null, accessibleWards?: string[]) {
+export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, offlineModeEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null, accessibleWards?: string[]) {
   if (!userId) return { error: 'User ID required' }
 
   // Update email if provided
@@ -161,6 +163,7 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (specialty) updatePayload.specialty = specialty
     if (gender !== undefined) updatePayload.gender = gender
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
+    if (offlineModeEnabled !== undefined) updatePayload.offline_mode_enabled = offlineModeEnabled
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
     if (accessibleWards !== undefined) {
       updatePayload.accessible_wards = accessibleWards
@@ -248,6 +251,7 @@ export async function getAllUsersAction() {
       specialty: prof?.specialty || 'psychiatry',
       gender: prof?.gender || null,
       ai_enabled: prof?.ai_enabled ?? true,
+      offline_mode_enabled: prof?.offline_mode_enabled ?? false,
       can_see_ward_patients: prof?.can_see_ward_patients ?? false,
       accessible_wards: prof?.accessible_wards || (prof?.ward_name ? [prof.ward_name] : [])
     }
@@ -434,4 +438,35 @@ export async function repairWardDiscrepanciesAction() {
 
   revalidatePath('/admin/manage')
   return { success: true, count: totalMigrated }
+}
+
+export async function getGlobalOfflineSettingAction() {
+  try {
+    const { data: settings, error } = await getSupabaseAdmin()
+      .from('system_settings')
+      .select('global_offline_enabled')
+      .eq('id', 1)
+      .single()
+
+    if (error) return { error: error.message }
+    return { enabled: settings?.global_offline_enabled ?? true }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
+
+export async function updateGlobalOfflineSettingAction(enabled: boolean) {
+  try {
+    await verifyAdmin()
+    const { error } = await getSupabaseAdmin()
+      .from('system_settings')
+      .update({ global_offline_enabled: enabled, updated_at: new Date().toISOString() })
+      .eq('id', 1)
+
+    if (error) return { error: error.message }
+    revalidatePath('/admin/manage')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message }
+  }
 }

@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { WardPatientDetail } from "@/components/patient/ward-patient-detail"
-import { ErPatientDetail } from "@/components/patient/er-patient-detail"
+import { OfflinePatientDetail } from "@/components/patient/OfflinePatientDetail"
+import type { Patient, Visit, Investigation } from "@/types/database.types"
 
 export const dynamic = 'force-dynamic'
 
@@ -23,24 +23,9 @@ export default async function PatientPage({
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
+  // Fetch initial data from Supabase for SSR (Instant load)
   const { data: patient } = await supabase.from("patients").select("*").eq("id", id).single()
   if (!patient) notFound()
-
-  // Safely normalize all JSONB arrays
-  function safeParse(val: any) {
-    if (Array.isArray(val)) return val;
-    if (typeof val === 'string') {
-      try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
-    }
-    return [];
-  }
-  
-  patient.allergies = safeParse(patient.allergies);
-  patient.past_surgeries = safeParse(patient.past_surgeries);
-  patient.chronic_diseases = safeParse(patient.chronic_diseases);
-  patient.psych_drugs = safeParse(patient.psych_drugs);
-  patient.medical_drugs = safeParse(patient.medical_drugs);
-  patient.er_treatment = safeParse(patient.er_treatment);
 
   const { data: visits } = await supabase
     .from("visits").select("*").eq("patient_id", id)
@@ -52,40 +37,12 @@ export default async function PatientPage({
     .order("date", { ascending: false })
     .order("id", { ascending: false })
 
-  // Fetch current user profile for AI permission check
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-  const { data: userProfile } = await supabase
-    .from('user_profiles')
-    .select('ai_enabled, ward_name')
-    .eq('user_id', authUser?.id)
-    .single()
-
-  const aiEnabled = userProfile?.ai_enabled ?? true
-  const wardName = userProfile?.ward_name || patient.ward_name || 'General Ward'
-
-  // Decide which view to render
-  // If explicitly 'ward', show ward. If in ER and not explicitly 'ward', show ER.
-  const isErView = patient.is_in_er && view !== 'ward'
-
-  if (isErView) {
-    return (
-      <ErPatientDetail 
-        patient={patient}
-        visits={visits || []}
-        investigations={investigations || []}
-        aiEnabled={aiEnabled}
-        wardName={wardName}
-      />
-    )
-  }
-
   return (
-    <WardPatientDetail 
-      patient={patient}
-      visits={visits || []}
-      investigations={investigations || []}
-      aiEnabled={aiEnabled}
-      wardName={wardName}
+    <OfflinePatientDetail 
+      initialPatient={patient as any}
+      initialVisits={(visits || []) as any[]}
+      initialInvestigations={(investigations || []) as any[]}
+      view={view}
     />
   )
 }

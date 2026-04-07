@@ -9,6 +9,9 @@ import { WardAnalytics } from '@/components/admin/ward-analytics'
 import { WardSettings } from '@/components/admin/ward-settings'
 import { ReminderArchive } from '@/components/admin/reminder-archive'
 import { NavigationButtons } from '@/components/layout/navigation-buttons'
+import { Switch } from '@/components/ui/switch'
+import { updateGlobalOfflineSettingAction } from '@/app/actions/admin-actions'
+import { toast } from 'sonner'
 
 export default function WardManagementClient({
   initialUsers,
@@ -16,7 +19,8 @@ export default function WardManagementClient({
   patientsData,
   wardSettingsData,
   hasServiceKey,
-  aiEnabled
+  aiEnabled,
+  initialGlobalOffline
 }: {
   initialUsers: any[]
   dbSizeMB: string
@@ -24,8 +28,10 @@ export default function WardManagementClient({
   wardSettingsData: any[]
   hasServiceKey: boolean
   aiEnabled: boolean
+  initialGlobalOffline: boolean
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards' | 'reminders'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards' | 'reminders' | 'settings'>('users')
+  const [globalOffline, setGlobalOffline] = useState(initialGlobalOffline)
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in-up">
@@ -119,6 +125,16 @@ export default function WardManagementClient({
         >
           <Shield className="h-4 w-4 shrink-0" /> Ward Setup
         </button>
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+            activeTab === 'settings' 
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm border border-slate-200 dark:border-slate-600' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Settings className="h-4 w-4 shrink-0" /> Platform Settings
+        </button>
       </div>
 
       {/* Service Role Error Warning */}
@@ -164,6 +180,58 @@ export default function WardManagementClient({
         {activeTab === 'research' && <MedicalStatistics patients={patientsData} aiEnabled={aiEnabled} />}
         {activeTab === 'reminders' && <ReminderArchive />}
         {activeTab === 'wards' && <WardSettings settings={wardSettingsData} users={initialUsers} />}
+        {activeTab === 'settings' && (
+          <div className="max-w-3xl space-y-6">
+            <div className="p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-900/5">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+                  <Activity className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-slate-50 tracking-tight">OfflineSync™ Configuration</h3>
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">Control institutional-wide offline accessibility.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-200/60 dark:border-slate-700/50 group transition-all hover:border-indigo-200 dark:hover:border-indigo-900/40">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Global Offline Support</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+                      When enabled, clinicians can opt-in to PowerSync Local-First mode. When disabled, the entire institution is forced to standard Online-Only Supabase REST access.
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Switch 
+                      checked={globalOffline} 
+                      onCheckedChange={async (val) => {
+                        setGlobalOffline(val)
+                        const res = await updateGlobalOfflineSettingAction(val)
+                        if (res.success) toast.success(`Global Offline Mode ${val ? 'Enabled' : 'Disabled'}`)
+                        else toast.error("Failed to update global setting")
+                      }} 
+                    />
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${globalOffline ? 'text-emerald-500' : 'text-slate-400'}`}>
+                      {globalOffline ? 'Active' : 'Deactivated'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-3xl border border-indigo-100 dark:border-indigo-800/40">
+                  <div className="flex gap-4">
+                    <ShieldAlert className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                       <p className="text-sm font-bold text-indigo-900 dark:text-indigo-100">Performance & Data Integrity Notice</p>
+                       <p className="text-xs text-indigo-700/80 dark:text-indigo-300/60 leading-relaxed">
+                         Disabling this globally will immediately stop all background syncing. Clinicians with pending offline changes should finalize their sync before deactivation to ensure clinical data continuity.
+                       </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { UserPlus, KeyRound, Edit, Trash2, ArrowRightLeft, User, X, Sparkles, Search, ChevronDown, Plus, Check as CheckIcon } from 'lucide-react'
+import { UserPlus, KeyRound, Edit, Trash2, ArrowRightLeft, User, X, Sparkles, Search, ChevronDown, Plus, Check as CheckIcon, Activity } from 'lucide-react'
 import { createUserAction, deleteUserAction, updateUserPasswordAction, migratePatientsAction, updateUserDetailsAction } from '@/app/actions/admin-actions'
 
 export function UserManagement({ users, wardNames }: { users: any[], wardNames: string[] }) {
@@ -20,6 +20,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   const [toUserId, setToUserId] = useState('')
   const [gender, setGender] = useState<'Male' | 'Female' | ''>('')
   const [aiEnabled, setAiEnabled] = useState(true)
+  const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
   const [canSeeWardPatients, setCanSeeWardPatients] = useState(false)
   const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -41,6 +42,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setSpecialty(user.specialty || 'psychiatry')
       setGender(user.gender || '')
       setAiEnabled(user.ai_enabled ?? true)
+      setOfflineModeEnabled(user.offline_mode_enabled ?? false)
       setCanSeeWardPatients(user.can_see_ward_patients ?? false)
       setAccessibleWards(user.accessible_wards || (user.ward_name ? [user.ward_name] : []))
     } else {
@@ -51,6 +53,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setWardName(wardNames[0] || '')
       setGender('')
       setAiEnabled(true)
+      setOfflineModeEnabled(false)
       setCanSeeWardPatients(false)
       setAccessibleWards([])
     }
@@ -89,6 +92,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     formData.append('ward_name', primaryWard)
     formData.append('specialty', specialty)
     formData.append('ai_enabled', String(aiEnabled))
+    formData.append('offline_mode_enabled', String(offlineModeEnabled))
     formData.append('can_see_ward_patients', String(canSeeWardPatients))
     if (gender) formData.append('gender', gender)
     formData.append('accessible_wards', JSON.stringify(updatedWards))
@@ -107,7 +111,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     const updatedWards = addTempWard(accessibleWards)
     const primaryWard = updatedWards[0] || 'Unassigned'
 
-    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, canSeeWardPatients, gender || null, updatedWards)
+    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, canSeeWardPatients, gender || null, updatedWards)
     setIsRefreshing(false)
     if (res?.error) alert(res.error)
     else closeModal()
@@ -201,6 +205,11 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                       <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
                         {u.specialty === 'internal_medicine' ? 'IM Resident' : 'Psych Resident'} {u.gender ? `(${u.gender})` : ''}
                       </span>
+                      {u.offline_mode_enabled && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-1 uppercase tracking-tighter">
+                          <Activity className="h-3 w-3" /> Offline Sync
+                        </span>
+                      )}
                       {u.ai_enabled ? (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-1 uppercase tracking-tighter">
                           <Sparkles className="h-3 w-3" /> AI Active
@@ -399,6 +408,22 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                           Enable AI Features
                         </p>
                         <p className="text-[11px] text-slate-500">Allow doctor to use Gemini Clinical Advisor & AI Research reports</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={offlineModeEnabled}
+                        onChange={e => setOfflineModeEnabled(e.target.checked)}
+                        className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold flex items-center gap-2">
+                          <Activity className="h-4 w-4 text-amber-500" />
+                          OfflineSync™ Support
+                        </p>
+                        <p className="text-[11px] text-slate-500">Allow doctor to use SQLite Local-First mode</p>
                       </div>
                     </label>
 

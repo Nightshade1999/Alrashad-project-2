@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase"
-import { queueMutation } from "@/lib/offline-sync"
 import { toast } from "sonner"
+import { useDatabase } from "@/hooks/useDatabase"
 import { GENERAL_SURGERIES, FEMALE_SURGERIES, MALE_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
 import { DrugListInput, DiseaseListInput, StringListInput } from "./medical-inputs"
 import { convertArabicNumbers } from "@/lib/utils"
@@ -54,6 +54,7 @@ export function AddPatientModal() {
   const [category, setCategory] = useState<PatientCategory>("Normal")
   const [province, setProvince] = useState("")
   const [educationLevel, setEducationLevel] = useState("")
+  const { isOfflineMode, patients: dbPatients } = useDatabase()
   
   // Relatives State
   const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>('Unknown')
@@ -127,14 +128,16 @@ export function AddPatientModal() {
     }
 
     try {
-      if (typeof navigator !== 'undefined' && navigator.onLine) {
-        // @ts-ignore
+      if (isOfflineMode) {
+        await dbPatients.insert({
+          ...payload,
+          ward_number: payload.ward_name // Mapping naming difference in SQLite schema if any
+        })
+        toast.success("Patient saved locally — syncing...")
+      } else {
         const { error } = await (supabase.from('patients') as any).insert([payload])
         if (error) throw error
         toast.success("Patient added successfully!")
-      } else {
-        await queueMutation('ADD_PATIENT', payload)
-        toast.success("Saved offline. Will sync when reconnected.")
       }
       setOpen(false)
       resetForm()

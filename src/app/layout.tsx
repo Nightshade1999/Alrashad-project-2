@@ -2,7 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { PowerSyncProvider } from "@/lib/powersync/PowerSyncProvider";
+import { SyncStatus } from "@/components/pwa/SyncStatus";
+import { ProgressBar } from "@/components/layout/ProgressBar";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import "./globals.css";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,7 +63,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col selection:bg-teal-100 dark:selection:bg-teal-900/30">
-        {children}
+        <Suspense fallback={null}>
+          <ProgressBar />
+        </Suspense>
+        <PowerSyncProvider>
+          {children}
+          <SyncStatus />
+          <InstallPrompt />
+        </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />
         <SpeedInsights />
       </body>

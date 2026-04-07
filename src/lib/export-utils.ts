@@ -558,88 +558,56 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
 }
 
 /**
- * Clinical Arabic Reshaper & RTL Helper
- * Since native jsPDF doesn't handle the cursive nature of Arabic (joining letters),
- * we manually reshape the glyphs to their context-aware forms (Isolated, Initial, Medial, Final)
- * and reverse the string for Right-to-Left (RTL) layout.
+ * Prepares text for jsPDF rendering:
+ * - Arabic segments are reshaped into contextual presentation forms (cursive letter connection)
+ *   using jsPDF's built-in `processArabic`, then character-reversed for RTL rendering.
+ * - Mixed Arabic/English text is handled word-by-word so English labels are preserved.
+ * - Multi-line strings (with \n) are processed line-by-line to preserve structure.
  */
-function prepareClinicalText(text: string = ""): string {
+function prepareClinicalText(doc: any, text: string = ""): string {
   if (!text) return "";
   if (typeof text !== 'string') text = String(text);
-  
-  // [Isolated, Final, Medial, Initial]
-  const ARABIC_MAP: Record<string, string[]> = {
-    "\u0621": ["\uFE80", "\uFE80", "\uFE80", "\uFE80"],
-    "\u0622": ["\uFE81", "\uFE82", "\uFE82", "\uFE81"],
-    "\u0623": ["\uFE83", "\uFE84", "\uFE84", "\uFE83"],
-    "\u0624": ["\uFE85", "\uFE86", "\uFE86", "\uFE85"],
-    "\u0625": ["\uFE87", "\uFE88", "\uFE88", "\uFE87"],
-    "\u0626": ["\uFE89", "\uFE8A", "\uFE8C", "\uFE8B"],
-    "\u0627": ["\uFE8D", "\uFE8E", "\uFE8E", "\uFE8D"],
-    "\u0628": ["\uFE8F", "\uFE90", "\uFE92", "\uFE91"],
-    "\u0629": ["\uFE93", "\uFE94", "\uFE94", "\uFE93"],
-    "\u062A": ["\uFE95", "\uFE96", "\uFE98", "\uFE97"],
-    "\u062B": ["\uFE99", "\uFE9A", "\uFE9C", "\uFE9B"],
-    "\u062C": ["\uFE9D", "\uFE9E", "\uFEA0", "\uFE9F"],
-    "\u062D": ["\uFEA1", "\uFEA2", "\uFEA4", "\uFEA3"],
-    "\u062E": ["\uFEA5", "\uFEA6", "\uFEA8", "\uFEA7"],
-    "\u062F": ["\uFEA9", "\uFEAA", "\uFEAA", "\uFEA9"],
-    "\u0630": ["\uFEAB", "\uFEAC", "\uFEAC", "\uFEAB"],
-    "\u0631": ["\uFEAD", "\uFEAE", "\uFEAE", "\uFEAD"],
-    "\u0632": ["\uFEAF", "\uFEB0", "\uFEB0", "\uFEAF"],
-    "\u0633": ["\uFEB1", "\uFEB2", "\uFEB4", "\uFEB3"],
-    "\u0634": ["\uFEB5", "\uFEB6", "\uFEB8", "\uFEB7"],
-    "\u0635": ["\uFEB9", "\uFEBA", "\uFEBC", "\uFEBB"],
-    "\u0636": ["\uFEBD", "\uFEBE", "\uFEC0", "\uFEBF"],
-    "\u0637": ["\uFEC1", "\uFEC2", "\uFEC4", "\uFEC3"],
-    "\u0638": ["\uFEC5", "\uFEC6", "\uFEC8", "\uFEC7"],
-    "\u0639": ["\uFEC9", "\uFECA", "\uFECC", "\uFECB"],
-    "\u063A": ["\uFECD", "\uFECE", "\uFED0", "\uFECF"],
-    "\u0641": ["\uFED1", "\uFED2", "\uFED4", "\uFED3"],
-    "\u0642": ["\uFED5", "\uFED6", "\uFED8", "\uFED7"],
-    "\u0643": ["\uFED9", "\uFEDA", "\uFEDC", "\uFEDB"],
-    "\u0644": ["\uFEDD", "\uFEDE", "\uFEE0", "\uFEDF"],
-    "\u0645": ["\uFEE1", "\uFEE2", "\uFEE4", "\uFEE3"],
-    "\u0646": ["\uFEE5", "\uFEE6", "\uFEE8", "\uFEE7"],
-    "\u0647": ["\uFEE9", "\uFEEA", "\uFEEC", "\uFEEB"],
-    "\u0648": ["\uFEED", "\uFEEE", "\uFEEE", "\uFEED"],
-    "\u0649": ["\uFEEF", "\uFEF0", "\uFEF0", "\uFEEF"],
-    "\u064A": ["\uFEF1", "\uFEF2", "\uFEF4", "\uFEF3"],
-    " ": [" ", " ", " ", " "]
-  };
 
-  const NON_CONNECTING = ["\u0621", "\u0622", "\u0623", "\u0624", "\u0625", "\u0627", "\u062F", "\u0630", "\u0631", "\u0632", "\u0648", "\u0629", " "];
-  const LIGATURES: Record<string, string[]> = {
-    "\u0644\u0627": ["\uFEFB", "\uFEFC", "\uFEFC", "\uFEFB"],
-    "\u0644\u0622": ["\uFEF5", "\uFEF6", "\uFEF6", "\uFEF5"],
-    "\u0644\u0623": ["\uFEF7", "\uFEF8", "\uFEF8", "\uFEF7"],
-    "\u0644\u0625": ["\uFEF9", "\uFEFA", "\uFEFA", "\uFEF9"],
-  };
+  const hasArabic = /[\u0600-\u06FF]/.test(text);
+  if (!hasArabic) return text;
 
-  const isAr = (c: string) => c && /[\u0600-\u06FF]/.test(c);
+  // Process line by line to preserve newlines
+  return text.split("\n").map(line => {
+    if (!/[\u0600-\u06FF]/.test(line)) return line;
 
-  const reshapeSeq = (content: string) => {
-    return content.split(" ").map(word => {
-      if (!word || !isAr(word[0])) return word;
-      let w = word;
-      for (const [lig, forms] of Object.entries(LIGATURES)) w = w.split(lig).join(forms[0]);
-      let reshaped = "";
-      for (let i = 0; i < w.length; i++) {
-        const char = w[i], entry = ARABIC_MAP[char];
-        if (!entry) { reshaped += char; continue; }
-        const prev = w[i - 1], next = w[i + 1];
-        const canPrev = prev && ARABIC_MAP[prev] && !NON_CONNECTING.includes(prev);
-        const canNext = next && ARABIC_MAP[next] && char !== " " && !NON_CONNECTING.includes(char);
-        if (!canPrev && !canNext) reshaped += entry[0];
-        else if (!canPrev && canNext) reshaped += entry[3];
-        else if (canPrev && canNext) reshaped += entry[2];
-        else reshaped += entry[1];
+    // Split line into Arabic and non-Arabic segments
+    // Each segment is either all-Arabic or all non-Arabic
+    const segments = line.split(/((?:[\u0600-\u06FF][\u0600-\u06FF\s]*[\u0600-\u06FF])|[\u0600-\u06FF])/g);
+
+    // Collect processed tokens for final RTL reordering
+    const tokens: Array<{ text: string; isArabic: boolean }> = [];
+
+    segments.forEach(seg => {
+      if (!seg) return;
+      if (/[\u0600-\u06FF]/.test(seg)) {
+        // Arabic segment: reshape using native jsPDF method → reverse characters for jsPDF RTL rendering
+        let shaped = seg.trim();
+        if (doc && typeof doc.processArabic === 'function') {
+           shaped = doc.processArabic(shaped);
+        }
+        const reversed = shaped.split("").reverse().join("");
+        tokens.push({ text: reversed, isArabic: true });
+      } else {
+        // Non-Arabic (Latin, numbers, punctuation)
+        if (seg.trim()) tokens.push({ text: seg, isArabic: false });
       }
-      return reshaped.split("").reverse().join("");
-    }).reverse().join(" ");
-  };
+    });
 
-  return text.replace(/[\u0600-\u06FF\s]+/g, (m) => m.trim() ? reshapeSeq(m) : m);
+    // For RTL lines: Arabic tokens are reversed in word order, English tokens stay in place
+    // Reverse the entire token array so Arabic reads right-to-left
+    const arabicTokenCount = tokens.filter(t => t.isArabic).length;
+    if (arabicTokenCount > 0 && arabicTokenCount === tokens.length) {
+      // Pure Arabic line — reverse word order
+      return tokens.map(t => t.text).reverse().join(" ");
+    }
+    // Mixed line — keep Arabic glyphs reversed, Latin LTR, joined in original order
+    return tokens.map(t => t.text).join(" ").trim();
+  }).join("\n");
 }
 
 /**
@@ -739,7 +707,7 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     doc.setFont(useFont, "bold");
     doc.setFontSize(sz(10));
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(prepareClinicalText(`Dr. ${doctorName}`), 14, 15);
+    doc.text(prepareClinicalText(doc, `Dr. ${doctorName}`), 14, 15);
 
     doc.setFontSize(sz(14));
     doc.setTextColor(30, 41, 59); // #1E293B
@@ -761,17 +729,19 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
       ]],
       body: [[
         {
-          content: `Name: ${prepareClinicalText(p.name || "N/A")}\nAge / Gender: ${p.age || "?"}y / ${p.gender || "N/A"}\nProvince: ${prepareClinicalText(p.province || "N/A")}\nWard: ${prepareClinicalText(p.ward_name || wardName || "N/A")}\n\nChronic Diseases:\n${prepareClinicalText(formatDiseases(p.chronic_diseases)) || "None recorded."}`,
+          content: `Name: ${prepareClinicalText(doc, p.name || "N/A")}\nAge / Gender: ${p.age || "?"}y / ${p.gender || "N/A"}\nProvince: ${prepareClinicalText(doc, p.province || "N/A")}\nWard: ${prepareClinicalText(doc, p.ward_name || wardName || "N/A")}\n\nChronic Diseases:\n${prepareClinicalText(doc, formatDiseases(p.chronic_diseases)) || "None recorded."}`,
           styles: { cellPadding: 2 }
         },
         {
           content: isER 
-            ? `Adm. Date: ${p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM yyyy, HH:mm") : "N/A"}\nReferring Doc: Dr. ${prepareClinicalText(p.er_admission_doctor || "Unknown")}\n\nCHIEF COMPLAINT:\n"${prepareClinicalText(p.er_chief_complaint || "None recorded")}"\n\nADMISSION NOTES:\n${prepareClinicalText(p.er_admission_notes || "No admission notes.")}`
-            : `Allergies: ${prepareClinicalText(parseArr(p.allergies).join(", ")) || "None recorded"}\n\nSurgical History:\n${prepareClinicalText(parseArr(p.past_surgeries).join(", ")) || "None recorded."}\n\nRelative: ${p.relative_status === 'Known' ? `Family known (${p.relative_visits || '0'} visits / 3mo)` : "No family contact recorded."}`,
+            ? `Adm. Date: ${p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM yyyy, HH:mm") : "N/A"}\nReferring Doc: Dr. ${prepareClinicalText(doc, p.er_admission_doctor || "Unknown")}\n\nCHIEF COMPLAINT:\n"${prepareClinicalText(doc, p.er_chief_complaint || "None recorded")}"\n\nADMISSION NOTES:\n${prepareClinicalText(doc, p.er_admission_notes || "No admission notes.")}`
+            : `Allergies: ${prepareClinicalText(doc, parseArr(p.allergies).join(", ")) || "None recorded"}\n\nSurgical History:\n${prepareClinicalText(doc, parseArr(p.past_surgeries).join(", ")) || "None recorded."}\n\nRelative: ${p.relative_status === 'Known' ? `Family known (${p.relative_visits || '0'} visits / 3mo)` : "No family contact recorded."}`,
           styles: { fillColor: isER ? [255, 241, 242] : [248, 250, 252], cellPadding: 2 }
         }
       ]],
-      styles: { fontSize: sz(8), font: useFont }
+      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
+      headStyles: { font: useFont, fontStyle: "bold" },
+      bodyStyles: { font: useFont, fontStyle: "normal" },
     });
 
     // 3. MEDICATIONS
@@ -783,16 +753,19 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
         { content: "III. ONGOING PSYCHIATRIC TREATMENT", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
       ]],
       body: [[
-        { content: formatDrugs(p.medical_drugs).map(d => `• ${prepareClinicalText(d)}`).join("\n") || "No medical medications.", styles: { cellPadding: 2 } },
-        { content: formatDrugs(p.psych_drugs).map(d => `• ${prepareClinicalText(d)}`).join("\n") || "No psychiatric medications.", styles: { cellPadding: 2, fillColor: [240, 253, 250] } }
+        { content: formatDrugs(p.medical_drugs).map(d => `• ${prepareClinicalText(doc, d)}`).join("\n") || "No medical medications.", styles: { cellPadding: 2 } },
+        { content: formatDrugs(p.psych_drugs).map(d => `• ${prepareClinicalText(doc, d)}`).join("\n") || "No psychiatric medications.", styles: { cellPadding: 2, fillColor: [240, 253, 250] } }
       ]],
-      styles: { fontSize: sz(8), font: useFont }
+      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
+      headStyles: { font: useFont, fontStyle: "bold" },
+      bodyStyles: { font: useFont, fontStyle: "normal" },
     });
 
     // 4. VITALS & PROGRESS (One-Page Scaled)
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 10,
       theme: "plain",
+      columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 'auto' } },
       head: [[
         { content: "IV. VITALS", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } },
         { content: isER ? "IV. EMERGENCY CLINICAL EVALUATION" : "V. LATEST CLINICAL PROGRESS EVALUATION", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
@@ -805,11 +778,13 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
           styles: { cellPadding: 2 }
         },
         {
-          content: prepareClinicalText(targetVisit?.exam_notes || "No clinical evaluation recorded."),
+          content: prepareClinicalText(doc, targetVisit?.exam_notes || "No clinical evaluation recorded."),
           styles: { cellPadding: 2 }
         }
       ]],
-      styles: { fontSize: sz(8), font: useFont }
+      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
+      headStyles: { font: useFont, fontStyle: "bold" },
+      bodyStyles: { font: useFont, fontStyle: "normal" },
     });
 
     // 5. ER TREATMENT (if applicable)
@@ -819,9 +794,11 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
         theme: "grid",
         head: [[{ content: "V. EMERGENCY PHARMACOLOGICAL TREATMENT", styles: { fillColor: themeColor as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" } }]],
         body: [[
-          { content: parseArr(p.er_treatment).map((t: any) => `• ${prepareClinicalText(t.name)} ${t.dosage || ""} — ${t.frequency || ""}`).join("\n") || "No emergency treatment recorded." }
+          { content: parseArr(p.er_treatment).map((t: any) => `• ${prepareClinicalText(doc, t.name)} ${t.dosage || ""} — ${t.frequency || ""}`).join("\n") || "No emergency treatment recorded." }
         ]],
-        styles: { fontSize: sz(9), font: useFont }
+        styles: { fontSize: sz(9), font: useFont, fontStyle: "normal" },
+        headStyles: { font: useFont, fontStyle: "bold" },
+        bodyStyles: { font: useFont, fontStyle: "normal" },
       });
     }
 
@@ -857,20 +834,27 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
       
       doc.setFontSize(sz(8));
       doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.setFont(useFont, "bold");
       doc.text(`${dateStr} -->`, 14, labStartY);
 
-      let currentX = 42;
-      activeLabs.forEach((lab) => {
+      let currentX = 46;
+      activeLabs.forEach((lab, labIdx) => {
         const isAbnormal = isLabAbnormal(lab.key, lab.val);
-        doc.setTextColor(100, 116, 139); // #64748B
+        const isLast = labIdx === activeLabs.length - 1;
+        const separator = isLast ? "" : " | ";
+
         doc.setFont(useFont, "bold");
+        doc.setFontSize(sz(8));
+        doc.setTextColor(100, 116, 139); // #64748B
         doc.text(`${lab.label}: `, currentX, labStartY);
-        
         const labelWidth = doc.getTextWidth(`${lab.label}: `);
+
+        doc.setFont(useFont, "normal");
         doc.setTextColor(isAbnormal ? 220 : 30, isAbnormal ? 38 : 41, isAbnormal ? 38 : 59);
-        doc.text(`${lab.val} | `, currentX + labelWidth, labStartY);
+        const valText = `${lab.val}${separator}`;
+        doc.text(valText, currentX + labelWidth, labStartY);
         
-        currentX += labelWidth + doc.getTextWidth(`${lab.val} | `) + 1;
+        currentX += labelWidth + doc.getTextWidth(valText);
       });
 
       labStartY += 6;
@@ -880,7 +864,7 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     doc.setFont(useFont, "italic");
     doc.setFontSize(sz(7));
     doc.setTextColor(148, 163, 184);
-    doc.text(prepareClinicalText(`Generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: Dr. ${doctorName}`), 105, 285, { align: "center" });
+    doc.text(prepareClinicalText(doc, `Generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: Dr. ${doctorName}`), 105, 285, { align: "center" });
   });
 
   const patientName = patients.length === 1 ? patients[0].name.replace(/\s+/g, '_') : "Multiple_Patients";

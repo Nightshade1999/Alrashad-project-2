@@ -7,11 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { createClient } from '@/lib/supabase'
-import { queueMutation } from '@/lib/offline-sync'
-import { toast } from 'sonner'
 import { convertArabicNumbers } from '@/lib/utils'
 import { addVisitAction } from '@/app/actions/patient-actions'
+import { useDatabase } from '@/hooks/useDatabase'
+import { createClient } from '@/lib/supabase'
 
 export function AddVisitModal({ 
   patientId, 
@@ -35,6 +34,7 @@ export function AddVisitModal({
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
   const router = useRouter()
+  const { isOfflineMode, visits: dbVisits } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,28 +54,24 @@ export function AddVisitModal({
       is_er: isEr
     }
 
-    // ── Offline path ──────────────────────────────────────────
-    if (!navigator.onLine) {
-      await queueMutation('ADD_VISIT', payload)
-      toast.success('Saved offline — will sync when you reconnect', {
-        icon: '📴',
-        duration: 4000,
-      })
-      setOpen(false)
-      setNotes('')
-      setLoading(false)
-      return
-    }
-
-    // ── Online path ───────────────────────────────────────────
+    // ── Database Path ─────────────────────────────────────────
     try {
-      const response = await addVisitAction(payload)
-      if (response.error) throw new Error(response.error)
+      if (isOfflineMode) {
+        const { data: { user } } = await createClient().auth.getUser()
+        await dbVisits.insert({
+          ...payload,
+          doctor_id: user?.id,
+          visit_date: `${payload.visit_date}T${payload.visit_time}:00`
+        })
+        toast.success('Saved to local database — syncing...')
+      } else {
+        const response = await addVisitAction(payload)
+        if (response.error) throw new Error(response.error)
+        toast.success('Visit note saved')
+      }
       
-      toast.success('Visit note saved')
       setOpen(false)
       setNotes('')
-      // router.refresh() is likely redundant now because of revalidatePath, but safe to keep
       router.refresh()
     } catch (err: any) {
       toast.error(err?.message || 'Failed to save visit')

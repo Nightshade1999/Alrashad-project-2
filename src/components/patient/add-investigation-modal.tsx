@@ -6,11 +6,11 @@ import { FlaskConical, Plus, X, WifiOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createClient } from '@/lib/supabase'
-import { queueMutation } from '@/lib/offline-sync'
 import { toast } from 'sonner'
 import { convertArabicNumbers } from '@/lib/utils'
 import { addInvestigationAction } from '@/app/actions/patient-actions'
+import { useDatabase } from '@/hooks/useDatabase'
+import { createClient } from '@/lib/supabase'
 
 const LAB_FIELDS = [
   { key: 'wbc',          label: 'WBC',       placeholder: 'e.g. 8.5' },
@@ -44,6 +44,7 @@ export function AddInvestigationModal({
   const [values, setValues] = useState<Record<string, string>>({})
   const [otherLabs, setOtherLabs] = useState<{name: string, value: string}[]>([])
   const router = useRouter()
+  const { isOfflineMode, investigations: dbLabs } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,25 +68,26 @@ export function AddInvestigationModal({
       payload.other_labs = otherLabs.filter(l => l.name && l.value)
     }
 
-    // ── Offline path ──────────────────────────────────────────
-    if (!navigator.onLine) {
-      await queueMutation('ADD_LABS', payload)
-      toast.success('Lab results saved offline — will sync when you reconnect', {
-        icon: '📴',
-        duration: 4000,
-      })
-      setOpen(false)
-      setValues({})
-      setLoading(false)
-      return
-    }
-
-    // ── Online path ───────────────────────────────────────────
+    // ── Database Path ─────────────────────────────────────────
     try {
-      const response = await addInvestigationAction(payload)
-      if (response.error) throw new Error(response.error)
+      if (isOfflineMode) {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase.from('user_profiles').select('doctor_name').eq('user_id', user?.id || '').single()
+        
+        await dbLabs.insert({
+          ...payload,
+          doctor_id: user?.id,
+          doctor_name: (profile as any)?.doctor_name || user?.email?.split('@')[0],
+          date: `${payload.date}T${payload.time}:00`
+        })
+        toast.success('Saved to local database — syncing...')
+      } else {
+        const response = await addInvestigationAction(payload)
+        if (response.error) throw new Error(response.error)
+        toast.success('Lab results saved')
+      }
       
-      toast.success('Lab results saved')
       setOpen(false)
       setValues({})
       router.refresh()
