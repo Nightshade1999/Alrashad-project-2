@@ -43,6 +43,8 @@ DROP POLICY IF EXISTS "Patient Shared Access" ON public.patients;
 DROP POLICY IF EXISTS "Patient UPDATE restriction" ON public.patients;
 DROP POLICY IF EXISTS "Patient SELECT restriction" ON public.patients;
 DROP POLICY IF EXISTS "Shared Patient Update" ON public.patients;
+DROP POLICY IF EXISTS "Verified Clinician Global Access" ON public.patients;
+DROP POLICY IF EXISTS "Verified Clinician Global Update" ON public.patients;
 
 -- Step 4b: Implement "Verified Clinician Collaboration" Policy
 -- Only users who are registered in user_profiles can access patients.
