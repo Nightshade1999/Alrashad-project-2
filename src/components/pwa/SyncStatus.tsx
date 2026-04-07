@@ -21,17 +21,34 @@ export function SyncStatus() {
   useEffect(() => {
     if (!ps) return;
 
-    // Use the statusStream for reactive, real-time updates in v1.x
-    const subscription = ps.statusStream.subscribe((currentStatus) => {
+    const updateStatus = () => {
+      // Use currentStatus (standard for v1.x)
+      const currentStatus = (ps as any).currentStatus;
+      if (!currentStatus) return;
+
       setStatus({
-        connected: currentStatus.connected,
+        connected: !!currentStatus.connected,
         hasSynced: !!currentStatus.hasSynced,
         lastSyncedAt: currentStatus.lastSyncedAt || null,
-        isSyncing: currentStatus.dataFlowStatus?.downloading === true || currentStatus.dataFlowStatus?.uploading === true
+        isSyncing: !!(currentStatus.downloading || currentStatus.uploading)
       });
+    };
+
+    // 1. Initial check
+    updateStatus();
+
+    // 2. Register for updates (v1.x standard)
+    const l = (ps as any).registerListener?.({
+      statusChanged: updateStatus
     });
 
-    return () => subscription.unsubscribe();
+    // 3. Fallback to statusStream if listener isn't available
+    const s = !l && (ps as any).statusStream?.subscribe?.(updateStatus);
+
+    return () => {
+      if (l) l();
+      if (s) s.unsubscribe();
+    };
   }, [ps]);
 
   if (!ps) return null;
@@ -55,10 +72,10 @@ export function SyncStatus() {
           <span className={`text-[10px] font-black uppercase tracking-widest ${
             status.isSyncing ? 'text-teal-600' : status.connected ? 'text-emerald-600' : 'text-amber-600'
           }`}>
-            {status.isSyncing ? 'Syncing...' : status.connected ? (status.hasSynced ? 'Safe & Synced' : 'Ready') : 'Offline Mode'}
+            {status.isSyncing ? 'Syncing...' : status.connected ? (status.hasSynced ? 'Safe & Synced' : 'Online') : 'Offline Mode'}
           </span>
           <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 tabular-nums">
-            {status.lastSyncedAt ? `Updated: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Initializing sync...'}
+            {status.lastSyncedAt ? `Updated: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for connection...'}
           </span>
         </div>
 
