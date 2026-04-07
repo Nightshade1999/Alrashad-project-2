@@ -558,11 +558,14 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
 }
 
 /**
- * Prepares text for jsPDF rendering:
- * - Arabic segments are reshaped into contextual presentation forms (cursive letter connection)
- *   using jsPDF's built-in `processArabic`, then character-reversed for RTL rendering.
- * - Mixed Arabic/English text is handled word-by-word so English labels are preserved.
- * - Multi-line strings (with \n) are processed line-by-line to preserve structure.
+ * Prepares text for jsPDF rendering with correct Arabic/RTL support.
+ *
+ * jsPDF's processArabic() already does two things:
+ *   1. Reshapes Arabic letters into contextual glyph forms (cursive connection)
+ *   2. Reorders the characters into visual (LTR-canvas) order for rendering
+ *
+ * DO NOT reverse the result — that would undo the visual ordering and break it.
+ * Simply pass the full string through processArabic and render it normally.
  */
 function prepareClinicalText(doc: any, text: string = ""): string {
   if (!text) return "";
@@ -575,40 +578,19 @@ function prepareClinicalText(doc: any, text: string = ""): string {
   return text.split("\n").map(line => {
     if (!/[\u0600-\u06FF]/.test(line)) return line;
 
-    // Split line into Arabic and non-Arabic segments
-    // Each segment is either all-Arabic or all non-Arabic
-    const segments = line.split(/((?:[\u0600-\u06FF][\u0600-\u06FF\s]*[\u0600-\u06FF])|[\u0600-\u06FF])/g);
-
-    // Collect processed tokens for final RTL reordering
-    const tokens: Array<{ text: string; isArabic: boolean }> = [];
-
-    segments.forEach(seg => {
-      if (!seg) return;
-      if (/[\u0600-\u06FF]/.test(seg)) {
-        // Arabic segment: reshape using native jsPDF method → reverse characters for jsPDF RTL rendering
-        let shaped = seg.trim();
-        if (doc && typeof doc.processArabic === 'function') {
-           shaped = doc.processArabic(shaped);
-        }
-        const reversed = shaped.split("").reverse().join("");
-        tokens.push({ text: reversed, isArabic: true });
-      } else {
-        // Non-Arabic (Latin, numbers, punctuation)
-        if (seg.trim()) tokens.push({ text: seg, isArabic: false });
-      }
-    });
-
-    // For RTL lines: Arabic tokens are reversed in word order, English tokens stay in place
-    // Reverse the entire token array so Arabic reads right-to-left
-    const arabicTokenCount = tokens.filter(t => t.isArabic).length;
-    if (arabicTokenCount > 0 && arabicTokenCount === tokens.length) {
-      // Pure Arabic line — reverse word order
-      return tokens.map(t => t.text).reverse().join(" ");
+    // If processArabic is available, use it on the whole line.
+    // It handles shaping + visual reordering — no extra reversal needed.
+    if (doc && typeof doc.processArabic === 'function') {
+      return doc.processArabic(line.trim());
     }
-    // Mixed line — keep Arabic glyphs reversed, Latin LTR, joined in original order
-    return tokens.map(t => t.text).join(" ").trim();
+
+    // Fallback when processArabic is unavailable: return as-is.
+    // jsPDF with Identity-H encoding will render Arabic in storage order,
+    // which at minimum shows glyph boxes for each character.
+    return line;
   }).join("\n");
 }
+
 
 /**
  * High-Fidelity PDF Export. 
