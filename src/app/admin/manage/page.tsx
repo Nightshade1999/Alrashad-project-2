@@ -20,6 +20,7 @@ export default async function AdminManagePage() {
   let patientsData: any[] = []
   let wardSettingsData: any[] = []
   let errorMessage: string | null = null
+  let globalOfflineEnabled = true
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (hasServiceKey) {
@@ -46,7 +47,9 @@ export default async function AdminManagePage() {
       wardSettingsData = wardSettingsRes.settings
     }
 
-    let globalOfflineEnabled = globalSettingsRes.enabled ?? true
+    if (globalSettingsRes) {
+      globalOfflineEnabled = globalSettingsRes.enabled ?? true
+    }
   } else {
     errorMessage = "CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables (.env). Administrators cannot see global data without it."
   }
@@ -77,7 +80,7 @@ export default async function AdminManagePage() {
         wardSettingsData={wardSettingsData}
         hasServiceKey={hasServiceKey}
         aiEnabled={aiEnabled}
-        initialGlobalOffline={globalSettingsRes?.enabled ?? true}
+        initialGlobalOffline={globalOfflineEnabled}
       />
       {errorMessage && (
         <div className="mt-12 overflow-hidden relative rounded-[2.5rem] bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800/40 p-8 shadow-xl shadow-amber-900/5 transition-all animate-scale-in">
