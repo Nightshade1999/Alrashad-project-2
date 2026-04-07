@@ -190,27 +190,64 @@
   animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* PWA Optimizations */
+/* ============================================================
+   PWA / Mobile Native Optimizations
+   ============================================================ */
+
 html, body {
-  /* Prevent pull-to-refresh on mobile Chrome (Android) */
+  /* Prevent pull-to-refresh on Android Chrome */
   overscroll-behavior-y: none;
-  /* Prevent random text resizing on orientation change */
+  /* Prevent text resize on orientation change */
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
   /* Smooth scrolling for native feel */
   scroll-behavior: smooth;
+  /* Respect iOS notch / home bar */
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
 }
 
-/* Ensure touch targets are generous for doctors on move */
-button, a, input, select {
+/* Remove iOS tap flash on interactive elements */
+button, a, input, select, textarea, [role="button"] {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
-/* Hide scrollbars for a cleaner PWA look, but allow scrolling */
-.hide-scrollbar {
+/* Prevent accidental text selection in app-like interactions */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Safe-area utility classes (use on sticky headers/footers) */
+.pt-safe  { padding-top:    env(safe-area-inset-top); }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom); }
+.pl-safe  { padding-left:   env(safe-area-inset-left); }
+.pr-safe  { padding-right:  env(safe-area-inset-right); }
+.mt-safe  { margin-top:     env(safe-area-inset-top); }
+.mb-safe  { margin-bottom:  env(safe-area-inset-bottom); }
+
+/* Standalone PWA styles (applies when installed to home screen) */
+@media (display-mode: standalone) {
+  /* Sticky header gains extra safe-area top padding for status bar */
+  header[data-pwa-header] {
+    padding-top: env(safe-area-inset-top);
+  }
+  /* Bottom content doesn't get hidden behind home bar */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Hide scrollbars for a cleaner PWA look (allow scroll, no bar) */
+.hide-scrollbar, .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-.hide-scrollbar::-webkit-scrollbar {
+.hide-scrollbar::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
   display: none;
-}
+}
