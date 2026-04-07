@@ -195,7 +195,7 @@ export function AddPatientModal() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
-                <Select value={gender} onValueChange={(val) => setGender(val || "")}>
+                <Select value={gender || ""} onValueChange={(val) => setGender(val || "")}>
                   <SelectTrigger id="gender">
                     <SelectValue placeholder="Select Gender" />
                   </SelectTrigger>
@@ -207,7 +207,7 @@ export function AddPatientModal() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="province">Province</Label>
-                <Select value={province} onValueChange={(val) => setProvince(val || "")}>
+                <Select value={province || ""} onValueChange={(val) => setProvince(val || "")}>
                   <SelectTrigger id="province">
                     <SelectValue placeholder="Select Province" />
                   </SelectTrigger>
@@ -220,7 +220,7 @@ export function AddPatientModal() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="educationLevel">Education Level</Label>
-                <Select value={educationLevel} onValueChange={(val) => setEducationLevel(val || "")}>
+                <Select value={educationLevel || ""} onValueChange={(val) => setEducationLevel(val || "")}>
                   <SelectTrigger id="educationLevel">
                     <SelectValue placeholder="Select Education Level" />
                   </SelectTrigger>
@@ -235,7 +235,7 @@ export function AddPatientModal() {
               {/* Relatives Info */}
               <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
                 <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
-                <Select value={relativeStatus} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
+                <Select value={relativeStatus || "Unknown"} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
                   <SelectTrigger id="relativeStatus">
                     <SelectValue />
                   </SelectTrigger>
@@ -249,14 +249,14 @@ export function AddPatientModal() {
               {relativeStatus === 'Known' && (
                 <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
                   <Label htmlFor="relativeVisits" className="text-blue-700 dark:text-blue-400">Visits per 3 months</Label>
-                  <Select value={relativeVisits} onValueChange={(val) => setRelativeVisits(val || "")}>
+                  <Select value={relativeVisits || ""} onValueChange={(val) => setRelativeVisits(val || "")}>
                     <SelectTrigger id="relativeVisits">
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0.5">0.5</SelectItem>
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "More than 12"].map((num) => (
-                        <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                        <SelectItem key={num?.toString()} value={num?.toString() || ""}>{num}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -265,7 +265,7 @@ export function AddPatientModal() {
 
               <div className="space-y-2 md:col-span-2 border-t pt-4">
                 <Label htmlFor="category">Category (Follow-up Level)</Label>
-                <Select value={category} onValueChange={(val) => setCategory(val as PatientCategory)}>
+                <Select value={category || "Normal"} onValueChange={(val) => setCategory(val as PatientCategory)}>
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select Category" />
                   </SelectTrigger>

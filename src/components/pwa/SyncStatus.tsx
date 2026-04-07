@@ -30,8 +30,11 @@ export function SyncStatus() {
 
       const isSyncing = !!(currentStatus.dataFlowStatus.downloading || currentStatus.dataFlowStatus.uploading);
       
+      const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
+      const lastSyncedTime = lastSyncedAt?.getTime() || 0;
+      
       // Create a stable string representation for comparison
-      const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${currentStatus.lastSyncedAt?.getTime()}`;
+      const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${lastSyncedTime}`;
       
       if (statusKey === lastStatusRef.current) {
         return;
@@ -42,7 +45,7 @@ export function SyncStatus() {
       setStatus({
         connected: !!currentStatus.connected,
         hasSynced: !!currentStatus.hasSynced,
-        lastSyncedAt: currentStatus.lastSyncedAt || null,
+        lastSyncedAt: lastSyncedAt,
         isSyncing
       });
     };

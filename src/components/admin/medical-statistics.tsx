@@ -115,7 +115,11 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
     else if (vId.startsWith('lab_')) {
        const labKey = vId.replace('lab_', '')
        if (Array.isArray(p.investigations) && p.investigations.length > 0) {
-         const sortedInvs = [...p.investigations].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          const sortedInvs = [...p.investigations].sort((a,b) => {
+            const da = a.date ? new Date(a.date).getTime() : 0;
+            const db = b.date ? new Date(b.date).getTime() : 0;
+            return db - da;
+          });
          for (const inv of sortedInvs) {
            if (inv[labKey] !== undefined && inv[labKey] !== null) {
              patientVal = parseFloat(inv[labKey])
@@ -127,7 +131,11 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
     else if (vId.startsWith('vital_')) {
        const vitalKey = vId.replace('vital_', '')
        if (Array.isArray(p.visits) && p.visits.length > 0) {
-         const sortedVisits = [...p.visits].sort((a,b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())
+          const sortedVisits = [...p.visits].sort((a,b) => {
+            const da = a.visit_date ? new Date(a.visit_date).getTime() : 0;
+            const db = b.visit_date ? new Date(b.visit_date).getTime() : 0;
+            return db - da;
+          });
          for (const visit of sortedVisits) {
            if (visit[vitalKey] !== undefined && visit[vitalKey] !== null) {
              patientVal = parseFloat(visit[vitalKey])

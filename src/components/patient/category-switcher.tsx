@@ -56,7 +56,7 @@ export function CategorySwitcher({ patientId, currentCategory }: CategorySwitche
   return (
     <div className="w-44">
       <Select 
-        value={val} 
+        value={val || "Normal"} 
         onValueChange={(v) => handleCategoryChange(v as PatientCategory)}
         disabled={isUpdating}
       >
