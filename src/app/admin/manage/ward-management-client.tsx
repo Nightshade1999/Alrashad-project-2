@@ -204,7 +204,7 @@ export default function WardManagementClient({
                   <div className="flex flex-col items-end gap-2">
                     <Switch 
                       checked={globalOffline} 
-                      onCheckedChange={async (val) => {
+                      onCheckedChange={async (val: boolean) => {
                         setGlobalOffline(val)
                         const res = await updateGlobalOfflineSettingAction(val)
                         if (res.success) toast.success(`Global Offline Mode ${val ? 'Enabled' : 'Disabled'}`)
