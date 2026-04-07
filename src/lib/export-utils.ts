@@ -593,264 +593,211 @@ function prepareClinicalText(doc: any, text: string = ""): string {
 
 
 /**
- * High-Fidelity PDF Export. 
- * Replicates the clinical style, color-coded headers, and structured tables 
- * of the professional Word export.
+ * PDF Export via HTML + window.print()
+ *
+ * WHY: jsPDF cannot correctly render Arabic bidirectional text regardless of font
+ * embedding. The browser's own rendering engine handles Arabic RTL perfectly.
+ *
+ * HOW: Build a styled HTML document, open in a new tab, auto-trigger window.print().
+ * The user saves as PDF from the native print dialog.
  */
 export async function exportToPdf(patients: any[], doctorName: string = "", wardName: string = "") {
   if (!doctorName && typeof window !== "undefined") {
-    doctorName = localStorage.getItem("wardManager_doctorName") || "Ward Clinician"
+    doctorName = localStorage.getItem("wardManager_doctorName") || "Ward Clinician";
   }
   if (!wardName && typeof window !== "undefined") {
-    wardName = localStorage.getItem("wardManager_wardName") || "MEDICAL WARD"
+    wardName = localStorage.getItem("wardManager_wardName") || "MEDICAL WARD";
   }
 
-  // Optimize constructor: putOnlyUsedFonts reduces file size
-  const doc = new jsPDF({
-    putOnlyUsedFonts: true
-  });
-  
-  // High-Fidelity Font Support (Robust Load)
-  try {
-    const response = await fetch("/fonts/Amiri-Regular.ttf");
-    if (response.ok) {
-      const arrayBuffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64Font = btoa(binary);
-      if (base64Font) {
-        doc.addFileToVFS('Amiri-Regular.ttf', base64Font);
-        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'normal', 'Identity-H');
-        // Register bold/italic aliases for font safety
-        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'bold', 'Identity-H');
-        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'italic', 'Identity-H');
-      }
-    }
-  } catch (err) {
-    console.error("Font loading error:", err);
-  }
+  const dateStr = format(new Date(), "dd MMMM yyyy");
 
-  const secondaryColor = [13, 148, 136]; // #0D9488
-  const normalTheme = [15, 23, 42];      // #0F172A
-  const erTheme = [190, 18, 60]          // #BE123C
-
-  patients.forEach((p, index) => {
-    if (index > 0) doc.addPage();
-    
+  const patientPages = patients.map((p) => {
     const isER = p.is_in_er || false;
-    const themeColor = isER ? erTheme : normalTheme;
+    const themeHex = isER ? "#BE123C" : "#0F172A";
+    const tealHex = "#0D9488";
 
-    // Line Projection Engine (One-Page Protocol Parity)
     const visitsForDoc = (p.visits || []).filter((v: any) => isER ? v.is_er : !v.is_er);
     visitsForDoc.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
-    const targetVisit = visitsForDoc.length > 0 ? visitsForDoc[0] : (p.visits?.[0] || null);
+    const targetVisit = visitsForDoc[0] || p.visits?.[0] || null;
 
     let docLabs = (p.investigations || []).filter((inv: any) => isER ? inv.is_er : !inv.is_er);
     if (docLabs.length === 0 && p.investigations?.length > 0) docLabs = [p.investigations[0]];
+    docLabs.sort((a: any, b: any) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+    const labsToPrint = docLabs.slice(0, 5);
 
-    const noteLines = targetVisit ? (targetVisit.exam_notes || "").split("\n").length : 1;
-    const admissionNoteLines = (p.er_admission_notes || "").split("\n").length;
-    const medsCount = parseArr(p.medical_drugs).length + parseArr(p.psych_drugs).length;
-    const erTxCount = parseArr(p.er_treatment).length;
-
-    const projectedLines = 6 +
-      Math.max(5 + medsCount, isER ? 6 + admissionNoteLines : 8) +
-      Math.max(5, 2 + noteLines) +
-      (isER ? 2 + erTxCount : 0) +
-      2 + Math.min(5, docLabs.length);
-
-    // PDF-Optimized Thresholds
-    const threshold = isER ? 36 : 52; 
-    let fontSizeOffset = 0;
-    let limitLabs = false;
-    if (projectedLines > threshold) {
-       fontSizeOffset = projectedLines > (threshold + 12) ? 2 : 1;
-       if (projectedLines > (threshold + 12)) limitLabs = true;
-    }
-
-    const sz = (baseValue: number) => Math.max(6, baseValue - fontSizeOffset);
-    
-    // Robust Font Existence Check to prevent 'widths' property error
-    const getSafeFont = () => {
-      try {
-        const list = (doc as any).getFontList();
-        if (list && list['Amiri']) return 'Amiri';
-        return 'helvetica';
-      } catch {
-        return 'helvetica';
-      }
+    // Wraps Arabic text in an RTL span; browser renders it correctly natively
+    const field = (val: string | null | undefined, fallback = "N/A"): string => {
+      const text = String(val || fallback).trim();
+      return /[\u0600-\u06FF]/.test(text)
+        ? `<span dir="rtl" style="font-family:'Noto Sans Arabic',sans-serif;unicode-bidi:embed;">${text}</span>`
+        : `<span>${text}</span>`;
     };
-    const useFont = getSafeFont();
 
-    // 1. HEADER
-    doc.setFont(useFont, "bold");
-    doc.setFontSize(sz(10));
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(prepareClinicalText(doc, `Dr. ${doctorName}`), 14, 15);
+    const drugsHtml = (arr: any[]): string =>
+      arr.length > 0
+        ? arr.map((d: any) => `<li>${field(`${d.name || d} ${d.dosage || ""} \u2014 ${d.frequency || ""}`)}</li>`).join("")
+        : `<li style="color:#94a3b8;font-style:italic;">None recorded</li>`;
 
-    doc.setFontSize(sz(14));
-    doc.setTextColor(30, 41, 59); // #1E293B
-    doc.text(isER ? "CLINICAL SUMMARY & EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY", 105, 25, { align: "center" });
+    const labsHtml = labsToPrint.map((inv: any) => {
+      const invDate = format(parseISO(inv.date || inv.created_at), isER ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy");
+      const entries: {key: string; label: string; val: any}[] = [
+        { key: "hb", label: "Hb", val: inv.hb },
+        { key: "wbc", label: "WBC", val: inv.wbc },
+        { key: "s_creatinine", label: "Cr", val: inv.s_creatinine },
+        { key: "s_urea", label: "Urea", val: inv.s_urea },
+        { key: "ast", label: "AST", val: inv.ast },
+        { key: "alt", label: "ALT", val: inv.alt },
+        { key: "rbs", label: "RBS", val: inv.rbs },
+        { key: "tsb", label: "TSB", val: inv.tsb },
+        { key: "hba1c", label: "HbA1c", val: inv.hba1c },
+        { key: "esr", label: "ESR", val: inv.esr },
+        { key: "crp", label: "CRP", val: inv.crp },
+        ...(Array.isArray(inv.other_labs) ? inv.other_labs.map((o: any) => ({ key: o.name, label: o.name, val: o.value })) : []),
+      ].filter(e => e.val !== null && e.val !== undefined && e.val !== "");
 
-    doc.setFont(useFont, "normal");
-    doc.setFontSize(sz(9));
-    doc.setTextColor(148, 163, 184); // #94A3B8
-    // Safe text call to prevent 'widths' crash
-    doc.text(format(new Date(), "dd MMMM yyyy"), 105, 32, { align: "center" });
+      const parts = entries.map(e => {
+        const abn = isLabAbnormal(e.key, e.val);
+        return `<span><strong style="color:#64748b;">${e.label}:</strong> <span style="${abn ? "color:#DC2626;font-weight:700;" : ""}">${e.val}</span></span>`;
+      }).join(" &nbsp;|&nbsp; ");
 
-    // 2. DEMOGRAPHICS & CLINICAL CONTEXT
-    autoTable(doc, {
-      startY: 40,
-      theme: "plain",
-      head: [[
-        { content: "I. PATIENT DEMOGRAPHICS", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }, 
-        { content: isER ? "II. ER ADMISSION NOTE" : "II. LONG-TERM MEDICAL HISTORY", styles: { textColor: themeColor as [number, number, number], fontStyle: "bold" } }
-      ]],
-      body: [[
-        {
-          content: `Name: ${prepareClinicalText(doc, p.name || "N/A")}\nAge / Gender: ${p.age || "?"}y / ${p.gender || "N/A"}\nProvince: ${prepareClinicalText(doc, p.province || "N/A")}\nWard: ${prepareClinicalText(doc, p.ward_name || wardName || "N/A")}\n\nChronic Diseases:\n${prepareClinicalText(doc, formatDiseases(p.chronic_diseases)) || "None recorded."}`,
-          styles: { cellPadding: 2 }
-        },
-        {
-          content: isER 
-            ? `Adm. Date: ${p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM yyyy, HH:mm") : "N/A"}\nReferring Doc: Dr. ${prepareClinicalText(doc, p.er_admission_doctor || "Unknown")}\n\nCHIEF COMPLAINT:\n"${prepareClinicalText(doc, p.er_chief_complaint || "None recorded")}"\n\nADMISSION NOTES:\n${prepareClinicalText(doc, p.er_admission_notes || "No admission notes.")}`
-            : `Allergies: ${prepareClinicalText(doc, parseArr(p.allergies).join(", ")) || "None recorded"}\n\nSurgical History:\n${prepareClinicalText(doc, parseArr(p.past_surgeries).join(", ")) || "None recorded."}\n\nRelative: ${p.relative_status === 'Known' ? `Family known (${p.relative_visits || '0'} visits / 3mo)` : "No family contact recorded."}`,
-          styles: { fillColor: isER ? [255, 241, 242] : [248, 250, 252], cellPadding: 2 }
-        }
-      ]],
-      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
-      headStyles: { font: useFont, fontStyle: "bold" },
-      bodyStyles: { font: useFont, fontStyle: "normal" },
-    });
+      return `<div class="lab-row"><span class="lab-date" style="color:${tealHex};">${invDate}</span> &rarr; ${parts || "No values"}</div>`;
+    }).join("") || `<p style="color:#94a3b8;font-style:italic;">No laboratory investigations found.</p>`;
 
-    // 3. MEDICATIONS
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 10,
-      theme: "plain",
-      head: [[
-        { content: "III. ONGOING MEDICAL TREATMENT", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } },
-        { content: "III. ONGOING PSYCHIATRIC TREATMENT", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
-      ]],
-      body: [[
-        { content: formatDrugs(p.medical_drugs).map(d => `• ${prepareClinicalText(doc, d)}`).join("\n") || "No medical medications.", styles: { cellPadding: 2 } },
-        { content: formatDrugs(p.psych_drugs).map(d => `• ${prepareClinicalText(doc, d)}`).join("\n") || "No psychiatric medications.", styles: { cellPadding: 2, fillColor: [240, 253, 250] } }
-      ]],
-      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
-      headStyles: { font: useFont, fontStyle: "bold" },
-      bodyStyles: { font: useFont, fontStyle: "normal" },
-    });
+    const sectionII = isER ? `
+      <div class="cell cell-alt">
+        <h4 style="color:${themeHex};">II. ER ADMISSION NOTE</h4>
+        <p><strong>Adm. Date:</strong> ${p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM yyyy, HH:mm") : "N/A"}</p>
+        <p><strong>Referring Doctor:</strong> Dr. ${field(p.er_admission_doctor || "Unknown")}</p>
+        <div class="note-box"><div class="note-label" style="color:${themeHex};">CHIEF COMPLAINT</div>
+        <div dir="auto">"${field(p.er_chief_complaint || "None recorded")}"</div></div>
+        <div class="note-box"><div class="note-label">ADMISSION NOTES</div>
+        <div dir="auto" style="white-space:pre-wrap;">${field(p.er_admission_notes || "No admission notes.")}</div></div>
+      </div>` : `
+      <div class="cell cell-alt">
+        <h4 style="color:${themeHex};">II. LONG-TERM MEDICAL HISTORY</h4>
+        <p><strong>Allergies:</strong> ${field(parseArr(p.allergies).join(", ") || "None recorded")}</p>
+        <p><strong>Surgical History:</strong> ${field(parseArr(p.past_surgeries).join(", ") || "None recorded.")}</p>
+        <p><strong>Relative:</strong> ${p.relative_status === "Known" ? `Family known (${p.relative_visits || "0"} visits / 3mo)` : "No family contact recorded."}</p>
+      </div>`;
 
-    // 4. VITALS & PROGRESS (One-Page Scaled)
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 10,
-      theme: "plain",
-      columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 'auto' } },
-      head: [[
-        { content: "IV. VITALS", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } },
-        { content: isER ? "IV. EMERGENCY CLINICAL EVALUATION" : "V. LATEST CLINICAL PROGRESS EVALUATION", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
-      ]],
-      body: [[
-        {
-          content: targetVisit 
-            ? `BP: ${targetVisit.bp_sys || "?"}/${targetVisit.bp_dia || "?"}\nPR: ${targetVisit.pr ? targetVisit.pr + " bpm" : "N/A"}\nSpO2: ${targetVisit.spo2 ? targetVisit.spo2 + "%" : "N/A"}\nTemp: ${targetVisit.temp ? targetVisit.temp + "°C" : "N/A"}`
-            : "No current vitals.",
-          styles: { cellPadding: 2 }
-        },
-        {
-          content: prepareClinicalText(doc, targetVisit?.exam_notes || "No clinical evaluation recorded."),
-          styles: { cellPadding: 2 }
-        }
-      ]],
-      styles: { fontSize: sz(8), font: useFont, fontStyle: "normal" },
-      headStyles: { font: useFont, fontStyle: "bold" },
-      bodyStyles: { font: useFont, fontStyle: "normal" },
-    });
+    const sectionErTx = isER ? `
+      <div class="section-header" style="background:${themeHex};color:#fff;">V. EMERGENCY PHARMACOLOGICAL TREATMENT</div>
+      <ul class="drug-list">${drugsHtml(parseArr(p.er_treatment))}</ul>` : "";
 
-    // 5. ER TREATMENT (if applicable)
-    if (isER) {
-      autoTable(doc, {
-        startY: (doc as any).lastAutoTable.finalY + 10,
-        theme: "grid",
-        head: [[{ content: "V. EMERGENCY PHARMACOLOGICAL TREATMENT", styles: { fillColor: themeColor as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" } }]],
-        body: [[
-          { content: parseArr(p.er_treatment).map((t: any) => `• ${prepareClinicalText(doc, t.name)} ${t.dosage || ""} — ${t.frequency || ""}`).join("\n") || "No emergency treatment recorded." }
-        ]],
-        styles: { fontSize: sz(9), font: useFont, fontStyle: "normal" },
-        headStyles: { font: useFont, fontStyle: "bold" },
-        bodyStyles: { font: useFont, fontStyle: "normal" },
-      });
+    return `<div class="page">
+      <div class="header-bar">
+        <div class="doctor-name" style="color:${tealHex};">Dr. ${doctorName}</div>
+        <div class="report-title">${isER ? "CLINICAL SUMMARY &amp; EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY"}</div>
+        <div class="report-date">${dateStr}</div>
+      </div>
+      <div class="two-col">
+        <div class="cell">
+          <h4 style="color:${tealHex};">I. PATIENT DEMOGRAPHICS</h4>
+          <p><strong>Name:</strong> ${field(p.name)}</p>
+          <p><strong>Age / Gender:</strong> ${p.age || "?"}y / ${p.gender || "N/A"}</p>
+          <p><strong>Province:</strong> ${field(p.province)}</p>
+          <p><strong>Ward:</strong> ${field(p.ward_name || wardName)}</p>
+          <p><strong>Chronic Diseases:</strong></p>
+          <p dir="auto">${field(formatDiseases(p.chronic_diseases))}</p>
+        </div>
+        ${sectionII}
+      </div>
+      <div class="two-col">
+        <div class="cell">
+          <h4 style="color:${tealHex};">III. ONGOING MEDICAL TREATMENT</h4>
+          <ul class="drug-list">${drugsHtml(parseArr(p.medical_drugs))}</ul>
+        </div>
+        <div class="cell cell-green">
+          <h4 style="color:${tealHex};">III. ONGOING PSYCHIATRIC TREATMENT</h4>
+          <ul class="drug-list">${drugsHtml(parseArr(p.psych_drugs))}</ul>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="cell">
+          <h4 style="color:${tealHex};">IV. VITALS</h4>
+          ${targetVisit
+            ? `<p><strong>BP:</strong> ${targetVisit.bp_sys || "?"}/${targetVisit.bp_dia || "?"}mmHg</p>
+               <p><strong>PR:</strong> ${targetVisit.pr ? targetVisit.pr + " bpm" : "N/A"}</p>
+               <p><strong>SpO2:</strong> ${targetVisit.spo2 ? targetVisit.spo2 + "%" : "N/A"}</p>
+               <p><strong>Temp:</strong> ${targetVisit.temp ? targetVisit.temp + "C" : "N/A"}</p>`
+            : `<p style="color:#94a3b8;font-style:italic;">No current vitals.</p>`}
+        </div>
+        <div class="cell">
+          <h4 style="color:${tealHex};">${isER ? "IV. EMERGENCY CLINICAL EVALUATION" : "V. LATEST CLINICAL PROGRESS EVALUATION"}</h4>
+          <div dir="auto" style="white-space:pre-wrap;font-size:0.8rem;">${field(targetVisit?.exam_notes || "No clinical evaluation recorded.")}</div>
+        </div>
+      </div>
+      ${sectionErTx}
+      <div class="section-header" style="color:${tealHex};border-bottom:2px solid ${tealHex};background:transparent;padding-bottom:4px;">
+        ${isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS"}
+      </div>
+      <div class="labs-block">${labsHtml}</div>
+      <div class="footer">Generated ${dateStr} &middot; Attending: Dr. ${doctorName} &middot; ${wardName.toUpperCase()}</div>
+    </div>`;
+  }).join('<div style="page-break-after:always;"></div>');
+
+  const GFONT = "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Noto+Sans+Arabic:wght@400;600;700&display=swap";
+
+  const html = `<!DOCTYPE html>
+<html lang="ar-IQ" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinical Summary - ${dateStr}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${GFONT}" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter','Noto Sans Arabic',sans-serif;font-size:.82rem;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{width:210mm;min-height:297mm;margin:0 auto;padding:14mm 14mm 10mm;display:flex;flex-direction:column;gap:10px}
+    .header-bar{border-bottom:3px solid #0D9488;padding-bottom:8px;margin-bottom:4px}
+    .doctor-name{font-size:.75rem;font-weight:900}
+    .report-title{font-size:1.1rem;font-weight:900;text-align:center;color:#1E293B;margin:4px 0;letter-spacing:.04em}
+    .report-date{font-size:.7rem;text-align:center;color:#94A3B8}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .cell{padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px}
+    .cell-alt{background:#f8fafc}.cell-green{background:#f0fdf4}
+    h4{font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+    p{margin-bottom:3px;font-size:.79rem;line-height:1.4}
+    .note-box{margin-top:6px;padding:6px 8px;background:#fff;border:1px dashed #cbd5e1;border-radius:4px;font-size:.78rem}
+    .note-label{font-size:.62rem;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:3px}
+    .drug-list{list-style:none;padding:0;margin:0;font-size:.79rem}
+    .drug-list li{padding:2px 0 2px 10px;border-left:2px solid #e2e8f0;margin-bottom:3px}
+    .section-header{font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:4px 8px;margin:2px 0}
+    .labs-block{padding:4px 0}
+    .lab-row{font-size:.75rem;padding:3px 0;border-bottom:1px solid #f1f5f9;line-height:1.6}
+    .lab-date{font-weight:700;margin-right:6px}
+    .footer{margin-top:auto;padding-top:8px;border-top:1px solid #e2e8f0;font-size:.65rem;color:#94a3b8;text-align:center}
+    [dir="rtl"],[dir="auto"]{font-family:'Noto Sans Arabic','Inter',sans-serif}
+    @media print{
+      body{background:#fff}
+      .page{width:100%;padding:10mm;margin:0;page-break-after:always}
+      .page:last-child{page-break-after:avoid}
     }
+  </style>
+</head>
+<body>
+  ${patientPages}
+  <script>
+    document.fonts.ready.then(function(){ setTimeout(function(){ window.print(); }, 500); });
+  </script>
+</body>
+</html>`;
 
-    // 6. LABORATORY FINDINGS
-    doc.setFont(useFont, "bold");
-    doc.setFontSize(sz(9));
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS", 14, (doc as any).lastAutoTable.finalY + 12);
-
-    const labsToPrint = limitLabs ? docLabs.slice(0, 2) : docLabs.slice(0, 6);
-    let labStartY = (doc as any).lastAutoTable.finalY + 16;
-
-    labsToPrint.forEach((inv: any) => {
-      const dateStr = format(parseISO(inv.date || inv.created_at), isER ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy");
-      
-      const labEntries: any[] = [
-        { key: 'hb', label: 'Hb', val: inv.hb },
-        { key: 'wbc', label: 'WBC', val: inv.wbc },
-        { key: 's_creatinine', label: 'Cr', val: inv.s_creatinine },
-        { key: 's_urea', label: 'Urea', val: inv.s_urea },
-        { key: 'ast', label: 'AST', val: inv.ast },
-        { key: 'alt', label: 'ALT', val: inv.alt },
-        { key: 'rbs', label: 'RBS', val: inv.rbs },
-        { key: 'tsb', label: 'TSB', val: inv.tsb },
-        { key: 'hba1c', label: 'HbA1c', val: inv.hba1c },
-        { key: 'esr', label: 'ESR', val: inv.esr },
-        { key: 'crp', label: 'CRP', val: inv.crp },
-      ];
-      const otherLabs = Array.isArray(inv.other_labs) ? inv.other_labs : [];
-      otherLabs.forEach((o: any) => labEntries.push({ key: o.name, label: prepareClinicalText(o.name), val: o.value }));
-
-      const activeLabs = labEntries.filter(l => l.val !== null && l.val !== undefined && l.val !== "");
-      
-      doc.setFontSize(sz(8));
-      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      doc.setFont(useFont, "bold");
-      doc.text(`${dateStr} -->`, 14, labStartY);
-
-      let currentX = 46;
-      activeLabs.forEach((lab, labIdx) => {
-        const isAbnormal = isLabAbnormal(lab.key, lab.val);
-        const isLast = labIdx === activeLabs.length - 1;
-        const separator = isLast ? "" : " | ";
-
-        doc.setFont(useFont, "bold");
-        doc.setFontSize(sz(8));
-        doc.setTextColor(100, 116, 139); // #64748B
-        doc.text(`${lab.label}: `, currentX, labStartY);
-        const labelWidth = doc.getTextWidth(`${lab.label}: `);
-
-        doc.setFont(useFont, "normal");
-        doc.setTextColor(isAbnormal ? 220 : 30, isAbnormal ? 38 : 41, isAbnormal ? 38 : 59);
-        const valText = `${lab.val}${separator}`;
-        doc.text(valText, currentX + labelWidth, labStartY);
-        
-        currentX += labelWidth + doc.getTextWidth(valText);
-      });
-
-      labStartY += 6;
-    });
-
-    // FOOTER
-    doc.setFont(useFont, "italic");
-    doc.setFontSize(sz(7));
-    doc.setTextColor(148, 163, 184);
-    doc.text(prepareClinicalText(doc, `Generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: Dr. ${doctorName}`), 105, 285, { align: "center" });
-  });
-
-  const patientName = patients.length === 1 ? patients[0].name.replace(/\s+/g, '_') : "Multiple_Patients";
-  doc.save(`${patientName}_Clinical_Summary.pdf`);
+  const win = window.open("", "_blank");
+  if (!win) {
+    // Popup blocked — download as HTML so user can open and print
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Clinical_Summary_${dateStr}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
 }
 
 /**
