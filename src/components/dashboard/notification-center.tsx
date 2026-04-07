@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner"
 import Link from "next/link"
 import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
+import { createClient } from "@/lib/supabase"
 
 export function NotificationCenter() {
   const [open, setOpen] = useState(false)
@@ -51,12 +52,7 @@ export function NotificationCenter() {
     }
     
     // Also fetch role to decide archive link
-    const { createServerClient } = await import('@supabase/ssr')
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll: () => [] } } // Simple check
-    )
+    const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
        setUserId(user.id)

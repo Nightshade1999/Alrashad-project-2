@@ -1,7 +1,7 @@
 "use client"
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Cloud, CloudOff, RefreshCcw, CheckCircle2 } from 'lucide-react'
 
 export function SyncStatus() {
@@ -18,30 +18,32 @@ export function SyncStatus() {
     isSyncing: false
   });
 
+  // Track previous status to avoid redundant updates/renders
+  const lastStatusRef = useRef<string>('');
+
   useEffect(() => {
-    if (!ps) {
-      console.log('SyncStatus: PowerSync database not initialized yet');
-      return;
-    }
+    if (!ps) return;
 
     const updateStatus = () => {
-      const currentStatus = (ps as any).currentStatus;
-      if (!currentStatus) {
-        console.log('SyncStatus: currentStatus is undefined');
+      const currentStatus = ps.currentStatus;
+      if (!currentStatus) return;
+
+      const isSyncing = !!(currentStatus.downloading || currentStatus.uploading);
+      
+      // Create a stable string representation for comparison
+      const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${currentStatus.lastSyncedAt?.getTime()}`;
+      
+      if (statusKey === lastStatusRef.current) {
         return;
       }
-
-      console.log('SyncStatus Update:', {
-        connected: currentStatus.connected,
-        hasSynced: currentStatus.hasSynced,
-        isSyncing: !!(currentStatus.downloading || currentStatus.uploading)
-      });
+      
+      lastStatusRef.current = statusKey;
 
       setStatus({
         connected: !!currentStatus.connected,
         hasSynced: !!currentStatus.hasSynced,
         lastSyncedAt: currentStatus.lastSyncedAt || null,
-        isSyncing: !!(currentStatus.downloading || currentStatus.uploading)
+        isSyncing
       });
     };
 
@@ -49,15 +51,13 @@ export function SyncStatus() {
     updateStatus();
 
     // Register for updates
-    const l = (ps as any).registerListener?.({
+    // The @powersync/web SDK uses registerListener for status changes
+    const unsubscribe = ps.registerListener?.({
       statusChanged: updateStatus
     });
 
-    const s = !l && (ps as any).statusStream?.subscribe?.(updateStatus);
-
     return () => {
-      if (l) l();
-      if (s) s.unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, [ps]);
 
