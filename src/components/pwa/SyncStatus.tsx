@@ -19,12 +19,23 @@ export function SyncStatus() {
   });
 
   useEffect(() => {
-    if (!ps) return;
+    if (!ps) {
+      console.log('SyncStatus: PowerSync database not initialized yet');
+      return;
+    }
 
     const updateStatus = () => {
-      // Use currentStatus (standard for v1.x)
       const currentStatus = (ps as any).currentStatus;
-      if (!currentStatus) return;
+      if (!currentStatus) {
+        console.log('SyncStatus: currentStatus is undefined');
+        return;
+      }
+
+      console.log('SyncStatus Update:', {
+        connected: currentStatus.connected,
+        hasSynced: currentStatus.hasSynced,
+        isSyncing: !!(currentStatus.downloading || currentStatus.uploading)
+      });
 
       setStatus({
         connected: !!currentStatus.connected,
@@ -34,15 +45,14 @@ export function SyncStatus() {
       });
     };
 
-    // 1. Initial check
+    // Initial check
     updateStatus();
 
-    // 2. Register for updates (v1.x standard)
+    // Register for updates
     const l = (ps as any).registerListener?.({
       statusChanged: updateStatus
     });
 
-    // 3. Fallback to statusStream if listener isn't available
     const s = !l && (ps as any).statusStream?.subscribe?.(updateStatus);
 
     return () => {
@@ -75,7 +85,7 @@ export function SyncStatus() {
             {status.isSyncing ? 'Syncing...' : status.connected ? (status.hasSynced ? 'Safe & Synced' : 'Online') : 'Offline Mode'}
           </span>
           <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 tabular-nums">
-            {status.lastSyncedAt ? `Updated: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Waiting for connection...'}
+            {status.lastSyncedAt ? `Updated: ${status.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Starting connection...'}
           </span>
         </div>
 
@@ -86,7 +96,6 @@ export function SyncStatus() {
         )}
       </div>
 
-      {/* Network Status Dot */}
       <div className={`absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white dark:border-slate-900 shadow-sm ${
         status.connected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
       }`} />

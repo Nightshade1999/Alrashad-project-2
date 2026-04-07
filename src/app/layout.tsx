@@ -31,7 +31,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Ward Manager - Alrashad Medical",
   description: "Secure clinical management for medical wards",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
