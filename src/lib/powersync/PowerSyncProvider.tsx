@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { PowerSyncDatabase, PowerSyncBackendConnector } from '@powersync/web';
+import { PowerSyncDatabase } from '@powersync/web';
 import { AppSchema } from './schema';
 import { SupabaseConnector } from './SupabaseConnector';
 import { createClient } from '@/lib/supabase';
@@ -29,9 +29,31 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const init = async () => {
       try {
         await powerSync.init();
-        await powerSync.connect(connector);
+        
+        // Only connect if we have a session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await powerSync.connect(connector);
+          console.log('PowerSync connected to backend');
+        }
+
+        // Watch for auth changes to connect/disconnect dynamically
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (session) {
+            try {
+              await powerSync.connect(connector);
+              console.log('PowerSync reconnected on auth change');
+            } catch (e) {
+              console.error('PowerSync reconnect failed:', e);
+            }
+          } else {
+            await powerSync.disconnect();
+            console.log('PowerSync disconnected on logout');
+          }
+        });
+
         setDb(powerSync);
-        console.log('PowerSync initialized successfully');
+        console.log('PowerSync initialized locally');
       } catch (error) {
         console.error('Failed to initialize PowerSync:', error);
       }
@@ -39,7 +61,6 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     init();
     
-    // Cleanup on unmount
     return () => {
       powerSync.disconnect();
     };

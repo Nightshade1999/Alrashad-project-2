@@ -1,4 +1,4 @@
-import { PowerSyncBackendConnector, CrudEntry, PowerSyncTransaction } from '@powersync/web';
+import { PowerSyncBackendConnector, CrudEntry } from '@powersync/web';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export class SupabaseConnector implements PowerSyncBackendConnector {
@@ -21,8 +21,8 @@ export class SupabaseConnector implements PowerSyncBackendConnector {
     };
   }
 
-  async uploadData(): Promise<void> {
-    const batches = await (this as any).database.getModifiedBatches();
+  async uploadData(db: any): Promise<void> {
+    const batches = await db.getModifiedBatches();
     for (const batch of batches) {
       for (const op of batch.operations) {
         const table = op.table;
