@@ -31,13 +31,9 @@ export function ReminderArchive() {
       const res = await getRemindersArchiveAction()
       if (res.data) setReminders(res.data)
       
-      // Get auth and role for personalized UI
-      const { createServerClient } = await import('@supabase/ssr')
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { cookies: { getAll: () => [] } }
-      )
+      // Get auth and role for personalized UI using proper browser client
+      const { createClient } = await import('@/lib/supabase')
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
          setUserId(user.id)

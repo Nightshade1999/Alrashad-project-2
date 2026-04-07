@@ -155,7 +155,7 @@ export function WardPatientDetail({
         </div>
         
         {/* Actions */}
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1 overflow-visible">
           {!isDeceased ? (
             <>
               <AddVisitModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />

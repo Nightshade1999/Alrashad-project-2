@@ -565,77 +565,81 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
  */
 function prepareClinicalText(text: string = ""): string {
   if (!text) return "";
+  if (typeof text !== 'string') text = String(text);
   
-  // Basic Arabic Reshaping Map (Common Clinical Characters)
-  // Maps isolated chars to their positional forms: [Isolated, End, Middle, Start]
+  // [Isolated, Final, Medial, Initial]
   const ARABIC_MAP: Record<string, string[]> = {
-    // Alif, Ba, Ta, Tha, Jeem, Heh, Kha, Dal, Thal, Reh, Zain, Seen, Sheen, Sad, Dad, Tah, Zah, Ain, Ghain, Feh, Qaf, Kaf, Lam, Meem, Noon, Heh, Waw, Yeh, Hamza, etc.
-    "\u0627": ["\uFE8D", "\uFE8E", "\uFE8E", "\uFE8D"], // Alif
-    "\u0628": ["\uFE8F", "\uFE90", "\uFE92", "\uFE91"], // Ba
-    "\u062A": ["\uFE95", "\uFE96", "\uFE98", "\uFE97"], // Ta
-    "\u062B": ["\uFE99", "\uFE9A", "\uFE9C", "\uFE9B"], // Tha
-    "\u062C": ["\uFE9D", "\uFE9E", "\uFEA0", "\uFE9F"], // Jeem
-    "\u062D": ["\uFEA1", "\uFEA2", "\uFEA4", "\uFEA3"], // Heh
-    "\u062E": ["\uFEA5", "\uFEA6", "\uFEA8", "\uFEA7"], // Kha
-    "\u062F": ["\uFEA9", "\uFEAA", "\uFEAA", "\uFEA9"], // Dal
-    "\u0630": ["\uFEAB", "\uFEAC", "\uFEAC", "\uFEAB"], // Thal
-    "\u0631": ["\uFEAD", "\uFEAE", "\uFEAE", "\uFEAD"], // Reh
-    "\u0632": ["\uFEAF", "\uFEB0", "\uFEB0", "\uFEAF"], // Zain
-    "\u0633": ["\uFEB1", "\uFEB2", "\uFEB4", "\uFEB3"], // Seen
-    "\u0634": ["\uFEB5", "\uFEB6", "\uFEB8", "\uFEB7"], // Sheen
-    "\u0635": ["\uFEB9", "\uFEBA", "\uFEBC", "\uFEBB"], // Sad
-    "\u0636": ["\uFEBD", "\uFEBE", "\uFEC0", "\uFEBF"], // Dad
-    "\u0637": ["\uFEC1", "\uFEC2", "\uFEC4", "\uFEC3"], // Tah
-    "\u0638": ["\uFEC5", "\uFEC6", "\uFEC8", "\uFEC7"], // Zah
-    "\u0639": ["\uFEC9", "\uFECA", "\uFECC", "\uFECB"], // Ain
-    "\u063A": ["\uFECD", "\uFECE", "\uFED0", "\uFECF"], // Ghain
-    "\u0641": ["\uFED1", "\uFED2", "\uFED4", "\uFED3"], // Feh
-    "\u0642": ["\uFED5", "\uFED6", "\uFED8", "\uFED7"], // Qaf
-    "\u0643": ["\uFED9", "\uFEDA", "\uFEDC", "\uFEDB"], // Kaf
-    "\u0644": ["\uFEDD", "\uFEDE", "\uFEE0", "\uFEDF"], // Lam
-    "\u0645": ["\uFEE1", "\uFEE2", "\uFEE4", "\uFEE3"], // Meem
-    "\u0646": ["\uFEE5", "\uFEE6", "\uFEE8", "\uFEE7"], // Noon
-    "\u0647": ["\uFEE9", "\uFEEA", "\uFEEC", "\uFEEB"], // Heh
-    "\u0648": ["\uFEED", "\uFEEE", "\uFEEE", "\uFEED"], // Waw
-    "\u064A": ["\uFEF1", "\uFEF2", "\uFEF4", "\uFEF3"], // Yeh
-    "\u0629": ["\uFE93", "\uFE94", "\uFE94", "\uFE93"], // Teh Marbuta
-    "\u0649": ["\uFEEF", "\uFEF0", "\uFEF0", "\uFEEF"], // Alef Maksura
-    "\u0622": ["\uFE81", "\uFE82", "\uFE82", "\uFE81"], // Alef Madda
+    "\u0621": ["\uFE80", "\uFE80", "\uFE80", "\uFE80"],
+    "\u0622": ["\uFE81", "\uFE82", "\uFE82", "\uFE81"],
+    "\u0623": ["\uFE83", "\uFE84", "\uFE84", "\uFE83"],
+    "\u0624": ["\uFE85", "\uFE86", "\uFE86", "\uFE85"],
+    "\u0625": ["\uFE87", "\uFE88", "\uFE88", "\uFE87"],
+    "\u0626": ["\uFE89", "\uFE8A", "\uFE8C", "\uFE8B"],
+    "\u0627": ["\uFE8D", "\uFE8E", "\uFE8E", "\uFE8D"],
+    "\u0628": ["\uFE8F", "\uFE90", "\uFE92", "\uFE91"],
+    "\u0629": ["\uFE93", "\uFE94", "\uFE94", "\uFE93"],
+    "\u062A": ["\uFE95", "\uFE96", "\uFE98", "\uFE97"],
+    "\u062B": ["\uFE99", "\uFE9A", "\uFE9C", "\uFE9B"],
+    "\u062C": ["\uFE9D", "\uFE9E", "\uFEA0", "\uFE9F"],
+    "\u062D": ["\uFEA1", "\uFEA2", "\uFEA4", "\uFEA3"],
+    "\u062E": ["\uFEA5", "\uFEA6", "\uFEA8", "\uFEA7"],
+    "\u062F": ["\uFEA9", "\uFEAA", "\uFEAA", "\uFEA9"],
+    "\u0630": ["\uFEAB", "\uFEAC", "\uFEAC", "\uFEAB"],
+    "\u0631": ["\uFEAD", "\uFEAE", "\uFEAE", "\uFEAD"],
+    "\u0632": ["\uFEAF", "\uFEB0", "\uFEB0", "\uFEAF"],
+    "\u0633": ["\uFEB1", "\uFEB2", "\uFEB4", "\uFEB3"],
+    "\u0634": ["\uFEB5", "\uFEB6", "\uFEB8", "\uFEB7"],
+    "\u0635": ["\uFEB9", "\uFEBA", "\uFEBC", "\uFEBB"],
+    "\u0636": ["\uFEBD", "\uFEBE", "\uFEC0", "\uFEBF"],
+    "\u0637": ["\uFEC1", "\uFEC2", "\uFEC4", "\uFEC3"],
+    "\u0638": ["\uFEC5", "\uFEC6", "\uFEC8", "\uFEC7"],
+    "\u0639": ["\uFEC9", "\uFECA", "\uFECC", "\uFECB"],
+    "\u063A": ["\uFECD", "\uFECE", "\uFED0", "\uFECF"],
+    "\u0641": ["\uFED1", "\uFED2", "\uFED4", "\uFED3"],
+    "\u0642": ["\uFED5", "\uFED6", "\uFED8", "\uFED7"],
+    "\u0643": ["\uFED9", "\uFEDA", "\uFEDC", "\uFEDB"],
+    "\u0644": ["\uFEDD", "\uFEDE", "\uFEE0", "\uFEDF"],
+    "\u0645": ["\uFEE1", "\uFEE2", "\uFEE4", "\uFEE3"],
+    "\u0646": ["\uFEE5", "\uFEE6", "\uFEE8", "\uFEE7"],
+    "\u0647": ["\uFEE9", "\uFEEA", "\uFEEC", "\uFEEB"],
+    "\u0648": ["\uFEED", "\uFEEE", "\uFEEE", "\uFEED"],
+    "\u0649": ["\uFEEF", "\uFEF0", "\uFEF0", "\uFEEF"],
+    "\u064A": ["\uFEF1", "\uFEF2", "\uFEF4", "\uFEF3"],
     " ": [" ", " ", " ", " "]
   };
 
-  const isArabic = (c: string) => /[\u0600-\u06FF]/.test(c);
-  const words = text.split(" ");
-  
-  const processedWords = words.map(word => {
-    if (!isArabic(word[0])) return word; // Skip non-Arabic
+  const NON_CONNECTING = ["\u0621", "\u0622", "\u0623", "\u0624", "\u0625", "\u0627", "\u062F", "\u0630", "\u0631", "\u0632", "\u0648", "\u0629", " "];
+  const LIGATURES: Record<string, string[]> = {
+    "\u0644\u0627": ["\uFEFB", "\uFEFC", "\uFEFC", "\uFEFB"],
+    "\u0644\u0622": ["\uFEF5", "\uFEF6", "\uFEF6", "\uFEF5"],
+    "\u0644\u0623": ["\uFEF7", "\uFEF8", "\uFEF8", "\uFEF7"],
+    "\u0644\u0625": ["\uFEF9", "\uFEFA", "\uFEFA", "\uFEF9"],
+  };
 
-    let reshaped = "";
-    for (let i = 0; i < word.length; i++) {
-      const char = word[i];
-      const entry = ARABIC_MAP[char];
-      if (!entry) {
-        reshaped += char;
-        continue;
+  const isAr = (c: string) => c && /[\u0600-\u06FF]/.test(c);
+
+  const reshapeSeq = (content: string) => {
+    return content.split(" ").map(word => {
+      if (!word || !isAr(word[0])) return word;
+      let w = word;
+      for (const [lig, forms] of Object.entries(LIGATURES)) w = w.split(lig).join(forms[0]);
+      let reshaped = "";
+      for (let i = 0; i < w.length; i++) {
+        const char = w[i], entry = ARABIC_MAP[char];
+        if (!entry) { reshaped += char; continue; }
+        const prev = w[i - 1], next = w[i + 1];
+        const canPrev = prev && ARABIC_MAP[prev] && !NON_CONNECTING.includes(prev);
+        const canNext = next && ARABIC_MAP[next] && char !== " " && !NON_CONNECTING.includes(char);
+        if (!canPrev && !canNext) reshaped += entry[0];
+        else if (!canPrev && canNext) reshaped += entry[3];
+        else if (canPrev && canNext) reshaped += entry[2];
+        else reshaped += entry[1];
       }
-      
-      const prev = word[i - 1];
-      const next = word[i + 1];
-      const hasPrev = prev && ARABIC_MAP[prev];
-      const hasNext = next && ARABIC_MAP[next];
+      return reshaped.split("").reverse().join("");
+    }).reverse().join(" ");
+  };
 
-      // Form Selection: [0: Isolated, 1: Final, 2: Medial, 3: Initial]
-      if (!hasPrev && !hasNext) reshaped += entry[0];
-      else if (!hasPrev && hasNext) reshaped += entry[3];
-      else if (hasPrev && hasNext) reshaped += entry[2];
-      else if (hasPrev && !hasNext) reshaped += entry[1];
-    }
-    // Reverse for RTL
-    return reshaped.split("").reverse().join("");
-  });
-
-  // Re-join with reversed word order if the whole sentence is Arabic
-  return processedWords.reverse().join(" ");
+  return text.replace(/[\u0600-\u06FF\s]+/g, (m) => m.trim() ? reshapeSeq(m) : m);
 }
 
 /**
@@ -658,27 +662,25 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
   
   // High-Fidelity Font Support (Robust Load)
   try {
-    const response = await fetch("https://cdn.jsdelivr.net/gh/googlefonts/amiri@main/fonts/ttf/Amiri-Regular.ttf");
-    const arrayBuffer = await response.arrayBuffer();
-    
-    // Chunked Base64 converter to ensure large font blobs aren't corrupted
-    const uint8 = new Uint8Array(arrayBuffer);
-    const CHUNK_SIZE = 0x8000; // 32KB chunks
-    let index = 0;
-    let binary = "";
-    while (index < uint8.length) {
-      binary += String.fromCharCode.apply(null, uint8.subarray(index, index + CHUNK_SIZE) as any);
-      index += CHUNK_SIZE;
-    }
-    const base64Font = btoa(binary);
-
-    if (base64Font) {
-      doc.addFileToVFS('Amiri.ttf', base64Font);
-      // 'Identity-H' is the key encoding for Unicode script (Arabic) support
-      (doc as any).addFont('Amiri.ttf', 'Amiri', 'normal', 'Identity-H');
+    const response = await fetch("/fonts/Amiri-Regular.ttf");
+    if (response.ok) {
+      const arrayBuffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Font = btoa(binary);
+      if (base64Font) {
+        doc.addFileToVFS('Amiri-Regular.ttf', base64Font);
+        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'normal', 'Identity-H');
+        // Register bold/italic aliases for font safety
+        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'bold', 'Identity-H');
+        (doc as any).addFont('Amiri-Regular.ttf', 'Amiri', 'italic', 'Identity-H');
+      }
     }
   } catch (err) {
-    console.error("Arabic font load failed, falling back to Helvetica", err);
+    console.error("Font loading error:", err);
   }
 
   const secondaryColor = [13, 148, 136]; // #0D9488

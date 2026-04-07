@@ -61,9 +61,9 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
         await exportToPdf([fullData], doctorName, wardName)
         toast.success("Clinical summary exported to PDF")
       }
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to export clinical summary")
+    } catch (err: any) {
+      console.error("PDF/Word export error:", err)
+      toast.error(`Failed to export: ${err?.message || "Unknown error"}`)
     } finally {
       setIsExporting(false)
     }
@@ -79,7 +79,7 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
         disabled={!!isExporting}
       >
         {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-        Export Summary
+        Export
       </Button>
 
       {showMenu && (

@@ -101,7 +101,7 @@ export function ErPatientDetail({
         )}
 
         {/* ── ER Action Bar Icons ── */}
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-rose-100 dark:border-rose-900/30 shadow-sm overflow-x-auto no-scrollbar">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-rose-100 dark:border-rose-900/30 shadow-sm overflow-visible">
            {/* Add Lab */}
            <AddInvestigationModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
            

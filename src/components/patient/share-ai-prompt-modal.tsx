@@ -61,7 +61,7 @@ export function ShareAIPromptModal({ patient }: ShareAIPromptModalProps) {
         onClick={() => setIsOpen(true)}
       >
         <Sparkles className="h-4 w-4" />
-        Consult AI
+        AI
       </Button>
 
       {isOpen && (
