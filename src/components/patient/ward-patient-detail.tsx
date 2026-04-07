@@ -4,7 +4,7 @@ import Link from "next/link"
 import { 
   AlertTriangle, Activity, FileText, User, 
   Heart, Database, Layers, FlaskConical as Flask, 
-  Clipboard as ClipboardIcon, Cross, Ambulance 
+  Clipboard as ClipboardIcon, Ambulance 
 } from "lucide-react"
 import { ReferralModal } from "@/components/patient/referral-modal"
 import { DeletePatientButton } from "@/components/patient/delete-button"
@@ -76,7 +76,7 @@ export function WardPatientDetail({
         <div className="bg-slate-900 border border-slate-800 text-slate-100 p-3 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in-up">
           <div className="flex items-center gap-3">
             <div className="bg-slate-800 p-2 rounded-xl">
-              <Cross className="h-4 w-4 text-red-400" />
+              <Activity className="h-4 w-4 text-red-400" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Classification</p>

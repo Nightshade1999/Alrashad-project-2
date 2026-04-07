@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Check, ChevronDown, RefreshCw } from 'lucide-react'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
 import { createClient } from '@/lib/supabase'
+import { UserProfile } from '@/types/database.types'
 
 const DEFAULT_WARD_NAME = "Internal Medicine - Psych Ward"
 
@@ -31,7 +32,7 @@ export function WardHeader() {
           .eq('user_id', user.id)
           .single()
 
-        const profileData = data as any
+        const profileData = data as UserProfile | null
         if (profileData?.ward_name) setWardName(profileData.ward_name)
         if (profileData?.accessible_wards) setAccessibleWards(profileData.accessible_wards)
         if (profileData?.doctor_name) {

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { 
   AlertCircle, Activity, FileText, User, 
   Heart, Database, Layers, FlaskConical as Flask, 
-  Clipboard as ClipboardIcon, Cross, ArrowLeft,
+  Clipboard as ClipboardIcon, ArrowLeft,
   Syringe, LogOut, BrainCircuit, PlusCircle, 
   Stethoscope, Thermometer, Droplets, Home, Ambulance
 } from "lucide-react"
@@ -249,7 +249,7 @@ export function ErPatientDetail({
                </div>
             </div>
 
-            <div className="bg-white/60 dark:bg-rose-900/20 rounded-2xl p-5 border border-rose-100 dark:border-rose-800/50 flex flex-col justify-center">
+          <div className="bg-white/60 dark:bg-rose-900/20 rounded-2xl p-5 border border-rose-100 dark:border-rose-800/50 flex flex-col justify-center">
                <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 mb-2">Admission Vitals</p>
                <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
