@@ -3,6 +3,8 @@ import ExcelJS from "exceljs"
 import Papa from "papaparse"
 import { format, parseISO } from "date-fns"
 import { isLabAbnormal } from "./utils"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 /** Safely parse a Supabase JSONB field that may arrive as a JSON string or already-parsed array. */
 function parseArr(val: any): any[] {
@@ -553,6 +555,334 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Clinical Arabic Reshaper & RTL Helper
+ * Since native jsPDF doesn't handle the cursive nature of Arabic (joining letters),
+ * we manually reshape the glyphs to their context-aware forms (Isolated, Initial, Medial, Final)
+ * and reverse the string for Right-to-Left (RTL) layout.
+ */
+function prepareClinicalText(text: string = ""): string {
+  if (!text) return "";
+  
+  // Basic Arabic Reshaping Map (Common Clinical Characters)
+  // Maps isolated chars to their positional forms: [Isolated, End, Middle, Start]
+  const ARABIC_MAP: Record<string, string[]> = {
+    // Alif, Ba, Ta, Tha, Jeem, Heh, Kha, Dal, Thal, Reh, Zain, Seen, Sheen, Sad, Dad, Tah, Zah, Ain, Ghain, Feh, Qaf, Kaf, Lam, Meem, Noon, Heh, Waw, Yeh, Hamza, etc.
+    "\u0627": ["\uFE8D", "\uFE8E", "\uFE8E", "\uFE8D"], // Alif
+    "\u0628": ["\uFE8F", "\uFE90", "\uFE92", "\uFE91"], // Ba
+    "\u062A": ["\uFE95", "\uFE96", "\uFE98", "\uFE97"], // Ta
+    "\u062B": ["\uFE99", "\uFE9A", "\uFE9C", "\uFE9B"], // Tha
+    "\u062C": ["\uFE9D", "\uFE9E", "\uFEA0", "\uFE9F"], // Jeem
+    "\u062D": ["\uFEA1", "\uFEA2", "\uFEA4", "\uFEA3"], // Heh
+    "\u062E": ["\uFEA5", "\uFEA6", "\uFEA8", "\uFEA7"], // Kha
+    "\u062F": ["\uFEA9", "\uFEAA", "\uFEAA", "\uFEA9"], // Dal
+    "\u0630": ["\uFEAB", "\uFEAC", "\uFEAC", "\uFEAB"], // Thal
+    "\u0631": ["\uFEAD", "\uFEAE", "\uFEAE", "\uFEAD"], // Reh
+    "\u0632": ["\uFEAF", "\uFEB0", "\uFEB0", "\uFEAF"], // Zain
+    "\u0633": ["\uFEB1", "\uFEB2", "\uFEB4", "\uFEB3"], // Seen
+    "\u0634": ["\uFEB5", "\uFEB6", "\uFEB8", "\uFEB7"], // Sheen
+    "\u0635": ["\uFEB9", "\uFEBA", "\uFEBC", "\uFEBB"], // Sad
+    "\u0636": ["\uFEBD", "\uFEBE", "\uFEC0", "\uFEBF"], // Dad
+    "\u0637": ["\uFEC1", "\uFEC2", "\uFEC4", "\uFEC3"], // Tah
+    "\u0638": ["\uFEC5", "\uFEC6", "\uFEC8", "\uFEC7"], // Zah
+    "\u0639": ["\uFEC9", "\uFECA", "\uFECC", "\uFECB"], // Ain
+    "\u063A": ["\uFECD", "\uFECE", "\uFED0", "\uFECF"], // Ghain
+    "\u0641": ["\uFED1", "\uFED2", "\uFED4", "\uFED3"], // Feh
+    "\u0642": ["\uFED5", "\uFED6", "\uFED8", "\uFED7"], // Qaf
+    "\u0643": ["\uFED9", "\uFEDA", "\uFEDC", "\uFEDB"], // Kaf
+    "\u0644": ["\uFEDD", "\uFEDE", "\uFEE0", "\uFEDF"], // Lam
+    "\u0645": ["\uFEE1", "\uFEE2", "\uFEE4", "\uFEE3"], // Meem
+    "\u0646": ["\uFEE5", "\uFEE6", "\uFEE8", "\uFEE7"], // Noon
+    "\u0647": ["\uFEE9", "\uFEEA", "\uFEEC", "\uFEEB"], // Heh
+    "\u0648": ["\uFEED", "\uFEEE", "\uFEEE", "\uFEED"], // Waw
+    "\u064A": ["\uFEF1", "\uFEF2", "\uFEF4", "\uFEF3"], // Yeh
+    "\u0629": ["\uFE93", "\uFE94", "\uFE94", "\uFE93"], // Teh Marbuta
+    "\u0649": ["\uFEEF", "\uFEF0", "\uFEF0", "\uFEEF"], // Alef Maksura
+    "\u0622": ["\uFE81", "\uFE82", "\uFE82", "\uFE81"], // Alef Madda
+    " ": [" ", " ", " ", " "]
+  };
+
+  const isArabic = (c: string) => /[\u0600-\u06FF]/.test(c);
+  const words = text.split(" ");
+  
+  const processedWords = words.map(word => {
+    if (!isArabic(word[0])) return word; // Skip non-Arabic
+
+    let reshaped = "";
+    for (let i = 0; i < word.length; i++) {
+      const char = word[i];
+      const entry = ARABIC_MAP[char];
+      if (!entry) {
+        reshaped += char;
+        continue;
+      }
+      
+      const prev = word[i - 1];
+      const next = word[i + 1];
+      const hasPrev = prev && ARABIC_MAP[prev];
+      const hasNext = next && ARABIC_MAP[next];
+
+      // Form Selection: [0: Isolated, 1: Final, 2: Medial, 3: Initial]
+      if (!hasPrev && !hasNext) reshaped += entry[0];
+      else if (!hasPrev && hasNext) reshaped += entry[3];
+      else if (hasPrev && hasNext) reshaped += entry[2];
+      else if (hasPrev && !hasNext) reshaped += entry[1];
+    }
+    // Reverse for RTL
+    return reshaped.split("").reverse().join("");
+  });
+
+  // Re-join with reversed word order if the whole sentence is Arabic
+  return processedWords.reverse().join(" ");
+}
+
+/**
+ * High-Fidelity PDF Export. 
+ * Replicates the clinical style, color-coded headers, and structured tables 
+ * of the professional Word export.
+ */
+export async function exportToPdf(patients: any[], doctorName: string = "", wardName: string = "") {
+  if (!doctorName && typeof window !== "undefined") {
+    doctorName = localStorage.getItem("wardManager_doctorName") || "Ward Clinician"
+  }
+  if (!wardName && typeof window !== "undefined") {
+    wardName = localStorage.getItem("wardManager_wardName") || "MEDICAL WARD"
+  }
+
+  // Optimize constructor: putOnlyUsedFonts reduces file size
+  const doc = new jsPDF({
+    putOnlyUsedFonts: true
+  });
+  
+  // High-Fidelity Font Support (Robust Load)
+  try {
+    const response = await fetch("https://cdn.jsdelivr.net/gh/googlefonts/amiri@main/fonts/ttf/Amiri-Regular.ttf");
+    const arrayBuffer = await response.arrayBuffer();
+    
+    // Chunked Base64 converter to ensure large font blobs aren't corrupted
+    const uint8 = new Uint8Array(arrayBuffer);
+    const CHUNK_SIZE = 0x8000; // 32KB chunks
+    let index = 0;
+    let binary = "";
+    while (index < uint8.length) {
+      binary += String.fromCharCode.apply(null, uint8.subarray(index, index + CHUNK_SIZE) as any);
+      index += CHUNK_SIZE;
+    }
+    const base64Font = btoa(binary);
+
+    if (base64Font) {
+      doc.addFileToVFS('Amiri.ttf', base64Font);
+      // 'Identity-H' is the key encoding for Unicode script (Arabic) support
+      (doc as any).addFont('Amiri.ttf', 'Amiri', 'normal', 'Identity-H');
+    }
+  } catch (err) {
+    console.error("Arabic font load failed, falling back to Helvetica", err);
+  }
+
+  const secondaryColor = [13, 148, 136]; // #0D9488
+  const normalTheme = [15, 23, 42];      // #0F172A
+  const erTheme = [190, 18, 60]          // #BE123C
+
+  patients.forEach((p, index) => {
+    if (index > 0) doc.addPage();
+    
+    const isER = p.is_in_er || false;
+    const themeColor = isER ? erTheme : normalTheme;
+
+    // Line Projection Engine (One-Page Protocol Parity)
+    const visitsForDoc = (p.visits || []).filter((v: any) => isER ? v.is_er : !v.is_er);
+    visitsForDoc.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
+    const targetVisit = visitsForDoc.length > 0 ? visitsForDoc[0] : (p.visits?.[0] || null);
+
+    let docLabs = (p.investigations || []).filter((inv: any) => isER ? inv.is_er : !inv.is_er);
+    if (docLabs.length === 0 && p.investigations?.length > 0) docLabs = [p.investigations[0]];
+
+    const noteLines = targetVisit ? (targetVisit.exam_notes || "").split("\n").length : 1;
+    const admissionNoteLines = (p.er_admission_notes || "").split("\n").length;
+    const medsCount = parseArr(p.medical_drugs).length + parseArr(p.psych_drugs).length;
+    const erTxCount = parseArr(p.er_treatment).length;
+
+    const projectedLines = 6 +
+      Math.max(5 + medsCount, isER ? 6 + admissionNoteLines : 8) +
+      Math.max(5, 2 + noteLines) +
+      (isER ? 2 + erTxCount : 0) +
+      2 + Math.min(5, docLabs.length);
+
+    // PDF-Optimized Thresholds
+    const threshold = isER ? 36 : 52; 
+    let fontSizeOffset = 0;
+    let limitLabs = false;
+    if (projectedLines > threshold) {
+       fontSizeOffset = projectedLines > (threshold + 12) ? 2 : 1;
+       if (projectedLines > (threshold + 12)) limitLabs = true;
+    }
+
+    const sz = (baseValue: number) => Math.max(6, baseValue - fontSizeOffset);
+    
+    // Robust Font Existence Check to prevent 'widths' property error
+    const getSafeFont = () => {
+      try {
+        const list = (doc as any).getFontList();
+        if (list && list['Amiri']) return 'Amiri';
+        return 'helvetica';
+      } catch {
+        return 'helvetica';
+      }
+    };
+    const useFont = getSafeFont();
+
+    // 1. HEADER
+    doc.setFont(useFont, "bold");
+    doc.setFontSize(sz(10));
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(prepareClinicalText(`Dr. ${doctorName}`), 14, 15);
+
+    doc.setFontSize(sz(14));
+    doc.setTextColor(30, 41, 59); // #1E293B
+    doc.text(isER ? "CLINICAL SUMMARY & EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY", 105, 25, { align: "center" });
+
+    doc.setFont(useFont, "normal");
+    doc.setFontSize(sz(9));
+    doc.setTextColor(148, 163, 184); // #94A3B8
+    // Safe text call to prevent 'widths' crash
+    doc.text(format(new Date(), "dd MMMM yyyy"), 105, 32, { align: "center" });
+
+    // 2. DEMOGRAPHICS & CLINICAL CONTEXT
+    autoTable(doc, {
+      startY: 40,
+      theme: "plain",
+      head: [[
+        { content: "I. PATIENT DEMOGRAPHICS", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }, 
+        { content: isER ? "II. ER ADMISSION NOTE" : "II. LONG-TERM MEDICAL HISTORY", styles: { textColor: themeColor as [number, number, number], fontStyle: "bold" } }
+      ]],
+      body: [[
+        {
+          content: `Name: ${prepareClinicalText(p.name || "N/A")}\nAge / Gender: ${p.age || "?"}y / ${p.gender || "N/A"}\nProvince: ${prepareClinicalText(p.province || "N/A")}\nWard: ${prepareClinicalText(p.ward_name || wardName || "N/A")}\n\nChronic Diseases:\n${prepareClinicalText(formatDiseases(p.chronic_diseases)) || "None recorded."}`,
+          styles: { cellPadding: 2 }
+        },
+        {
+          content: isER 
+            ? `Adm. Date: ${p.er_admission_date ? format(parseISO(p.er_admission_date), "dd MMM yyyy, HH:mm") : "N/A"}\nReferring Doc: Dr. ${prepareClinicalText(p.er_admission_doctor || "Unknown")}\n\nCHIEF COMPLAINT:\n"${prepareClinicalText(p.er_chief_complaint || "None recorded")}"\n\nADMISSION NOTES:\n${prepareClinicalText(p.er_admission_notes || "No admission notes.")}`
+            : `Allergies: ${prepareClinicalText(parseArr(p.allergies).join(", ")) || "None recorded"}\n\nSurgical History:\n${prepareClinicalText(parseArr(p.past_surgeries).join(", ")) || "None recorded."}\n\nRelative: ${p.relative_status === 'Known' ? `Family known (${p.relative_visits || '0'} visits / 3mo)` : "No family contact recorded."}`,
+          styles: { fillColor: isER ? [255, 241, 242] : [248, 250, 252], cellPadding: 2 }
+        }
+      ]],
+      styles: { fontSize: sz(8), font: useFont }
+    });
+
+    // 3. MEDICATIONS
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      theme: "plain",
+      head: [[
+        { content: "III. ONGOING MEDICAL TREATMENT", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } },
+        { content: "III. ONGOING PSYCHIATRIC TREATMENT", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
+      ]],
+      body: [[
+        { content: formatDrugs(p.medical_drugs).map(d => `• ${prepareClinicalText(d)}`).join("\n") || "No medical medications.", styles: { cellPadding: 2 } },
+        { content: formatDrugs(p.psych_drugs).map(d => `• ${prepareClinicalText(d)}`).join("\n") || "No psychiatric medications.", styles: { cellPadding: 2, fillColor: [240, 253, 250] } }
+      ]],
+      styles: { fontSize: sz(8), font: useFont }
+    });
+
+    // 4. VITALS & PROGRESS (One-Page Scaled)
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      theme: "plain",
+      head: [[
+        { content: "IV. VITALS", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } },
+        { content: isER ? "IV. EMERGENCY CLINICAL EVALUATION" : "V. LATEST CLINICAL PROGRESS EVALUATION", styles: { textColor: secondaryColor as [number, number, number], fontStyle: "bold" } }
+      ]],
+      body: [[
+        {
+          content: targetVisit 
+            ? `BP: ${targetVisit.bp_sys || "?"}/${targetVisit.bp_dia || "?"}\nPR: ${targetVisit.pr ? targetVisit.pr + " bpm" : "N/A"}\nSpO2: ${targetVisit.spo2 ? targetVisit.spo2 + "%" : "N/A"}\nTemp: ${targetVisit.temp ? targetVisit.temp + "°C" : "N/A"}`
+            : "No current vitals.",
+          styles: { cellPadding: 2 }
+        },
+        {
+          content: prepareClinicalText(targetVisit?.exam_notes || "No clinical evaluation recorded."),
+          styles: { cellPadding: 2 }
+        }
+      ]],
+      styles: { fontSize: sz(8), font: useFont }
+    });
+
+    // 5. ER TREATMENT (if applicable)
+    if (isER) {
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 10,
+        theme: "grid",
+        head: [[{ content: "V. EMERGENCY PHARMACOLOGICAL TREATMENT", styles: { fillColor: themeColor as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: "bold" } }]],
+        body: [[
+          { content: parseArr(p.er_treatment).map((t: any) => `• ${prepareClinicalText(t.name)} ${t.dosage || ""} — ${t.frequency || ""}`).join("\n") || "No emergency treatment recorded." }
+        ]],
+        styles: { fontSize: sz(9), font: useFont }
+      });
+    }
+
+    // 6. LABORATORY FINDINGS
+    doc.setFont(useFont, "bold");
+    doc.setFontSize(sz(9));
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS", 14, (doc as any).lastAutoTable.finalY + 12);
+
+    const labsToPrint = limitLabs ? docLabs.slice(0, 2) : docLabs.slice(0, 6);
+    let labStartY = (doc as any).lastAutoTable.finalY + 16;
+
+    labsToPrint.forEach((inv: any) => {
+      const dateStr = format(parseISO(inv.date || inv.created_at), isER ? "dd MMM yyyy, HH:mm" : "dd MMM yyyy");
+      
+      const labEntries: any[] = [
+        { key: 'hb', label: 'Hb', val: inv.hb },
+        { key: 'wbc', label: 'WBC', val: inv.wbc },
+        { key: 's_creatinine', label: 'Cr', val: inv.s_creatinine },
+        { key: 's_urea', label: 'Urea', val: inv.s_urea },
+        { key: 'ast', label: 'AST', val: inv.ast },
+        { key: 'alt', label: 'ALT', val: inv.alt },
+        { key: 'rbs', label: 'RBS', val: inv.rbs },
+        { key: 'tsb', label: 'TSB', val: inv.tsb },
+        { key: 'hba1c', label: 'HbA1c', val: inv.hba1c },
+        { key: 'esr', label: 'ESR', val: inv.esr },
+        { key: 'crp', label: 'CRP', val: inv.crp },
+      ];
+      const otherLabs = Array.isArray(inv.other_labs) ? inv.other_labs : [];
+      otherLabs.forEach((o: any) => labEntries.push({ key: o.name, label: prepareClinicalText(o.name), val: o.value }));
+
+      const activeLabs = labEntries.filter(l => l.val !== null && l.val !== undefined && l.val !== "");
+      
+      doc.setFontSize(sz(8));
+      doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+      doc.text(`${dateStr} -->`, 14, labStartY);
+
+      let currentX = 42;
+      activeLabs.forEach((lab) => {
+        const isAbnormal = isLabAbnormal(lab.key, lab.val);
+        doc.setTextColor(100, 116, 139); // #64748B
+        doc.setFont(useFont, "bold");
+        doc.text(`${lab.label}: `, currentX, labStartY);
+        
+        const labelWidth = doc.getTextWidth(`${lab.label}: `);
+        doc.setTextColor(isAbnormal ? 220 : 30, isAbnormal ? 38 : 41, isAbnormal ? 38 : 59);
+        doc.text(`${lab.val} | `, currentX + labelWidth, labStartY);
+        
+        currentX += labelWidth + doc.getTextWidth(`${lab.val} | `) + 1;
+      });
+
+      labStartY += 6;
+    });
+
+    // FOOTER
+    doc.setFont(useFont, "italic");
+    doc.setFontSize(sz(7));
+    doc.setTextColor(148, 163, 184);
+    doc.text(prepareClinicalText(`Generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: Dr. ${doctorName}`), 105, 285, { align: "center" });
+  });
+
+  const patientName = patients.length === 1 ? patients[0].name.replace(/\s+/g, '_') : "Multiple_Patients";
+  doc.save(`${patientName}_Clinical_Summary.pdf`);
 }
 
 /**
