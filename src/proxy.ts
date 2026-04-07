@@ -31,11 +31,17 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
+  // Public paths that must be accessible without authentication
+  const isPublicPath =
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname === '/manifest.webmanifest' ||
+    request.nextUrl.pathname === '/manifest.json' ||
+    request.nextUrl.pathname === '/sw.js' ||
+    request.nextUrl.pathname === '/workbox-*.js' ||
+    request.nextUrl.pathname === '/offline.html';
+
+  if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -58,8 +64,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - PWA files: manifest, service worker, offline page
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest\.webmanifest|manifest\.json|sw\.js|workbox-.*\.js|offline\.html|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -4,6 +4,19 @@ import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useState, useEffect, useRef } from 'react'
 import { Cloud, CloudOff, RefreshCcw, CheckCircle2 } from 'lucide-react'
 
+function deriveStatus(ps: any) {
+  const currentStatus = ps?.currentStatus;
+  if (!currentStatus) return { connected: false, hasSynced: false, lastSyncedAt: null, isSyncing: false };
+  const isSyncing = !!(currentStatus.dataFlowStatus?.downloading || currentStatus.dataFlowStatus?.uploading);
+  const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
+  return {
+    connected: !!currentStatus.connected,
+    hasSynced: !!currentStatus.hasSynced,
+    lastSyncedAt,
+    isSyncing,
+  };
+}
+
 export function SyncStatus() {
   const ps = usePowerSync();
   const [status, setStatus] = useState<{
@@ -11,12 +24,7 @@ export function SyncStatus() {
     hasSynced: boolean;
     lastSyncedAt: Date | null;
     isSyncing: boolean;
-  }>({
-    connected: false,
-    hasSynced: false,
-    lastSyncedAt: null,
-    isSyncing: false
-  });
+  }>(() => deriveStatus(ps));
 
   // Track previous status to avoid redundant updates/renders
   const lastStatusRef = useRef<string>('');
