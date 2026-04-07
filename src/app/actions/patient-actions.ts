@@ -53,17 +53,11 @@ export async function addVisitAction(payload: any) {
     const { error } = await supabase.from('visits').insert(sanitizedPayload)
 
     if (error) {
-      // ── Defensive Fallback ──
-      if (error.message.includes("schema cache") || error.message.includes("column") || error.message.includes("doctor_id")) {
-        console.warn("Retrying visit insert without tracking/vitals due to schema cache mismatch.")
-        const strippedPayload = { 
-          patient_id: payload.patient_id, 
-          visit_date: combinedDateTime, 
-          exam_notes: payload.exam_notes, 
-          is_er: isEnforcedEr
-        }
-        
-        const { error: retryError } = await supabase.from('visits').insert(strippedPayload)
+      // If it's a schema cache error, retry once with the same payload.
+      // We no longer strip doctor_id or vitals as the schema is now stable.
+      if (error.message.includes("schema cache")) {
+        console.warn("Retrying visit insert due to schema cache mismatch...")
+        const { error: retryError } = await supabase.from('visits').insert(sanitizedPayload)
         if (retryError) return { error: retryError.message }
       } else {
         return { error: error.message }
@@ -136,22 +130,21 @@ export async function addInvestigationAction(payload: any) {
       ...sanitizedLabs,
       is_er: isEnforcedEr,
       doctor_id: user.id,
-      doctor_name: profile?.doctor_name || "Unknown Physician"
+      doctor_name: profile?.doctor_name || user.email?.split('@')[0] || "Unknown Physician"
     }
 
-    // 4. Primary Attempt (Full schema)
+    // 4. Primary Attempt
     const { error: primaryError } = await supabase
       .from('investigations')
       .insert(finalPayload)
 
     if (primaryError) {
-      if (primaryError.message.includes("doctor_id") || primaryError.message.includes("schema cache")) {
-        console.warn("Retrying lab insert without doctor tracking due to schema cache mismatch.")
-        const { doctor_id, doctor_name, ...rest } = finalPayload
-        
+      // If it's a schema cache error, retry once with the same payload.
+      if (primaryError.message.includes("schema cache")) {
+        console.warn("Retrying lab insert due to schema cache mismatch...")
         const { error: retryError } = await supabase
           .from('investigations')
-          .insert(rest)
+          .insert(finalPayload)
         
         if (retryError) return { error: retryError.message }
       } else {

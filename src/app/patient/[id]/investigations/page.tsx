@@ -149,7 +149,7 @@ export default async function InvestigationsPage({
                           Verified By:
                         </span>
                         <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-100">
-                          Dr. {inv.doctor_name || (inv.visit_id && visitToDoctorMap[inv.visit_id]) || 'Unknown'}
+                          Dr. {inv.doctor_name || (inv.visit_id && visitToDoctorMap[inv.visit_id]) || 'Unknown Clinician'}
                         </span>
                       </div>
                     </td>

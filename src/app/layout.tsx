@@ -32,6 +32,13 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Ward App",
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "application-name": "Ward App",
+    "msapplication-TileColor": "#0d9488",
+    "msapplication-tap-highlight": "no",
+  },
   formatDetection: {
     telephone: false,
   },

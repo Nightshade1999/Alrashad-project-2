@@ -189,3 +189,28 @@
 .animate-scale-in {
   animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* PWA Optimizations */
+html, body {
+  /* Prevent pull-to-refresh on mobile Chrome (Android) */
+  overscroll-behavior-y: none;
+  /* Prevent random text resizing on orientation change */
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  /* Smooth scrolling for native feel */
+  scroll-behavior: smooth;
+}
+
+/* Ensure touch targets are generous for doctors on move */
+button, a, input, select {
+  touch-action: manipulation;
+}
+
+/* Hide scrollbars for a cleaner PWA look, but allow scrolling */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
