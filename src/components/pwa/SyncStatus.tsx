@@ -28,7 +28,7 @@ export function SyncStatus() {
       const currentStatus = ps.currentStatus;
       if (!currentStatus) return;
 
-      const isSyncing = !!(currentStatus.downloading || currentStatus.uploading);
+      const isSyncing = !!(currentStatus.dataFlowStatus.downloading || currentStatus.dataFlowStatus.uploading);
       
       // Create a stable string representation for comparison
       const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${currentStatus.lastSyncedAt?.getTime()}`;
