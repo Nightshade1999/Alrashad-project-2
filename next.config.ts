@@ -18,7 +18,10 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   /* config options here */
-  turbopack: {},
 };
 
-export default withPWA(nextConfig);
+// Only wrap with PWA in production or when explicitly enabled for testing
+// This allows using Turbopack during normal local development
+const isPWAEnabled = process.env.NODE_ENV === 'production' || process.env.ENABLE_PWA === 'true';
+
+export default isPWAEnabled ? withPWA(nextConfig) : nextConfig;

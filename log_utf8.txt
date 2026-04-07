@@ -1,0 +1,32 @@
+﻿commit d6b902d23dc9b611f46cf91f1905ce4efec734db
+Merge: c3104a1 2974b81
+Author: Nightshade1999 <starsky9910@gmail.com>
+Date:   Thu Apr 2 01:13:48 2026 +0300
+
+    Merge pull request #1 from Nightshade1999/main
+    
+    Main
+
+commit 2974b81114ff9b91a62727ac0a146dfa6e8c5c01
+Author: Ahmed Bakr <Starsky9910@gmail.com>
+Date:   Thu Apr 2 01:12:03 2026 +0300
+
+    Remove text truncation to ensure full patient name visibility
+
+commit 7d11282c03ab33c3e3eb52bf9c240e7004b01fb4
+Author: Ahmed Bakr <Starsky9910@gmail.com>
+Date:   Thu Apr 2 01:05:19 2026 +0300
+
+    Optimize iOS layout and Word export formatting
+
+commit 11a068e5a6b482953a8b6bfba02683db850af779
+Author: Ahmed Bakr <Starsky9910@gmail.com>
+Date:   Wed Apr 1 23:29:01 2026 +0300
+
+    Final: Re-enable PWA and mobile clinical enhancements
+
+commit bb313fe7c070686dddefc977703efb52aa6d2833
+Author: Ahmed Bakr <Starsky9910@gmail.com>
+Date:   Wed Apr 1 23:20:00 2026 +0300
+
+    Debug: Temporarily disable PWA for mobile SSL investigation
