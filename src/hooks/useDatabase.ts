@@ -62,7 +62,7 @@ export function useDatabase() {
       },
       get: async (id: string) => {
         if (isOfflineMode && ps) {
-          return ps.get('SELECT * FROM patients WHERE id = ?', [id]) as unknown as Patient;
+          return await ps.get('SELECT * FROM patients WHERE id = ?', [id]) as unknown as Patient;
         } else {
           const { data } = await supabase.from('patients').select('*').eq('id', id).single();
           return data as Patient;
@@ -74,12 +74,14 @@ export function useDatabase() {
           const now = new Date().toISOString();
           return ps.execute(
             `INSERT INTO patients (
-              id, name, ward_number, age, gender, category, 
+              id, user_id, ward_name, ward_number, name, room_number, age, gender, category, 
+              province, education_level, relative_status, relative_visits,
               past_surgeries, chronic_diseases, psych_drugs, 
               medical_drugs, allergies, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              id, data.name, data.ward_name || data.ward_number, data.age, data.gender, data.category,
+              id, data.user_id, data.ward_name, data.ward_number || data.ward_name, data.name, data.room_number, data.age, data.gender, data.category,
+              data.province, data.education_level, data.relative_status, data.relative_visits,
               JSON.stringify(data.past_surgeries || []), 
               JSON.stringify(data.chronic_diseases || []), 
               JSON.stringify(data.psych_drugs || []), 

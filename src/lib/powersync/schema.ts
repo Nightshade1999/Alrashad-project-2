@@ -1,57 +1,87 @@
-import { Schema, Table, Column, ColumnType } from '@powersync/web';
+import { column, Schema, Table } from '@powersync/web';
 
-export const AppSchema = new Schema([
-  new Table('patients', [
-    new Column('name', ColumnType.Text),
-    new Column('ward_number', ColumnType.Text),
-    new Column('age', ColumnType.Integer),
-    new Column('gender', ColumnType.Text),
-    new Column('category', ColumnType.Text),
-    new Column('past_surgeries', ColumnType.Text),
-    new Column('chronic_diseases', ColumnType.Text),
-    new Column('psych_drugs', ColumnType.Text),
-    new Column('medical_drugs', ColumnType.Text),
-    new Column('allergies', ColumnType.Text),
-    new Column('er_admission_date', ColumnType.Text),
-    new Column('er_admission_doctor', ColumnType.Text),
-    new Column('er_chief_complaint', ColumnType.Text),
-    new Column('er_treatment', ColumnType.Text),
-    new Column('created_at', ColumnType.Text),
-    new Column('updated_at', ColumnType.Text),
-  ]),
-  new Table('visits', [
-    new Column('patient_id', ColumnType.Text),
-    new Column('doctor_id', ColumnType.Text),
-    new Column('visit_date', ColumnType.Text),
-    new Column('exam_notes', ColumnType.Text),
-  ]),
-  new Table('investigations', [
-    new Column('patient_id', ColumnType.Text),
-    new Column('date', ColumnType.Text),
-    new Column('wbc', ColumnType.Real),
-    new Column('hb', ColumnType.Real),
-    new Column('s_urea', ColumnType.Real),
-    new Column('s_creatinine', ColumnType.Real),
-    new Column('ast', ColumnType.Real),
-    new Column('alt', ColumnType.Real),
-    new Column('tsb', ColumnType.Real),
-    new Column('hba1c', ColumnType.Real),
-    new Column('rbs', ColumnType.Real),
-    new Column('is_er', ColumnType.Integer),
-    new Column('doctor_id', ColumnType.Text),
-    new Column('doctor_name', ColumnType.Text),
-  ]),
-  new Table('user_profiles', [
-    new Column('user_id', ColumnType.Text),
-    new Column('ward_name', ColumnType.Text),
-    new Column('offline_mode_enabled', ColumnType.Integer),
-    new Column('is_admin', ColumnType.Integer),
-    new Column('ai_enabled', ColumnType.Integer),
-    new Column('created_at', ColumnType.Text),
-    new Column('updated_at', ColumnType.Text),
-  ]),
-  new Table('system_settings', [
-    new Column('global_offline_enabled', ColumnType.Integer),
-    new Column('updated_at', ColumnType.Text),
-  ])
-]);
+const patients = new Table({
+  user_id: column.text,
+  ward_name: column.text,
+  ward_number: column.text,
+  name: column.text,
+  room_number: column.text,
+  age: column.integer,
+  gender: column.text,
+  category: column.text,
+  province: column.text,
+  education_level: column.text,
+  relative_status: column.text,
+  relative_visits: column.text,
+  past_surgeries: column.text,
+  chronic_diseases: column.text,
+  psych_drugs: column.text,
+  medical_drugs: column.text,
+  allergies: column.text,
+  is_in_er: column.integer,
+  er_admission_date: column.text,
+  er_admission_doctor: column.text,
+  er_chief_complaint: column.text,
+  er_admission_notes: column.text,
+  er_treatment: column.text,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
+const visits = new Table({
+  patient_id: column.text,
+  doctor_id: column.text,
+  visit_date: column.text,
+  exam_notes: column.text,
+  bp_sys: column.integer,
+  bp_dia: column.integer,
+  pr: column.integer,
+  spo2: column.integer,
+  temp: column.real,
+  is_er: column.integer,
+});
+
+const investigations = new Table({
+  visit_id: column.text,
+  patient_id: column.text,
+  date: column.text,
+  wbc: column.real,
+  hb: column.real,
+  s_urea: column.real,
+  s_creatinine: column.real,
+  ast: column.real,
+  alt: column.real,
+  tsb: column.real,
+  hba1c: column.real,
+  rbs: column.real,
+  is_er: column.integer,
+  doctor_id: column.text,
+  doctor_name: column.text,
+});
+
+const user_profiles = new Table({
+  user_id: column.text,
+  ward_name: column.text,
+  doctor_name: column.text,
+  role: column.text,
+  specialty: column.text,
+  ai_enabled: column.integer,
+  offline_mode_enabled: column.integer,
+  is_admin: column.integer,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
+const system_settings = new Table({
+  global_offline_enabled: column.integer,
+  see_all_patients: column.integer,
+  updated_at: column.text,
+});
+
+export const AppSchema = new Schema({
+  patients,
+  visits,
+  investigations,
+  user_profiles,
+  system_settings
+});
