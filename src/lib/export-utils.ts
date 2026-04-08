@@ -748,8 +748,16 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
   <link href="${GFONT}" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter','Noto Sans Arabic',sans-serif;font-size:.82rem;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .page{width:210mm;min-height:297mm;margin:0 auto;padding:14mm 14mm 10mm;display:flex;flex-direction:column;gap:10px}
+    body{font-family:'Inter','Noto Sans Arabic',sans-serif;font-size:.82rem;color:#1e293b;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:60px}
+    #print-controls{position:fixed;top:0;left:0;right:0;height:60px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;gap:20px;z-index:9999;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1)}
+    .btn{padding:10px 20px;border-radius:12px;font-weight:700;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.05em;border:none}
+    .btn-print{background:#0D9488;color:#fff}
+    .btn-print:hover{background:#0F766E;transform:translateY(-1px)}
+    .btn-pdf{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
+    .btn-pdf:hover{background:#e2e8f0;color:#1e293b}
+    #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:12px 24px;border-radius:12px;font-size:.8rem;font-weight:600;display:none;z-index:10000;box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1);animation:slideUp 0.3s ease-out}
+    @keyframes slideUp{from{transform:translate(-50%, 100%)}to{transform:translate(-50%, 0)}}
+    .page{width:210mm;min-height:297mm;margin:20px auto;padding:14mm 14mm 10mm;display:flex;flex-direction:column;gap:10px;background:#fff;box-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)}
     .header-bar{border-bottom:3px solid #0D9488;padding-bottom:8px;margin-bottom:4px}
     .doctor-name{font-size:.75rem;font-weight:900}
     .report-title{font-size:1.1rem;font-weight:900;text-align:center;color:#1E293B;margin:4px 0;letter-spacing:.04em}
@@ -770,16 +778,42 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     .footer{margin-top:auto;padding-top:8px;border-top:1px solid #e2e8f0;font-size:.65rem;color:#94a3b8;text-align:center}
     [dir="rtl"],[dir="auto"]{font-family:'Noto Sans Arabic','Inter',sans-serif}
     @media print{
-      body{background:#fff}
-      .page{width:100%;padding:10mm;margin:0;page-break-after:always}
+      body{background:#fff;padding-top:0}
+      #print-controls, #toast{display:none !important}
+      .page{width:100%;padding:10mm;margin:0;page-break-after:always;box-shadow:none}
       .page:last-child{page-break-after:avoid}
     }
   </style>
 </head>
 <body>
-  ${patientPages}
+  <div id="print-controls">
+    <button class="btn btn-print" onclick="window.print()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V2h8v5M4 14H2V7h12v7h-2M12 11H4v5h8v-5z"/></svg>
+      Print Records
+    </button>
+    <button class="btn btn-pdf" onclick="saveAsPdf()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v4H4v-4M8 2v10m-3-3l3 3 3-3"/></svg>
+      Save as PDF
+    </button>
+  </div>
+  <div id="toast">Tip: Choose "Save as PDF" as the Destination in the print dialog.</div>
+  
+  <div id="content">
+    ${patientPages}
+  </div>
+
   <script>
-    document.fonts.ready.then(function(){ setTimeout(function(){ window.print(); }, 500); });
+    function saveAsPdf() {
+      const toast = document.getElementById('toast');
+      toast.style.display = 'block';
+      setTimeout(() => { window.print(); }, 100);
+      setTimeout(() => { toast.style.display = 'none'; }, 5000);
+    }
+    
+    // Auto-trigger print but leave controls visible if user cancels
+    document.fonts.ready.then(function(){ 
+       setTimeout(function(){ window.print(); }, 800); 
+    });
   </script>
 </body>
 </html>`;
