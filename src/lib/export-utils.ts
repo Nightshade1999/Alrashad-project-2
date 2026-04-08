@@ -751,6 +751,8 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     body{font-family:'Inter','Noto Sans Arabic',sans-serif;font-size:.82rem;color:#1e293b;background:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact;padding-top:60px}
     #print-controls{position:fixed;top:0;left:0;right:0;height:60px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;gap:20px;z-index:9999;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1)}
     .btn{padding:10px 20px;border-radius:12px;font-weight:700;font-size:.85rem;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.05em;border:none}
+    .btn-back{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
+    .btn-back:hover{background:#e2e8f0;transform:translateY(-1px)}
     .btn-print{background:#0D9488;color:#fff}
     .btn-print:hover{background:#0F766E;transform:translateY(-1px)}
     .btn-pdf{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
@@ -787,13 +789,18 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
 </head>
 <body>
   <div id="print-controls">
+    <button class="btn btn-back" onclick="window.close()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back to App
+    </button>
+    <div style="width:1px;height:28px;background:#e2e8f0;margin:0 8px"></div>
     <button class="btn btn-print" onclick="window.print()">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V2h8v5M4 14H2V7h12v7h-2M12 11H4v5h8v-5z"/></svg>
-      Print Records
+      Print
     </button>
     <button class="btn btn-pdf" onclick="saveAsPdf()">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v4H4v-4M8 2v10m-3-3l3 3 3-3"/></svg>
-      Save as PDF
+      Download as PDF
     </button>
   </div>
   <div id="toast">Tip: Choose "Save as PDF" as the Destination in the print dialog.</div>

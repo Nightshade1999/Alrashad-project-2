@@ -86,13 +86,10 @@ export function UserSettingsModal() {
                         <p className="text-sm font-black text-slate-800 dark:text-slate-100 italic leading-none">Dr. {name}</p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
                            <span className={`h-1.5 w-1.5 rounded-full ${gender === 'Male' ? 'bg-blue-400' : 'bg-rose-400'}`} />
-                           {gender} Identity
+                           {gender}
                         </p>
                      </div>
                   </div>
-                  <p className="text-[9px] font-bold text-slate-400 italic mt-2 ml-1 leading-relaxed">
-                    * Identity and gender for the current session are set during sign-in.
-                  </p>
                 </div>
               </div>
 

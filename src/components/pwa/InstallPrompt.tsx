@@ -53,18 +53,22 @@ export function InstallPrompt() {
       return
     }
 
-    // Detect platform
+    // Detect platform — MOBILE ONLY
     const ua = navigator.userAgent
     const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream
     const isAndroid = /Android/.test(ua)
-    if (isIOS) setPlatform('ios')
-    else if (isAndroid || 'BeforeInstallPromptEvent' in window) setPlatform('android')
+    const isMobile = isIOS || isAndroid
+    
+    // Don't show on desktop at all
+    if (!isMobile) return
 
-    // Android / Chrome — wait for browser prompt, then decide
+    if (isIOS) setPlatform('ios')
+    else setPlatform('android')
+
+    // Android / Chrome — wait for browser prompt
     const handler = (e: any) => {
       e.preventDefault()
       setDeferredPrompt(e)
-      // Delay showing so the page has settled
       setTimeout(maybeShowPrompt, 3000)
     }
     window.addEventListener('beforeinstallprompt', handler)

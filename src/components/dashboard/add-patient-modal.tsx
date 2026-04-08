@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,6 +55,7 @@ export function AddPatientModal() {
   const [category, setCategory] = useState<PatientCategory>("Normal")
   const [province, setProvince] = useState("")
   const [educationLevel, setEducationLevel] = useState("")
+  const router = useRouter()
   const { isOfflineMode, patients: dbPatients } = useDatabase()
   
   // Relatives State
@@ -131,9 +133,9 @@ export function AddPatientModal() {
       if (isOfflineMode) {
         await dbPatients.insert({
           ...payload,
-          ward_number: payload.ward_name // Mapping naming difference in SQLite schema if any
+          ward_number: payload.ward_name
         })
-        toast.success("Patient saved locally — syncing...")
+        toast.success("Patient saved successfully!")
       } else {
         const { error } = await (supabase.from('patients') as any).insert([payload])
         if (error) throw error
@@ -141,6 +143,7 @@ export function AddPatientModal() {
       }
       setOpen(false)
       resetForm()
+      router.refresh()
     } catch (error) {
       console.error(error)
       toast.error("Failed to add patient")

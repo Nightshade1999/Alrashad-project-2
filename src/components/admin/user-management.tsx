@@ -21,7 +21,6 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   const [gender, setGender] = useState<'Male' | 'Female' | ''>('')
   const [aiEnabled, setAiEnabled] = useState(true)
   const [offlineModeEnabled, setOfflineModeEnabled] = useState(false)
-  const [canSeeWardPatients, setCanSeeWardPatients] = useState(false)
   const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [wardSearch, setWardSearch] = useState('')
@@ -42,7 +41,6 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setGender(user.gender || '')
       setAiEnabled(user.ai_enabled ?? true)
       setOfflineModeEnabled(user.offline_mode_enabled ?? false)
-      setCanSeeWardPatients(user.can_see_ward_patients ?? false)
       setAccessibleWards(user.accessible_wards || (user.ward_name ? [user.ward_name] : []))
     } else {
       setEmail('')
@@ -53,7 +51,6 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setGender('')
       setAiEnabled(true)
       setOfflineModeEnabled(false)
-      setCanSeeWardPatients(false)
       setAccessibleWards([])
     }
     setWardSearch('')
@@ -81,7 +78,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     formData.append('specialty', specialty)
     formData.append('ai_enabled', String(aiEnabled))
     formData.append('offline_mode_enabled', String(offlineModeEnabled))
-    formData.append('can_see_ward_patients', String(canSeeWardPatients))
+    formData.append('can_see_ward_patients', 'false')
     if (gender) formData.append('gender', gender)
     formData.append('accessible_wards', JSON.stringify(updatedWards))
     formData.append('ward_name', primaryWard)
@@ -99,7 +96,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     const updatedWards = accessibleWards
     const primaryWard = updatedWards[0] || 'Unassigned'
 
-    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, canSeeWardPatients, gender || null, updatedWards)
+    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, false, gender || null, updatedWards)
     setIsRefreshing(false)
     if (res?.error) alert(res.error)
     else closeModal()
@@ -403,21 +400,6 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={canSeeWardPatients}
-                        onChange={e => setCanSeeWardPatients(e.target.checked)}
-                        className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold flex items-center gap-2">
-                          <ArrowRightLeft className="h-4 w-4 text-teal-500" />
-                          Ward Collaboration
-                        </p>
-                        <p className="text-[11px] text-slate-500">Allow doctor to see all patients in their assigned ward</p>
-                      </div>
-                    </label>
                   </div>
 
                   <div className="pt-4 flex justify-end">

@@ -1,13 +1,13 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+"use client"
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
-import { AlertCircle, Clock, Activity, CalendarClock } from 'lucide-react'
+import { AlertCircle, Clock, Activity, CalendarClock, Loader2, RefreshCw } from 'lucide-react'
 import { ExportButton } from '@/components/dashboard/export-button'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
-
-export const dynamic = 'force-dynamic'
+import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 
 const CATEGORIES = [
   {
@@ -65,49 +65,131 @@ const CATEGORIES = [
   },
 ]
 
-export default async function MyWardPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
+interface PatientSummary {
+  id: string
+  name: string
+  room_number: string | null
+  category: string
+  is_in_er: boolean
+}
 
-  const { data: authData } = await supabase.auth.getUser()
-  const user = authData?.user
-
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('user_id', user?.id)
-    .maybeSingle()
-    
-  // REDIRECT IF NO WARD SELECTED:
-  if (!profile?.ward_name) {
-    redirect('/dashboard/select-ward')
-  }
-    
-  const { data: patients } = await supabase
+async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
+  const supabase = createClient()
+  const { data } = await supabase
     .from('patients')
     .select('id, name, room_number, category, is_in_er')
-    .eq('ward_name', profile?.ward_name || '')
+    .eq('ward_name', wardName)
+  return (data as PatientSummary[]) || []
+}
+
+async function fetchPatientsOffline(ps: any, wardName: string): Promise<PatientSummary[]> {
+  try {
+    return await ps.getAll(
+      `SELECT id, name, room_number, category, is_in_er FROM patients WHERE ward_name = ?`,
+      [wardName]
+    ) as PatientSummary[]
+  } catch {
+    return []
+  }
+}
+
+export default function MyWardPage() {
+  const ps = usePowerSync()
+  const [wardName, setWardName] = useState<string | null>(null)
+  const [patients, setPatients] = useState<PatientSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setError('Not authenticated'); setLoading(false); return }
+
+        let profile: any = null
+
+        if (navigator.onLine) {
+          const { data } = await supabase
+            .from('user_profiles')
+            .select('ward_name')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          profile = data
+        } else if (ps) {
+          profile = await ps.get('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id])
+        }
+
+        if (!profile?.ward_name) {
+          window.location.href = '/dashboard/select-ward'
+          return
+        }
+
+        setWardName(profile.ward_name)
+
+        let pts: PatientSummary[] = []
+        if (navigator.onLine) {
+          pts = await fetchPatientsOnline(profile.ward_name)
+        } else if (ps) {
+          pts = await fetchPatientsOffline(ps, profile.ward_name)
+        }
+        setPatients(pts)
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load ward data')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [ps])
 
   const counts = {
-    'High Risk': patients?.filter(p => p.category === 'High Risk' && !p.is_in_er).length ?? 0,
-    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length ?? 0,
-    'Normal': patients?.filter(p => p.category === 'Normal' && !p.is_in_er).length ?? 0,
-    'ER Patients': patients?.filter(p => p.is_in_er).length ?? 0,
-    'Deceased/Archive': patients?.filter(p => p.category === 'Deceased/Archive').length ?? 0,
-    total: patients?.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length ?? 0,
+    'High Risk': patients.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
+    'Close Follow-up': patients.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
+    'Normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
+    'ER Patients': patients.filter(p => p.is_in_er).length,
+    'Deceased/Archive': patients.filter(p => p.category === 'Deceased/Archive').length,
+    total: patients.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length,
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-in fade-in duration-500">
+        <div className="relative">
+          <div className="h-20 w-20 rounded-full border-t-4 border-r-4 border-teal-500 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Activity className="h-8 w-8 text-teal-500" />
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-black text-slate-700 dark:text-slate-200 uppercase tracking-widest">Loading Ward</p>
+          <p className="text-sm text-slate-400 mt-1">Fetching patient records...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertCircle className="h-12 w-12 text-rose-500" />
+        <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{error}</p>
+        <button onClick={() => window.location.reload()} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl font-bold">
+          <RefreshCw className="h-4 w-4" /> Retry
+        </button>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-300">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-            My Ward ({profile?.ward_name})
+            My Ward {wardName && <span className="text-slate-400 font-medium">({wardName})</span>}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted
@@ -127,15 +209,18 @@ export default async function MyWardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        {CATEGORIES.map((cat) => {
+        {CATEGORIES.map((cat, index) => {
           const Icon = cat.icon
           const count = counts[cat.dbValue as keyof typeof counts] as number
           return (
             <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`}>
-              <div className={`group relative rounded-2xl border ${cat.border} ${cat.lightBg} p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:translate-y-0 overflow-hidden`}>
+              <div
+                className={`group relative rounded-2xl border ${cat.border} ${cat.lightBg} p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 active:translate-y-0 overflow-hidden animate-in fade-in slide-in-from-bottom-2`}
+                style={{ animationDelay: `${index * 60}ms` }}
+              >
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cat.gradient}`} />
                 <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
+                  <div className={`p-2.5 rounded-xl ${cat.iconBg} group-hover:scale-110 transition-transform duration-300`}>
                     <Icon className={`h-5 w-5 ${cat.iconColor}`} />
                   </div>
                   <span className="text-2xl">{cat.dot}</span>
@@ -159,7 +244,7 @@ export default async function MyWardPage() {
 
       {/* Archive / Deceased Section */}
       <Link href="/dashboard/category/archive">
-        <div className="group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-6 cursor-pointer transition-all hover:shadow-md">
+        <div className="group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-6 cursor-pointer transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: '260ms' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-slate-200 dark:bg-slate-800/80">
@@ -187,7 +272,7 @@ export default async function MyWardPage() {
       
       {/* ── ER Patients Section ── */}
       <Link href="/dashboard/er">
-        <div className="group relative rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-6 cursor-pointer transition-all hover:shadow-md mt-5">
+        <div className="group relative rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-6 cursor-pointer transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: '310ms' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-rose-100 dark:bg-rose-900/60">
@@ -199,7 +284,7 @@ export default async function MyWardPage() {
                   <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">ER Patients</h3>
                 </div>
                 <p className="text-sm text-slate-500 mt-1">
-                  Patients from {profile?.ward_name || 'your ward'} currently receiving emergency care.
+                  Patients from {wardName || 'your ward'} currently receiving emergency care.
                 </p>
               </div>
             </div>

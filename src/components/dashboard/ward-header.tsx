@@ -73,59 +73,56 @@ export function WardHeader() {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50 uppercase">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50 italic"
+          style={{ fontFamily: "var(--font-playfair, 'Playfair Display', Georgia, serif)" }}
+        >
           Dr. {doctorName}
         </h1>
       </div>
 
-      {/* Ward Switcher / Display */}
-      <div className="relative mt-0.5" ref={switcherRef}>
-        <div 
-          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-transparent transition-all ${
-            accessibleWards.length > 1 
-              ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-900/50' 
-              : 'bg-transparent'
-          }`}
-          onClick={accessibleWards.length > 1 ? () => setShowSwitcher(!showSwitcher) : (wardName === DEFAULT_WARD_NAME || !wardName) ? () => window.location.href = '/dashboard/select-ward' : undefined}
-        >
-          <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${(!wardName || wardName === DEFAULT_WARD_NAME) ? 'text-amber-600 animate-pulse' : 'text-slate-500'}`}>
-            {(!wardName || wardName === DEFAULT_WARD_NAME) ? 'Select Workstation' : wardName}
-          </span>
-          {accessibleWards.length > 1 && (
+      {/* Ward Switcher — only if multi-ward access */}
+      {accessibleWards.length > 1 && (
+        <div className="relative mt-0.5" ref={switcherRef}>
+          <div 
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg border border-transparent cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-900/50 transition-all"
+            onClick={() => setShowSwitcher(!showSwitcher)}
+          >
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
+              {wardName || 'Select Ward'}
+            </span>
             <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-300 ${showSwitcher ? 'rotate-180' : ''}`} />
-          )}
-        </div>
-
-      {/* Switcher Dropdown */}
-      {showSwitcher && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-2 animate-in fade-in slide-in-from-top-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 p-2 border-b border-slate-100 dark:border-slate-800 mb-2">Switch Active Ward</p>
-          <div className="space-y-1">
-            {accessibleWards.map((w: string) => (
-              <button
-                key={w}
-                disabled={isSyncing}
-                onClick={() => handleWardSwitch(w)}
-                className={`w-full text-left px-3 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
-                  w === wardName 
-                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {w}
-                {w === wardName && <Check className="h-4 w-4" />}
-                {isSyncing && w !== wardName && <RefreshCw className="h-3 w-3 animate-spin opacity-0" />}
-              </button>
-            ))}
           </div>
-          {isSyncing && (
-            <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-2xl flex items-center justify-center backdrop-blur-[1px]">
-              <RefreshCw className="h-6 w-6 text-indigo-600 animate-spin" />
+
+          {/* Switcher Dropdown */}
+          {showSwitcher && (
+            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[100] p-2 animate-in fade-in slide-in-from-top-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 p-2 border-b border-slate-100 dark:border-slate-800 mb-2">Switch Active Ward</p>
+              <div className="space-y-1">
+                {accessibleWards.map((w: string) => (
+                  <button
+                    key={w}
+                    disabled={isSyncing}
+                    onClick={() => handleWardSwitch(w)}
+                    className={`w-full text-left px-3 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-between ${
+                      w === wardName 
+                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {w}
+                    {w === wardName && <Check className="h-4 w-4" />}
+                  </button>
+                ))}
+              </div>
+              {isSyncing && (
+                <div className="absolute inset-0 bg-white/50 dark:bg-black/50 rounded-2xl flex items-center justify-center backdrop-blur-[1px]">
+                  <RefreshCw className="h-6 w-6 text-indigo-600 animate-spin" />
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
-      </div>
     </div>
   )
 }

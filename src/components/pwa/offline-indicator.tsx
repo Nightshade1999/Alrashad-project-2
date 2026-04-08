@@ -66,31 +66,43 @@ export function OfflineIndicator() {
   if (!ps) return null;
 
   // --- 1. FULL SCREEN INITIAL SYNC OVERLAY ---
-  // If the device has NEVER successfully synced clinical data, block the UI
-  if (!status.hasSynced && status.connected) {
+  // Block UI until device has successfully synced at least once
+  if (!status.hasSynced) {
+    const isWaitingOffline = !status.connected;
     return (
       <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
         <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-indigo-500/10 opacity-50" />
         
         <div className="relative">
-          <div className="h-32 w-32 rounded-full border-t-4 border-r-4 border-teal-500 animate-spin mb-8" />
+          <div className={`h-32 w-32 rounded-full border-t-4 border-r-4 ${isWaitingOffline ? 'border-amber-500' : 'border-teal-500'} animate-spin mb-8`} />
           <div className="absolute inset-0 flex items-center justify-center">
-             <Database className="h-12 w-12 text-teal-400" />
+             <Database className={`h-12 w-12 ${isWaitingOffline ? 'text-amber-400' : 'text-teal-400'}`} />
           </div>
         </div>
 
-        <h2 className="text-3xl font-black text-white tracking-tight mb-4">Initial Clinical Sync</h2>
-        <p className="text-slate-400 max-w-sm mb-8 font-medium">
-          Downloading ward database for full offline availability. This ensures your patient records are ready even without signal.
-        </p>
+        {isWaitingOffline ? (
+          <>
+            <h2 className="text-3xl font-black text-white tracking-tight mb-4">Waiting for Connection</h2>
+            <p className="text-slate-400 max-w-sm mb-8 font-medium">
+              This is your first time opening the app. A network connection is needed to download the ward database before offline mode can work.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-3xl font-black text-white tracking-tight mb-4">Initial Clinical Sync</h2>
+            <p className="text-slate-400 max-w-sm mb-8 font-medium">
+              Downloading ward database for full offline availability. This ensures your patient records are ready even without signal.
+            </p>
+          </>
+        )}
 
         <div className="w-full max-w-xs h-2 bg-slate-800 rounded-full overflow-hidden mb-4">
-           <div className="h-full bg-teal-500 animate-pulse w-full" />
+           <div className={`h-full ${isWaitingOffline ? 'bg-amber-500' : 'bg-teal-500'} animate-pulse w-full`} />
         </div>
         
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-teal-500">
-           <RefreshCw className="h-3 w-3 animate-spin" />
-           Syncing Patient Stream
+        <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] ${isWaitingOffline ? 'text-amber-500' : 'text-teal-500'}`}>
+           <RefreshCw className={`h-3 w-3 ${isWaitingOffline ? '' : 'animate-spin'}`} />
+           {isWaitingOffline ? 'Awaiting Network...' : 'Syncing Patient Stream'}
         </div>
       </div>
     )

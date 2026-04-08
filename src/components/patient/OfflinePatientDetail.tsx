@@ -26,6 +26,11 @@ export function OfflinePatientDetail({
   const [invList, setInvList] = useState<Investigation[]>(initialInvestigations);
   const [loading, setLoading] = useState(false);
 
+  // Scroll to top when patient detail opens — prevents page starting at the bottom
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [initialPatient.id])
+
   useEffect(() => {
     if (!isOfflineMode) return;
 
