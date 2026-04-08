@@ -50,7 +50,7 @@ export default function SelectWardPage() {
         if (isAdmin) {
           if (navigator.onLine) {
             const { data: allWards } = await supabase.from('ward_settings').select('ward_name')
-            if (allWards) wards = allWards.map(w => w.ward_name)
+            if (allWards) wards = (allWards as any[]).map(w => w.ward_name)
           } else if (ps) {
             const allWards = await ps.getAll('SELECT ward_name FROM ward_settings')
             wards = allWards.map((w: any) => w.ward_name)

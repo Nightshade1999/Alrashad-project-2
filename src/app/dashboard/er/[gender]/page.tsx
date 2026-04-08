@@ -33,11 +33,11 @@ export default function GenderErPage({ params }: { params: Promise<{ gender: str
           const { data: wards } = await supabase
             .from('ward_settings')
             .select('ward_name')
-            .eq('gender', gender)
-          validWards = wards?.map(w => w.ward_name) || []
+            .eq('gender', gender as string)
+          validWards = (wards as any[])?.map(w => w.ward_name) || []
         } else if (ps) {
-          const wards = await ps.getAll('SELECT ward_name FROM ward_settings WHERE gender = ?', [gender])
-          validWards = wards.map((w: any) => w.ward_name)
+          const wards = await ps.getAll('SELECT ward_name FROM ward_settings WHERE gender = ?', [gender as string])
+          validWards = (wards as any[]).map((w: any) => w.ward_name)
         }
 
         // 2. Fetch patients
