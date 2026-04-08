@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { UserPlus, KeyRound, Edit, Trash2, ArrowRightLeft, User, X, Sparkles, Search, ChevronDown, Plus, Check as CheckIcon, Activity } from 'lucide-react'
 import { createUserAction, deleteUserAction, updateUserPasswordAction, migratePatientsAction, updateUserDetailsAction } from '@/app/actions/admin-actions'
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function UserManagement({ users, wardNames }: { users: any[], wardNames: string[] }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -249,6 +250,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
 
       {/* ===== OVERLAYS / MODALS ===== */}
       {activeModal && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
@@ -454,6 +456,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )

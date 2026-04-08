@@ -5,6 +5,7 @@ import { Sparkles, Copy, ExternalLink, Check, BrainCircuit, MessageSquare, Termi
 import { Button } from "@/components/ui/button"
 import { AI_TEMPLATES, buildAIPrompt, AIPromptTemplate } from "@/lib/prompt-utils"
 import { toast } from "sonner"
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 interface ShareAIPromptModalProps {
   patient: any
@@ -65,6 +66,7 @@ export function ShareAIPromptModal({ patient }: ShareAIPromptModalProps) {
       </Button>
 
       {isOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header */}
@@ -171,6 +173,7 @@ export function ShareAIPromptModal({ patient }: ShareAIPromptModalProps) {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   )

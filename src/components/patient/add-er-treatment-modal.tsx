@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { DrugListInput } from "@/components/dashboard/medical-inputs"
 import { MedicalDrugParams } from "@/types/database.types"
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function AddErTreatmentModal({ 
   patientId, 
@@ -67,6 +68,7 @@ export function AddErTreatmentModal({
   }
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
       <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl flex flex-col max-h-[90dvh] animate-scale-in">
@@ -103,5 +105,6 @@ export function AddErTreatmentModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

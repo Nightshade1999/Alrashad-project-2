@@ -21,6 +21,7 @@ import {
   addVisitAction, 
   addInvestigationAction 
 } from "@/app/actions/patient-actions"
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId: string, isEr: boolean, disabled?: boolean }) {
   const [open, setOpen] = useState(false)
@@ -169,6 +170,7 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
       </Button>
 
       {open && (
+         <ModalPortal>
          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
            
@@ -278,6 +280,7 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
              </form>
            </div>
          </div>
+         </ModalPortal>
       )}
     </>
   )

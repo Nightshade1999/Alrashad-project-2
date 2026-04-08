@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function ReferralModal({ patientId, isReferred, referralHospital, referralDate }: { 
   patientId: string
@@ -107,6 +108,7 @@ export function ReferralModal({ patientId, isReferred, referralHospital, referra
       </Button>
 
       {open && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
 
@@ -164,6 +166,7 @@ export function ReferralModal({ patientId, isReferred, referralHospital, referra
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   )

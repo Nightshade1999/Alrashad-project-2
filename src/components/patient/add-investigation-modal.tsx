@@ -11,6 +11,7 @@ import { convertArabicNumbers } from '@/lib/utils'
 import { addInvestigationAction } from '@/app/actions/patient-actions'
 import { useDatabase } from '@/hooks/useDatabase'
 import { createClient } from '@/lib/supabase'
+import { ModalPortal } from '@/components/ui/modal-portal'
 
 const LAB_FIELDS = [
   { key: 'wbc',          label: 'WBC',       placeholder: 'e.g. 8.5' },
@@ -122,6 +123,7 @@ export function AddInvestigationModal({
   }
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
@@ -229,5 +231,6 @@ export function AddInvestigationModal({
         </form>
       </div>
     </div>
+    </ModalPortal>
   )
 }
