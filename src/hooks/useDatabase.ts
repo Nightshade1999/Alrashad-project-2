@@ -57,7 +57,7 @@ export function useDatabase() {
     patients: {
       list: async (wardName?: string) => {
         if (isOfflineMode && ps) {
-          let query = 'SELECT * FROM patients WHERE category != "Deceased/Archive"';
+      let query = `SELECT * FROM patients WHERE category != 'Deceased/Archive'`;
           if (wardName) query += ` AND ward_name = '${wardName}'`;
           return ps.getAll(query);
         } else {

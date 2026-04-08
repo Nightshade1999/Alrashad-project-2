@@ -130,23 +130,29 @@ export function AddPatientModal() {
     }
 
     try {
-      if (isOfflineMode) {
+      // Only use local PowerSync path when truly offline.
+      // When online, always insert directly into Supabase so the data is
+      // immediately visible on page reload (PowerSync syncs bidirectionally anyway).
+      if (isOfflineMode && !navigator.onLine) {
         await dbPatients.insert({
           ...payload,
           ward_number: payload.ward_name
         })
-        toast.success("Patient saved successfully!")
+        toast.success("Patient saved to local device!")
       } else {
-        const { error } = await (supabase.from('patients') as any).insert([payload])
+        const { data: inserted, error } = await (supabase.from('patients') as any).insert([payload]).select()
         if (error) throw error
+        if (!inserted || inserted.length === 0) {
+          throw new Error("Insert was blocked — check Supabase RLS policies for this user's ward.")
+        }
         toast.success("Patient added successfully!")
       }
       setOpen(false)
       resetForm()
-      router.refresh()
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to add patient")
+      window.location.reload()
+    } catch (error: any) {
+      console.error("Add patient failed:", error)
+      toast.error(error?.message || "Failed to add patient")
     } finally {
       setIsSubmitting(false)
     }

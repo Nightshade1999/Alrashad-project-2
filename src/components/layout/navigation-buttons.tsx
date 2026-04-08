@@ -1,12 +1,14 @@
 "use client"
 
 import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase'
 
 // Maps route patterns to their logical parent (not history-based)
-function getParentRoute(pathname: string): string | null {
+function getParentRoute(pathname: string, isMultiWard: boolean): string | null {
   // Patient sub-pages → patient detail
   if (/^\/patient\/[^/]+\/(visits|investigations|er)$/.test(pathname)) {
     const patientId = pathname.split('/')[2]
@@ -28,6 +30,10 @@ function getParentRoute(pathname: string): string | null {
   if (pathname === '/dashboard/er') {
     return '/dashboard/my-ward'
   }
+  // My ward → select-ward (only for multi-ward users)
+  if (pathname === '/dashboard/my-ward') {
+    return isMultiWard ? '/dashboard/select-ward' : null
+  }
   // Select ward → dashboard
   if (pathname === '/dashboard/select-ward') {
     return '/dashboard'
@@ -46,9 +52,27 @@ function getParentRoute(pathname: string): string | null {
 export function NavigationButtons() {
   const router = useRouter()
   const pathname = usePathname()
+  const [isMultiWard, setIsMultiWard] = useState(false)
+
+  useEffect(() => {
+    // Only fetch if on my-ward to avoid unnecessary requests on every page
+    if (pathname !== '/dashboard/my-ward') return
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      ;(supabase.from('user_profiles') as any)
+        .select('accessible_wards')
+        .eq('user_id', user.id)
+        .single()
+        .then(({ data }: any) => {
+          const wards = data?.accessible_wards
+          setIsMultiWard(Array.isArray(wards) && wards.length > 1)
+        })
+    })
+  }, [pathname])
 
   const isDashboard = pathname === '/dashboard'
-  const parentRoute = getParentRoute(pathname)
+  const parentRoute = getParentRoute(pathname, isMultiWard)
 
   if (isDashboard) return null
 

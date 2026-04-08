@@ -112,7 +112,7 @@ export function OfflineDashboard() {
         </Link>
 
         {/* Normal Ward Card */}
-        <Link href="/dashboard/select-ward">
+        <Link href={(!isAdmin && (profile?.accessible_wards?.length ?? 0) <= 1) ? '/dashboard/my-ward' : '/dashboard/select-ward'}>
           <div className="group relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full">
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
               <LayoutDashboard className="h-32 w-32 text-emerald-500" />

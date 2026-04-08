@@ -60,11 +60,17 @@ export default function SelectWardPage() {
         setProfile(activeProfile)
         setAccessibleWards(wards)
 
-        // Auto-select logic
-        if (wards.length === 1 && activeProfile?.ward_name !== wards[0]) {
-          handleSelectWard(wards[0])
-        } else if (wards.length === 1 && activeProfile?.ward_name === wards[0]) {
+        // Auto-select logic: single ward users skip selection entirely
+        if (wards.length === 1) {
+          const activeWard = wards[0]
+          if (activeProfile?.ward_name !== activeWard) {
+            // Ward mismatch — sync silently then navigate
+            if (navigator.onLine) {
+              await syncProfileWardAction(activeWard)
+            }
+          }
           router.push('/dashboard/my-ward')
+          return
         }
 
       } catch (err) {

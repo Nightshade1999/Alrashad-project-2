@@ -1,937 +1,949 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { 
-  BrainCircuit, Database, FileText, Loader2, ArrowRight, Table, 
-  Sigma, Info, AlertCircle, CheckCircle2, FlaskConical, Calendar, 
-  Search, Filter, Sparkles, Activity, Divide, Users, LucideIcon, Download,
-  TrendingUp, TrendingDown, Trash2, X
+import {
+  BrainCircuit, Loader2, FileText, Sigma, AlertCircle, FlaskConical,
+  Search, Sparkles, Activity, Users, Download, TrendingUp, TrendingDown,
+  HeartPulse, Stethoscope, BarChart3, ArrowRight, CheckCircle2, Info,
+  Table, X, ChevronRight, Zap, Eye, RefreshCw
 } from 'lucide-react'
 import { exportResearchToWord, exportResearchToExcel } from '@/lib/export-utils'
 import ReactMarkdown from 'react-markdown'
-import { 
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell, LineChart, Line,
-  AreaChart, Area, PieChart, Pie
+  AreaChart, Area, PieChart, Pie, RadarChart, Radar, PolarGrid, PolarAngleAxis
 } from 'recharts'
 import { runComplexAIStudyAction } from '@/app/actions/research-actions'
-import { COMMON_DISEASES, ALL_SURGERIES } from '@/lib/medical-dictionary'
+import { useVariableDiscovery } from '@/hooks/use-variable-discovery'
 
-import { useVariableDiscovery, type Variable, type Measure } from '@/hooks/use-variable-discovery'
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  'Demographics': Users,
-  'Clinical Status': Activity,
-  'Social': Users,
-  'Scale Counts': Sigma,
-  'Temporal': Calendar,
-  'Outcome': FileText,
-  'Chronic Diseases': Activity,
-  'Medical Drugs': FlaskConical,
-  'Psych Drugs': BrainCircuit,
-  'Laboratory': Database,
-  'Facilities': Table
+// ─────────────────────────────────────────────────────────────
+// COLOUR PALETTE
+// ─────────────────────────────────────────────────────────────
+const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+const CATEGORY_COLOURS: Record<string, string> = {
+  'High Risk': '#ef4444',
+  'Close Follow-up': '#f59e0b',
+  'Normal': '#10b981',
+  'Deceased/Archive': '#6b7280',
 }
 
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+function parseArr(field: any): any[] {
+  if (Array.isArray(field)) return field
+  if (typeof field === 'string') { try { const p = JSON.parse(field); return Array.isArray(p) ? p : [] } catch { return [] } }
+  return []
+}
+
+// Client-side Chi-Square (simplified, works great for n > 100)
+function chiSquare(tableData: Record<string, Record<string, number>>) {
+  const rows = Object.keys(tableData)
+  const cols = Array.from(new Set(rows.flatMap(r => Object.keys(tableData[r]))))
+  const rowTotals = rows.map(r => cols.reduce((s, c) => s + (tableData[r][c] || 0), 0))
+  const colTotals = cols.map(c => rows.reduce((s, r) => s + (tableData[r][c] || 0), 0))
+  const total = rowTotals.reduce((a, b) => a + b, 0)
+  if (total === 0) return null
+
+  let chi2 = 0
+  rows.forEach((r, ri) => {
+    cols.forEach((c, ci) => {
+      const observed = tableData[r][c] || 0
+      const expected = (rowTotals[ri] * colTotals[ci]) / total
+      if (expected > 0) chi2 += Math.pow(observed - expected, 2) / expected
+    })
+  })
+  const df = (rows.length - 1) * (cols.length - 1)
+  // approximate p-value (good enough for dashboards)
+  const p = df > 0 ? Math.exp(-0.717 * chi2 - 0.416 * chi2 * chi2 / df) : 1
+  return { chi2: chi2.toFixed(3), df, p: Math.min(p, 1).toFixed(4), significant: p < 0.05 }
+}
+
+// Cross-tabulate two categorical series from patients array
+function crossTab(patients: any[], getX: (p: any) => string | null, getY: (p: any) => string | null) {
+  const table: Record<string, Record<string, number>> = {}
+  patients.forEach(p => {
+    const x = getX(p); const y = getY(p)
+    if (!x || !y) return
+    if (!table[x]) table[x] = {}
+    table[x][y] = (table[x][y] || 0) + 1
+  })
+  return table
+}
+
+// ─────────────────────────────────────────────────────────────
+// QUICK INSIGHT CARD
+// ─────────────────────────────────────────────────────────────
+function InsightCard({ title, value, sub, color, icon: Icon, trend }: {
+  title: string; value: string | number; sub: string; color: string; icon: any; trend?: 'up' | 'down' | 'neutral'
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 transition-all hover:-translate-y-0.5 hover:shadow-xl ${color}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="p-2 rounded-xl bg-white/10 backdrop-blur-sm">
+          <Icon className="h-5 w-5 text-white" />
+        </div>
+        {trend && (
+          <div className="flex items-center gap-1">
+            {trend === 'up' ? <TrendingUp className="h-4 w-4 text-white/70" /> :
+             trend === 'down' ? <TrendingDown className="h-4 w-4 text-white/70" /> : null}
+          </div>
+        )}
+      </div>
+      <div className="text-3xl font-black text-white tracking-tight mb-0.5">{value}</div>
+      <div className="text-[11px] font-black uppercase tracking-[0.15em] text-white/60">{title}</div>
+      <div className="text-xs text-white/50 mt-1">{sub}</div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// DISEASE PREVALENCE BAR
+// ─────────────────────────────────────────────────────────────
+function DiseaseBar({ name, count, total, rank }: { name: string; count: number; total: number; rank: number }) {
+  const pct = total > 0 ? (count / total) * 100 : 0
+  const colors = ['from-rose-500 to-red-600', 'from-orange-500 to-amber-500', 'from-violet-500 to-purple-600', 'from-teal-500 to-emerald-500', 'from-sky-500 to-blue-600']
+  return (
+    <div className="group flex items-center gap-4 py-2.5">
+      <div className="w-6 text-center text-[10px] font-black text-slate-400">#{rank}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-semibold text-slate-300 truncate pr-2">{name}</span>
+          <span className="text-xs font-black text-slate-400 whitespace-nowrap">{count} <span className="text-slate-600">({pct.toFixed(1)}%)</span></span>
+        </div>
+        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full bg-gradient-to-r ${colors[rank - 1] || colors[0]} rounded-full transition-all duration-700`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// VARIABLE PICKER (Reusable)
+// ─────────────────────────────────────────────────────────────
+function VariablePicker({
+  label, accent, groups, selected, onToggle, search, onSearch, logicMode, onLogicToggle
+}: {
+  label: string; accent: string; groups: Record<string, any[]>;
+  selected: string[]; onToggle: (id: string) => void;
+  search: string; onSearch: (s: string) => void;
+  logicMode: 'any' | 'all'; onLogicToggle: () => void;
+}) {
+  const [openGroup, setOpenGroup] = useState(Object.keys(groups)[0] || '')
+  const filtered = groups[openGroup]?.filter(v => v.label.toLowerCase().includes(search.toLowerCase())) || []
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-800/30">
+        <div className="flex items-center gap-2.5">
+          <div className={`h-7 w-7 rounded-lg ${accent} flex items-center justify-center text-xs font-black text-white`}>{label}</div>
+          <span className="text-sm font-bold text-slate-200">
+            {label === 'X' ? 'Independent Variable' : 'Dependent Outcome'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {selected.length > 0 && (
+            <span className="text-[10px] font-black text-white bg-indigo-600 px-2 py-0.5 rounded-full">
+              {selected.length} selected
+            </span>
+          )}
+          {selected.length > 1 && (
+            <button
+              onClick={onLogicToggle}
+              className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border transition-all ${
+                logicMode === 'any'
+                  ? 'bg-indigo-600/20 border-indigo-700 text-indigo-300'
+                  : 'bg-violet-600/20 border-violet-700 text-violet-300'
+              }`}
+            >
+              {logicMode === 'any' ? 'ANY of' : 'ALL of'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Group Tabs */}
+      <div className="flex overflow-x-auto no-scrollbar border-b border-slate-800">
+        {Object.keys(groups).map(g => (
+          <button
+            key={g}
+            onClick={() => setOpenGroup(g)}
+            className={`px-4 py-2.5 whitespace-nowrap text-[10px] font-black uppercase tracking-wider transition-all shrink-0 border-b-2 ${
+              openGroup === g
+                ? 'text-indigo-400 border-indigo-500 bg-indigo-500/5'
+                : 'text-slate-500 border-transparent hover:text-slate-300'
+            }`}
+          >
+            {g.replace(/^\d+\.\s*/, '')}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+          <input
+            value={search} onChange={e => onSearch(e.target.value)}
+            placeholder="Search factors..."
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500 transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Factor List */}
+      <div className="px-3 pb-3 max-h-52 overflow-y-auto space-y-0.5">
+        {filtered.length === 0 && (
+          <div className="py-6 text-center text-slate-600 text-xs italic">No matches</div>
+        )}
+        {filtered.map(v => {
+          const isSelected = selected.includes(v.id)
+          return (
+            <label
+              key={v.id}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all hover:bg-slate-800 ${isSelected ? 'bg-indigo-950/50 border border-indigo-800/40' : 'border border-transparent'}`}
+            >
+              <div className={`h-4 w-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'}`}>
+                {isSelected && <CheckCircle2 className="h-3 w-3 text-white" />}
+              </div>
+              <input type="checkbox" checked={isSelected} onChange={() => onToggle(v.id)} className="hidden" />
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs font-semibold truncate block ${isSelected ? 'text-indigo-300' : 'text-slate-400'}`}>{v.label}</span>
+                <span className="text-[9px] text-slate-600 uppercase tracking-wider">{v.type}</span>
+              </div>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUSTOM RECHARTS TOOLTIP
+// ─────────────────────────────────────────────────────────────
+function DarkTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 shadow-2xl">
+      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-xs font-bold text-white">{p.name}: {p.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────
 export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; aiEnabled: boolean }) {
   const { ALL_VARIABLES, categorizedGroups, getVariableValue } = useVariableDiscovery(patients)
 
-  // UI STATE
-  const [researchMode, setResearchMode] = useState<'Standard' | 'AI Investigator'>('Standard')
-  const [wardFilter, setWardFilter] = useState('All Wards')
-  
-  // Independent Var State (Multi-selection)
-  const [cat1, setCat1] = useState<string>('1. Demographics')
+  // ── Mode ─────────────────────────────────────────────────
+  const [mode, setMode] = useState<'insights' | 'explorer' | 'ai'>('insights')
+
+  // ── Explorer state ────────────────────────────────────────
+  const [wardFilter, setWardFilter] = useState('All')
   const [selectedVars1, setSelectedVars1] = useState<string[]>([])
   const [logicMode1, setLogicMode1] = useState<'any' | 'all'>('any')
-  
-  // Dependent Var State (Target for correlation - Now Multi-select)
-  const [cat2, setCat2] = useState<string>('2. Clinical Risk & Status')
   const [selectedVars2, setSelectedVars2] = useState<string[]>([])
   const [logicMode2, setLogicMode2] = useState<'any' | 'all'>('any')
+  const [search1, setSearch1] = useState('')
+  const [search2, setSearch2] = useState('')
+  const [chartType, setChartType] = useState<'Bar' | 'Line' | 'Area' | 'Pie'>('Bar')
 
-  const [userObjective, setUserObjective] = useState('')
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [report, setReport] = useState<string | null>(null)
+  // ── Results ───────────────────────────────────────────────
+  const [clientResults, setClientResults] = useState<any>(null)
   const [pythonResults, setPythonResults] = useState<any>(null)
+  const [report, setReport] = useState<string | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [userObjective, setUserObjective] = useState('')
 
-  const [searchTerm1, setSearchTerm1] = useState('')
-  const [searchTerm2, setSearchTerm2] = useState('')
-  const [chartType, setChartType] = useState<'Bar' | 'Line' | 'Area' | 'Scatter' | 'Pie'>('Bar')
-  const [showFrequencies, setShowFrequencies] = useState(false)
+  // ── Cohort ────────────────────────────────────────────────
+  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.doctor_ward || p.ward_name))).filter(Boolean).sort(), [patients])
+  const cohort = useMemo(() => wardFilter === 'All' ? patients : patients.filter(p => (p.doctor_ward || p.ward_name) === wardFilter), [patients, wardFilter])
 
-  // Helper to compute value for a patient
-  const getPatientValue = (p: any, vId: string) => {
-    let patientVal: any = null
-    const v = ALL_VARIABLES.find(x => x.id === vId)
-    if (!v) return null
+  // ─────────────────────────────────────────────────────────
+  // QUICK INSIGHTS (auto-computed)
+  // ─────────────────────────────────────────────────────────
+  const insights = useMemo(() => {
+    if (patients.length === 0) return null
 
-    if (vId === 'doctor_ward') patientVal = p.doctor_ward
-    else if (vId === 'is_deceased') patientVal = p.category === 'Deceased/Archive' ? 'Yes' : 'No'
-    else if (vId === 'high_risk_season') {
-      if (!p.high_risk_date) patientVal = 'N/A'
-      else {
-        const month = new Date(p.high_risk_date).getMonth() + 1
-        patientVal = (month >= 5 && month <= 9) ? 'Summer' : (month >= 11 || month <= 2) ? 'Winter' : 'Shoulder'
-      }
-    }
-    else if (vId === 'death_season') {
-      if (!p.date_of_death) patientVal = 'N/A'
-      else {
-        const month = new Date(p.date_of_death).getMonth() + 1
-        patientVal = (month >= 5 && month <= 9) ? 'Summer' : (month >= 11 || month <= 2) ? 'Winter' : 'Shoulder'
-      }
-    }
-    else if (vId === 'days_to_high_risk') {
-      if (!p.high_risk_date) patientVal = null
-      else {
-        const start = new Date(p.created_at).getTime()
-        const end = new Date(p.high_risk_date).getTime()
-        patientVal = Math.floor((end - start) / (1000 * 60 * 60 * 24))
-      }
-    }
-    else if (vId === 'clinical_duration') {
-      const start = new Date(p.created_at).getTime()
-      const end = p.date_of_death ? new Date(p.date_of_death).getTime() : Date.now()
-      patientVal = Math.floor((end - start) / (1000 * 60 * 60 * 24))
-    }
-    else if (vId.startsWith('disease_')) {
-      const dName = v.label
-      patientVal = Array.isArray(p.chronic_diseases) && p.chronic_diseases.some((cd: any) => cd.name === dName) ? 'Yes' : 'No'
-    }
-    else if (vId.startsWith('int_drug_')) {
-      const dName = v.label
-      patientVal = Array.isArray(p.medical_drugs) && p.medical_drugs.some((d: any) => d.name === dName) ? 'Yes' : 'No'
-    }
-    else if (vId.startsWith('psych_drug_')) {
-      const dName = v.label
-      patientVal = Array.isArray(p.psych_drugs) && p.psych_drugs.some((d: any) => d.name === dName) ? 'Yes' : 'No'
-    }
-    else if (vId.startsWith('ward_')) {
-      const wName = v.label
-      patientVal = p.doctor_ward === wName ? 'Yes' : 'No'
-    }
-    else if (vId.startsWith('surgery_')) {
-       const sName = v.label
-       patientVal = Array.isArray(p.past_surgeries) && p.past_surgeries.some((s: any) => s === sName) ? 'Yes' : 'No'
-    }
-    else if (vId.startsWith('lab_')) {
-       const labKey = vId.replace('lab_', '')
-       if (Array.isArray(p.investigations) && p.investigations.length > 0) {
-          const sortedInvs = [...p.investigations].sort((a,b) => {
-            const da = a.date ? new Date(a.date).getTime() : 0;
-            const db = b.date ? new Date(b.date).getTime() : 0;
-            return db - da;
-          });
-         for (const inv of sortedInvs) {
-           if (inv[labKey] !== undefined && inv[labKey] !== null) {
-             patientVal = parseFloat(inv[labKey])
-             break
-           }
-         }
-       }
-    }
-    else if (vId.startsWith('vital_')) {
-       const vitalKey = vId.replace('vital_', '')
-       if (Array.isArray(p.visits) && p.visits.length > 0) {
-          const sortedVisits = [...p.visits].sort((a,b) => {
-            const da = a.visit_date ? new Date(a.visit_date).getTime() : 0;
-            const db = b.visit_date ? new Date(b.visit_date).getTime() : 0;
-            return db - da;
-          });
-         for (const visit of sortedVisits) {
-           if (visit[vitalKey] !== undefined && visit[vitalKey] !== null) {
-             patientVal = parseFloat(visit[vitalKey])
-             break
-           }
-         }
-       }
-    }
-    else if (vId === 'total_surgeries') patientVal = Array.isArray(p.past_surgeries) ? p.past_surgeries.length : 0
-    else if (vId === 'total_chronic') patientVal = Array.isArray(p.chronic_diseases) ? p.chronic_diseases.length : 0
-    else if (vId === 'total_visits') patientVal = Array.isArray(p.visits) ? p.visits.length : 0
-    else if (vId === 'age') patientVal = parseFloat(p.age) || null
-    else patientVal = p[vId] || null
-
-    return patientVal
-  }
-
-  const computeCompositeVal = (p: any, ids: string[], logic: 'any' | 'all') => {
-    const results = ids.map(vid => {
-      const val = getPatientValue(p, vid)
-      const v = ALL_VARIABLES.find(x => x.id === vid)
-      if (v?.type === 'categorical') return val === 'Yes' || val === true
-      if (v?.type === 'continuous') return (Number(val) || 0) > 0
-      return !!val
+    // Disease prevalence
+    const diseaseCounts: Record<string, number> = {}
+    patients.forEach(p => {
+      parseArr(p.chronic_diseases).forEach((d: any) => {
+        if (d?.name) diseaseCounts[d.name] = (diseaseCounts[d.name] || 0) + 1
+      })
     })
-    if (logic === 'any') return results.some(r => r) ? 'Positive (Any)' : 'Negative'
-    return results.every(r => r) ? 'Positive (All)' : 'Negative'
-  }
+    const topDiseases = Object.entries(diseaseCounts).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
-  // Clean data extraction mapping
-  const buildFlatDataset = (cohort: any[], compositeId1: string, compositeId2: string) => {
-    return cohort.map(patient => {
-      const flatRecord: any = {}
-      
-      if (selectedVars1.length === 1) {
-        const v = ALL_VARIABLES.find(x => x.id === selectedVars1[0])
-        if (v?.type === 'continuous') flatRecord[v.id] = getPatientValue(patient, v.id)
-      }
-      if (selectedVars2.length === 1) {
-        const v = ALL_VARIABLES.find(x => x.id === selectedVars2[0])
-        if (v?.type === 'continuous') flatRecord[v.id] = getPatientValue(patient, v.id)
-      }
+    // Category breakdown
+    const catCounts: Record<string, number> = {}
+    patients.forEach(p => { const c = p.category || 'Unknown'; catCounts[c] = (catCounts[c] || 0) + 1 })
 
-      // X Calculation
-      flatRecord[compositeId1] = computeCompositeVal(patient, selectedVars1, logicMode1)
-      
-      // Y Calculation
-      flatRecord[compositeId2] = computeCompositeVal(patient, selectedVars2, logicMode2)
+    // Gender split
+    const genderCounts: Record<string, number> = {}
+    patients.forEach(p => { const g = p.gender || 'Unknown'; genderCounts[g] = (genderCounts[g] || 0) + 1 })
 
-      // Add individual values for numerical correlations if single selection
-      if (selectedVars1.length === 1) {
-        const v = ALL_VARIABLES.find(x => x.id === selectedVars1[0])
-        if (v?.type === 'continuous') {
-           // We repeat the extraction but for direct value
-           let val: any = null
-           if (v.id.startsWith('lab_')) {
-              const key = v.id.replace('lab_', '')
-              const lastInv = Array.isArray(patient.investigations) ? [...patient.investigations].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] : null
-              val = lastInv ? parseFloat(lastInv[key]) : null
-           } else if (v.id.startsWith('vital_')) {
-              const key = v.id.replace('vital_', '')
-              const lastVisit = Array.isArray(patient.visits) ? [...patient.visits].sort((a,b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0] : null
-              val = lastVisit ? parseFloat(lastVisit[key]) : null
-           } else if (v.id === 'age') val = parseFloat(patient.age)
-           flatRecord[v.id] = val
-        }
-      }
+    // Ward breakdown
+    const wardCounts: Record<string, number> = {}
+    patients.forEach(p => { const w = p.doctor_ward || p.ward_name || 'Unknown'; wardCounts[w] = (wardCounts[w] || 0) + 1 })
 
-      if (selectedVars2.length === 1) {
-        const v = ALL_VARIABLES.find(x => x.id === selectedVars2[0])
-        if (v?.type === 'continuous') {
-           let val: any = null
-           if (v.id.startsWith('lab_')) {
-              const key = v.id.replace('lab_', '')
-              const lastInv = Array.isArray(patient.investigations) ? [...patient.investigations].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] : null
-              val = lastInv ? parseFloat(lastInv[key]) : null
-           } else if (v.id.startsWith('vital_')) {
-              const key = v.id.replace('vital_', '')
-              const lastVisit = Array.isArray(patient.visits) ? [...patient.visits].sort((a,b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0] : null
-              val = lastVisit ? parseFloat(lastVisit[key]) : null
-           } else if (v.id === 'age') val = parseFloat(patient.age)
-           flatRecord[v.id] = val
-        }
-      }
+    // Deceased count
+    const deceased = patients.filter(p => p.category === 'Deceased/Archive').length
+    const highRisk = patients.filter(p => p.category === 'High Risk').length
 
-      return flatRecord
+    // Comorbidity distribution
+    const comborbCount = patients.map(p => parseArr(p.chronic_diseases).length)
+    const avgComorbidity = comborbCount.reduce((a, b) => a + b, 0) / patients.length
+
+    // Age distribution
+    const ages = patients.map(p => Number(p.age)).filter(a => a > 0 && a < 130)
+    const avgAge = ages.length > 0 ? Math.round(ages.reduce((a, b) => a + b, 0) / ages.length) : 0
+
+    return { topDiseases, catCounts, genderCounts, wardCounts, deceased, highRisk, avgComorbidity: avgComorbidity.toFixed(1), avgAge, total: patients.length }
+  }, [patients])
+
+  // ─────────────────────────────────────────────────────────
+  // CLIENT-SIDE ANALYSIS
+  // ─────────────────────────────────────────────────────────
+  const getVarLabel = (id: string) => ALL_VARIABLES.find(v => v.id === id)?.label || id
+  const getVarType = (id: string) => ALL_VARIABLES.find(v => v.id === id)?.type || 'categorical'
+
+  const getCompositeValue = (p: any, ids: string[], logic: 'any' | 'all'): string => {
+    if (ids.length === 0) return 'N/A'
+    if (ids.length === 1) {
+      const val = getVariableValue(p, ids[0])
+      return val !== null && val !== undefined ? String(val) : 'N/A'
+    }
+    const results = ids.map(id => {
+      const val = getVariableValue(p, id)
+      if (getVarType(id) === 'categorical') return val === 'Yes' || val === 'Present'
+      return (Number(val) || 0) > 0
     })
+    const hit = logic === 'any' ? results.some(Boolean) : results.every(Boolean)
+    return hit ? `Positive (${logic === 'any' ? 'Any' : 'All'})` : 'Negative'
   }
 
-  const runAnalysis = async () => {
-    setIsAnalyzing(true)
+  const runClientAnalysis = () => {
+    if (selectedVars1.length === 0 || selectedVars2.length === 0) {
+      setError('Select at least one factor for both X and Y axes.')
+      return
+    }
     setError(null)
     setPythonResults(null)
     setReport(null)
 
-    const filteredPatients = wardFilter === 'All Wards' 
-      ? patients 
-      : patients.filter(p => p.doctor_ward === wardFilter)
+    const xLabel = selectedVars1.length === 1 ? getVarLabel(selectedVars1[0]) : `${logicMode1 === 'any' ? 'Any' : 'All'} of (${selectedVars1.length} factors)`
+    const yLabel = selectedVars2.length === 1 ? getVarLabel(selectedVars2[0]) : `${logicMode2 === 'any' ? 'Any' : 'All'} of (${selectedVars2.length} factors)`
 
-    if (filteredPatients.length === 0) {
-      setError(`No patients found in ${wardFilter}.`)
-      setIsAnalyzing(false)
-      return
-    }
+    const table = crossTab(
+      cohort,
+      p => getCompositeValue(p, selectedVars1, logicMode1),
+      p => getCompositeValue(p, selectedVars2, logicMode2)
+    )
 
-    if (researchMode === 'AI Investigator') {
-      if (!aiEnabled) {
-        setError("AI Research features are disabled for your account.")
-        setIsAnalyzing(false)
-        return
-      }
-      const aiRes = await runComplexAIStudyAction(userObjective, filteredPatients)
-      if (aiRes.error) setError(aiRes.error)
-      else setReport(aiRes.result || "No conclusion.")
-      setIsAnalyzing(false)
-      return
-    }
+    // Remove N/A rows
+    delete table['N/A']
+    Object.keys(table).forEach(k => { delete table[k]['N/A'] })
 
+    const chi = chiSquare(table)
+
+    // Build chart data
+    const xKeys = Object.keys(table)
+    const yKeys = Array.from(new Set(xKeys.flatMap(k => Object.keys(table[k]))))
+    const chartData = xKeys.map(x => ({ name: x, ...table[x] }))
+
+    const n = xKeys.reduce((acc, k) => acc + Object.values(table[k]).reduce((a, b) => a + b, 0), 0)
+
+    setClientResults({ xLabel, yLabel, table, chartData, yKeys, chi, n, xKeys })
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // PYTHON + AI ANALYSIS
+  // ─────────────────────────────────────────────────────────
+  const runAdvancedAnalysis = async () => {
     if (selectedVars1.length === 0 || selectedVars2.length === 0) {
-      setError("Please select at least one Variable for X and one for Y.")
-      setIsAnalyzing(false)
+      setError('Select at least one factor for both X and Y axes.')
       return
     }
+    setIsAnalyzing(true)
+    setError(null)
+    setPythonResults(null)
+    setReport(null)
+    setClientResults(null)
 
-    const compositeId1 = "independent_composite"
-    const compositeLabel1 = selectedVars1.length > 1 
-      ? `${logicMode1 === 'any' ? 'ANY' : 'ALL'} of (${selectedVars1.length} factors)`
-      : ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.label || "Indep Factor"
-
-    const compositeId2 = "dependent_composite"
-    const compositeLabel2 = selectedVars2.length > 1
-      ? `${logicMode2 === 'any' ? 'ANY' : 'ALL'} of (${selectedVars2.length} factors)`
-      : ALL_VARIABLES.find(v => v.id === selectedVars2[0])?.label || "Dep Factor"
-
-    const payloadDataset = buildFlatDataset(filteredPatients, compositeId1, compositeId2)
-
-    const indepType = selectedVars1.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.type : 'categorical'
-    const depType = selectedVars2.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars2[0])?.type : 'categorical'
-
-    const payload = {
-      independent_vars: [{ 
-        name: selectedVars1.length === 1 ? (indepType === 'continuous' ? selectedVars1[0] : compositeId1) : compositeId1, 
-        label: compositeLabel1, 
-        type: indepType 
-      }],
-      dependent_var: { 
-        name: selectedVars2.length === 1 ? (depType === 'continuous' ? selectedVars2[0] : compositeId2) : compositeId2, 
-        label: compositeLabel2, 
-        type: depType 
-      },
-      data: payloadDataset
-    }
+    const xLabel = selectedVars1.length === 1 ? getVarLabel(selectedVars1[0]) : `${logicMode1 === 'any' ? 'Any' : 'All'} of (${selectedVars1.length})`
+    const yLabel = selectedVars2.length === 1 ? getVarLabel(selectedVars2[0]) : `${logicMode2 === 'any' ? 'Any' : 'All'} of (${selectedVars2.length})`
 
     try {
+      const dataset = cohort.map(p => ({
+        x: getCompositeValue(p, selectedVars1, logicMode1),
+        y: getCompositeValue(p, selectedVars2, logicMode2),
+      }))
+
       const apiBase = process.env.NEXT_PUBLIC_STAT_ENGINE_URL || 'http://127.0.0.1:8000'
       const res = await fetch(`${apiBase}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          independent_vars: [{ name: 'x', label: xLabel, type: getVarType(selectedVars1[0]) }],
+          dependent_var: { name: 'y', label: yLabel, type: getVarType(selectedVars2[0]) },
+          data: dataset
+        })
       })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || "Math Engine Failed")
-      }
-      
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Engine error') }
       const mathData = await res.json()
-      setPythonResults(mathData)
+      setPythonResults({ ...mathData, xLabel, yLabel })
 
-      const finalPrompt = `Write a Medical Research Results interpretation for: "${compositeLabel1}" (Independent) vs "${compositeLabel2}" (Dependent). 
-      Math Engine Output: ${JSON.stringify(mathData)}
-      Explain the clinical significance, keeping the tone strictly academic.`
-      
       const aiRes = await fetch('/api/research/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt })
+        body: JSON.stringify({ prompt: `Medical Research Interpretation: "${xLabel}" vs "${yLabel}". Stats: ${JSON.stringify(mathData)}. Explain clinical significance academically.` })
       })
-
-      if (aiRes.ok) {
-         const aiTxt = await aiRes.json()
-         setReport(aiTxt.text)
-      } else {
-         const errorPayload = await aiRes.json().catch(() => ({ text: "Unknown AI Error" }))
-         setReport(`### Statistical Output Successful\n\n**Test Performed:** ${mathData.test_used}\n**P-Value:** ${mathData.p_value}\n**Statistic:** ${mathData.statistic}\n\n*Note: AI Interpretation engine failed (${errorPayload.text}). Raw statistical output shown above.*`)
-      }
-
+      if (aiRes.ok) { const t = await aiRes.json(); setReport(t.text) }
     } catch (e: any) {
-      console.error("AI Error:", e)
-      if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
-         setError("Medical Research Engine is currently OFFLINE. Please ensure the Python analytics server is running on port 8000.")
-      } else {
-         setError(`Research Engine Error: ${e.message}`)
-      }
-    } finally {
-      setIsAnalyzing(false)
-    }
+      if (e.name === 'TypeError') setError('Python Math Engine is offline. Use Quick Analysis for client-side results.')
+      else setError(`Error: ${e.message}`)
+    } finally { setIsAnalyzing(false) }
   }
 
-  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.doctor_ward))).filter(Boolean), [patients])
+  // ─────────────────────────────────────────────────────────
+  // AI NATURAL LANGUAGE MODE
+  // ─────────────────────────────────────────────────────────
+  const runAI = async () => {
+    if (!userObjective) return
+    setIsAnalyzing(true)
+    setError(null)
+    setReport(null)
+    const res = await runComplexAIStudyAction(userObjective, patients)
+    if (res.error) setError(res.error)
+    else setReport(res.result || '')
+    setIsAnalyzing(false)
+  }
 
-  // --- CHART RENDERING LOGIC ---
-  const renderChart = () => {
-    if (!pythonResults || !pythonResults.chart_data) return null
-    const { type: engineType, groups, values, data, x, y } = pythonResults.chart_data
+  // ─────────────────────────────────────────────────────────
+  // CHART RENDERER
+  // ─────────────────────────────────────────────────────────
+  const renderChart = (data: any) => {
+    const { chartData, yKeys } = data
+    const gradientColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
-    // 1. FREQUENCY DISTRIBUTION (BINNING) - e.g. Age vs Disease
-    // If showFrequencies is on and we have meaningful keys
-    const indepKeys = Object.keys(data || {})
-    const isNumericalX = selectedVars1.length === 1 && ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.type === 'continuous'
-    const isCategoricalY = selectedVars2.length >= 1 // Often disease Present/Absent
-
-    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
-
-    // MODAL: PIE CHART (Proportions)
     if (chartType === 'Pie') {
-      const pieData = indepKeys.map(k => {
-          const subKeys = Object.keys(data[k])
-          const totalInGroup = subKeys.reduce((acc, sk) => acc + data[k][sk], 0)
-          return { name: k, value: totalInGroup }
-      })
+      const pieData = data.xKeys?.map((k: string, i: number) => ({
+        name: k,
+        value: Object.values(data.table[k] || {}).reduce((a: any, b: any) => a + b, 0)
+      })) || []
       return (
-        <div className="h-[400px] w-full mt-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie 
-                data={pieData} 
-                dataKey="value" 
-                nameKey="name" 
-                cx="50%" cy="50%" 
-                outerRadius={120} 
-                innerRadius={60}
-                paddingAngle={5}
-                label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-              >
-                {pieData.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-              </Pie>
-              <Tooltip />
-              <Legend verticalAlign="bottom" height={36}/>
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110} innerRadius={55} paddingAngle={4}
+              label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}>
+              {pieData.map((_: any, i: number) => <Cell key={i} fill={gradientColors[i % gradientColors.length]} />)}
+            </Pie>
+            <Tooltip content={<DarkTooltip />} />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
       )
     }
-
-    // SCATTER (Correlation Focus)
-    if (chartType === 'Scatter' || engineType === 'scatter' || pythonResults.test_used === 'Pearson Correlation') {
-      const scatterPoints = (x || []).map((val: number, i: number) => ({ x: val, y: y[i] }))
-      return (
-        <div className="h-[350px] w-full mt-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis type="number" dataKey="x" name={pythonResults.indep_label} fontSize={12} tickLine={false} axisLine={false} label={{ value: pythonResults.indep_label, position: 'insideBottom', offset: -5, fontSize: 10 }} />
-              <YAxis type="number" dataKey="y" name={pythonResults.dep_label} fontSize={12} tickLine={false} axisLine={false} label={{ value: pythonResults.dep_label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 }, offset: 10 }} />
-              <ZAxis type="number" range={[64, 64]} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter name="Patients" data={scatterPoints} fill="#6366f1" opacity={0.6} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
-      )
-    }
-
-    // PREPARE CATEGORICAL/SORTED DATA FOR BAR/LINE/AREA
-    const depKeys = indepKeys.length > 0 ? Object.keys(data[indepKeys[0]] || {}) : []
-    const sortedChartData = indepKeys.map(indepVal => ({
-      name: indepVal,
-      ...data[indepVal]
-    })).sort((a, b) => {
-       // Try numeric sort if possible
-       const na = parseFloat(a.name)
-       const nb = parseFloat(b.name)
-       if (!isNaN(na) && !isNaN(nb)) return na - nb
-       return a.name.localeCompare(b.name)
-    })
-
     if (chartType === 'Line') {
       return (
-        <div className="h-[350px] w-full mt-6 text-slate-900">
-           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={sortedChartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-              <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-              <Legend verticalAlign="top" align="right" />
-              {depKeys.map((k, idx) => (
-                <Line key={k} type="monotone" dataKey={k} stroke={colors[idx % colors.length]} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip content={<DarkTooltip />} />
+            <Legend />
+            {yKeys.map((k: string, i: number) => (
+              <Line key={k} type="monotone" dataKey={k} stroke={gradientColors[i % gradientColors.length]} strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       )
     }
-
     if (chartType === 'Area') {
       return (
-        <div className="h-[350px] w-full mt-6">
-           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sortedChartData}>
-              <defs>
-                {depKeys.map((k, idx) => (
-                  <linearGradient key={`grad-${k}`} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={colors[idx % colors.length]} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={colors[idx % colors.length]} stopOpacity={0}/>
-                  </linearGradient>
-                ))}
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
-              <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip />
-              <Legend verticalAlign="top" align="right" />
-              {depKeys.map((k, idx) => (
-                <Area key={k} type="monotone" dataKey={k} stroke={colors[idx % colors.length]} fillOpacity={1} fill={`url(#grad-${idx})`} strokeWidth={2} />
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={chartData}>
+            <defs>
+              {yKeys.map((k: string, i: number) => (
+                <linearGradient key={k} id={`ag${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={gradientColors[i % gradientColors.length]} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={gradientColors[i % gradientColors.length]} stopOpacity={0} />
+                </linearGradient>
               ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+            <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip content={<DarkTooltip />} />
+            <Legend />
+            {yKeys.map((k: string, i: number) => (
+              <Area key={k} type="monotone" dataKey={k} stroke={gradientColors[i % gradientColors.length]} fill={`url(#ag${i})`} strokeWidth={2} />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
       )
     }
-
-    // DEFAULT: BAR CHART (Stacked by default for multi-outcomes)
+    // Default: Bar
     return (
-      <div className="h-[350px] w-full mt-6">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={sortedChartData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-            <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-            <Legend verticalAlign="top" align="right" iconType="circle" />
-            {depKeys.map((k, idx) => (
-              <Bar key={k} dataKey={k} stackId="a" fill={colors[idx % colors.length]} radius={idx === depKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData} barCategoryGap="30%">
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+          <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+          <Tooltip content={<DarkTooltip />} />
+          <Legend />
+          {yKeys.map((k: string, i: number) => (
+            <Bar key={k} dataKey={k} stackId="a" fill={gradientColors[i % gradientColors.length]} radius={i === yKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     )
   }
 
+  // ─────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 pb-32">
-      {/* Title & Modes */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Advanced Medical Research Hub</h2>
-          <p className="text-slate-500 font-medium">Python-powered statistical tests and AI interpretation.</p>
+    <div className="min-h-screen bg-slate-950 -mx-4 md:-mx-8 -mt-8 px-3 sm:px-4 md:px-8 pt-6 sm:pt-8 pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+
+      {/* ── HERO HEADER ─────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl mb-6 sm:mb-8 bg-gradient-to-br from-slate-900 via-indigo-950/50 to-slate-900 border border-indigo-900/30 p-5 sm:p-8">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 h-80 w-80 rounded-full bg-indigo-600/10 blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 h-60 w-60 rounded-full bg-violet-600/10 blur-3xl" />
         </div>
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl">
-           <button 
-             onClick={() => setResearchMode('Standard')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition ${researchMode === 'Standard' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
-           >
-             Scientific Mode
-           </button>
-           <button 
-             onClick={() => setResearchMode('AI Investigator')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition ${researchMode === 'AI Investigator' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
-           >
-             NLP Mode
-           </button>
-        </div>
-      </div>
-
-      {/* Dataset Status Indicator */}
-      <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl">
-         <div className={`h-2 w-2 rounded-full ${patients.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-         <div className="flex-1 flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-            <span className="text-slate-500">Loaded Cohort: {patients.length} Clinical Records</span>
-            {patients.length === 0 && (
-              <span className="text-red-600 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" /> Data Access Restricted or Database Empty
-              </span>
-            )}
-         </div>
-      </div>
-
-      {error && (
-        <div className="p-4 bg-rose-50 border-rose-200 text-rose-700 rounded-xl flex items-center gap-3">
-           <AlertCircle className="h-5 w-5" />
-           <span className="font-semibold">{error}</span>
-        </div>
-      )}
-
-      {researchMode === 'Standard' ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100 dark:border-slate-800">
-             <Filter className="h-5 w-5 text-slate-400" />
-             <div>
-               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Study Cohort Filter</label>
-               <select 
-                 value={wardFilter} 
-                 onChange={e => setWardFilter(e.target.value)} 
-                 className="bg-transparent font-bold text-indigo-600 outline-none cursor-pointer"
-               >
-                 <option value="All Wards">All Global Wards</option>
-                 {distinctWards.map(w => <option key={w} value={w}>{w}</option>)}
-               </select>
-             </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 relative">
-            {/* Variable X Selector */}
-            <div className="space-y-6 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800/60 p-6 rounded-[2rem] shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400 font-bold">
-                   <div className="h-8 w-8 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-sm shadow-inner">X</div>
-                   <span className="tracking-tight text-lg">Independent Factors</span>
+        <div className="relative">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 rounded-2xl bg-indigo-600/20 border border-indigo-500/20">
+                  <BrainCircuit className="h-6 w-6 text-indigo-400" />
                 </div>
-                
-                {selectedVars1.length > 1 && (
-                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[10px] font-black uppercase ring-1 ring-slate-200 dark:ring-slate-700">
-                    <button 
-                      onClick={() => setLogicMode1('any')}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${logicMode1 === 'any' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'}`}
-                    >
-                      Any Of
-                    </button>
-                    <button 
-                      onClick={() => setLogicMode1('all')}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${logicMode1 === 'all' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm' : 'text-slate-500'}`}
-                    >
-                      All Of
-                    </button>
-                  </div>
-                )}
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400/70">Admin · Medical Research</div>
+                  <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight">Clinical Relationship Explorer</h2>
+                </div>
               </div>
-              
-              <div className="space-y-4">
-                 <div>
-                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">1. Choose Category</label>
-                   <select 
-                     value={cat1} 
-                     onChange={e => {
-                       setCat1(e.target.value)
-                       setSelectedVars1([categorizedGroups[e.target.value]?.[0]?.id || ''])
-                       setSearchTerm1('') // Reset search on category change for clarity
-                     }}
-                     className="w-full bg-white dark:bg-slate-800 border-none rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-sm ring-1 ring-slate-100 dark:ring-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none cursor-pointer"
-                   >
-                     {Object.keys(categorizedGroups).map(cat => (
-                       <option key={`c1-${cat}`} value={cat}>{cat}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div>
-                   <div className="flex items-center justify-between mb-2 px-1">
-                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest shrink-0">2. Select Factors</label>
-                     <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 font-bold">{selectedVars1.length} selected</span>
-                   </div>
-
-                   {/* Search Bar for Factors */}
-                   <div className="relative mb-3 group">
-                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                     <input 
-                       type="text"
-                       placeholder={`Search in ${cat1}...`}
-                       value={searchTerm1}
-                       onChange={e => setSearchTerm1(e.target.value)}
-                       className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500/10 transition-all"
-                     />
-                   </div>
-
-                   <div className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100/60 dark:border-slate-700/60 rounded-2xl max-h-[220px] overflow-y-auto p-3 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-200">
-                     {categorizedGroups[cat1]?.filter(v => v.label.toLowerCase().includes(searchTerm1.toLowerCase())).map(v => (
-                       <label key={`v1-chk-${v.id}`} className={`flex items-center gap-3 cursor-pointer p-2.5 rounded-xl transition-all border border-transparent hover:bg-white dark:hover:bg-slate-700 ${selectedVars1.includes(v.id) ? 'bg-white dark:bg-slate-700 border-indigo-100 dark:border-indigo-900/30 shadow-xs' : ''}`}>
-                         <div className={`h-5 w-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedVars1.includes(v.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-200 dark:border-slate-600'}`}>
-                           <input 
-                             type="checkbox"
-                             checked={selectedVars1.includes(v.id)}
-                             onChange={e => {
-                               if (e.target.checked) setSelectedVars1(prev => [...prev, v.id])
-                               else setSelectedVars1(prev => prev.filter(x => x !== v.id))
-                             }}
-                             className="hidden"
-                           />
-                           {selectedVars1.includes(v.id) && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
-                         </div>
-                         <div className="flex flex-col">
-                           <span className={`text-sm font-semibold transition-colors ${selectedVars1.includes(v.id) ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                             {v.label}
-                           </span>
-                           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{v.type}</span>
-                         </div>
-                       </label>
-                     ))}
-                     {categorizedGroups[cat1]?.filter(v => v.label.toLowerCase().includes(searchTerm1.toLowerCase())).length === 0 && (
-                       <div className="py-8 text-center text-slate-400 text-xs font-medium italic">No matches for "{searchTerm1}"</div>
-                     )}
-                   </div>
-                 </div>
-              </div>
+              <p className="text-slate-400 text-xs sm:text-sm max-w-xl leading-relaxed hidden sm:block">
+                Discover statistically significant correlations across your clinical database. Cross-tabulate any combination of demographics, conditions, labs, and outcomes.
+              </p>
             </div>
 
-            {/* Variable Y Selector (Now Symmetrical) */}
-            <div className="space-y-6 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800/60 p-6 rounded-[2rem] shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-violet-600 dark:text-violet-400 font-bold">
-                   <div className="h-8 w-8 rounded-2xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center text-sm shadow-inner">Y</div>
-                   <span className="tracking-tight text-lg">Dependent Outcomes</span>
+            {/* Live stats */}
+            <div className="flex gap-2 sm:gap-3 shrink-0 flex-wrap">
+              {[
+                { n: insights?.total || 0, label: 'Patients', color: 'text-teal-400' },
+                { n: distinctWards.length, label: 'Wards', color: 'text-violet-400' },
+                { n: insights?.topDiseases.length || 0, label: 'Diseases', color: 'text-amber-400' },
+              ].map(s => (
+                <div key={s.label} className="text-center px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-800/60 border border-slate-700/50 min-w-[72px] sm:min-w-[90px]">
+                  <div className={`text-lg sm:text-2xl font-black ${s.color}`}>{s.n.toLocaleString()}</div>
+                  <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 mt-0.5">{s.label}</div>
                 </div>
-                
-                {selectedVars2.length > 1 && (
-                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[10px] font-black uppercase ring-1 ring-slate-200 dark:ring-slate-700">
-                    <button 
-                      onClick={() => setLogicMode2('any')}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${logicMode2 === 'any' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500'}`}
-                    >
-                      Any Of
-                    </button>
-                    <button 
-                      onClick={() => setLogicMode2('all')}
-                      className={`px-3 py-1.5 rounded-lg transition-all ${logicMode2 === 'all' ? 'bg-white dark:bg-slate-700 text-violet-600 dark:text-violet-300 shadow-sm' : 'text-slate-500'}`}
-                    >
-                      All Of
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-4">
-                 <div>
-                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">1. Choose Category</label>
-                   <select 
-                     value={cat2} 
-                     onChange={e => {
-                       setCat2(e.target.value)
-                       setSelectedVars2([categorizedGroups[e.target.value]?.[0]?.id || ''])
-                       setSearchTerm2('')
-                     }}
-                     className="w-full bg-white dark:bg-slate-800 border-none rounded-2xl px-5 py-3.5 text-sm font-semibold shadow-sm ring-1 ring-slate-100 dark:ring-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20 transition-all appearance-none cursor-pointer"
-                   >
-                     {Object.keys(categorizedGroups).map(cat => (
-                       <option key={`c2-${cat}`} value={cat}>{cat}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div>
-                   <div className="flex items-center justify-between mb-2 px-1">
-                     <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest shrink-0">2. Select Factors</label>
-                     <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-slate-500 font-bold">{selectedVars2.length} selected</span>
-                   </div>
-
-                   {/* Search Bar for Factors */}
-                   <div className="relative mb-3 group">
-                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
-                     <input 
-                       type="text"
-                       placeholder={`Search in ${cat2}...`}
-                       value={searchTerm2}
-                       onChange={e => setSearchTerm2(e.target.value)}
-                       className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-violet-500/10 transition-all"
-                     />
-                   </div>
-
-                   <div className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-100/60 dark:border-slate-700/60 rounded-2xl max-h-[220px] overflow-y-auto p-3 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-200">
-                     {categorizedGroups[cat2]?.filter(v => v.label.toLowerCase().includes(searchTerm2.toLowerCase())).map(v => (
-                       <label key={`v2-chk-${v.id}`} className={`flex items-center gap-3 cursor-pointer p-2.5 rounded-xl transition-all border border-transparent hover:bg-white dark:hover:bg-slate-700 ${selectedVars2.includes(v.id) ? 'bg-white dark:bg-slate-700 border-violet-100 dark:border-violet-900/30 shadow-xs' : ''}`}>
-                         <div className={`h-5 w-5 rounded-lg border-2 flex items-center justify-center transition-all ${selectedVars2.includes(v.id) ? 'bg-violet-500 border-violet-500' : 'border-slate-200 dark:border-slate-600'}`}>
-                           <input 
-                             type="checkbox"
-                             checked={selectedVars2.includes(v.id)}
-                             onChange={e => {
-                               if (e.target.checked) setSelectedVars2(prev => [...prev, v.id])
-                               else setSelectedVars2(prev => prev.filter(x => x !== v.id))
-                             }}
-                             className="hidden"
-                           />
-                           {selectedVars2.includes(v.id) && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
-                         </div>
-                         <div className="flex flex-col">
-                           <span className={`text-sm font-semibold transition-colors ${selectedVars2.includes(v.id) ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                             {v.label}
-                           </span>
-                           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{v.type}</span>
-                         </div>
-                       </label>
-                     ))}
-                     {categorizedGroups[cat2]?.filter(v => v.label.toLowerCase().includes(searchTerm2.toLowerCase())).length === 0 && (
-                       <div className="py-8 text-center text-slate-400 text-xs font-medium italic">No matches for "{searchTerm2}"</div>
-                     )}
-                   </div>
-                 </div>
-              </div>
+              ))}
             </div>
           </div>
 
-            {/* Action Bar (Run Analysis & Export) */}
-            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 mt-12 mb-8">
-               {pythonResults && (
-                 <>
-                   <button 
-                     onClick={() => exportResearchToExcel({
-                       objective: userObjective || "Statistical Analysis",
-                       varX: selectedVars1.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.label || "Indep" : "Composite (X)",
-                       varY: selectedVars2.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars2[0])?.label || "Dep" : "Composite (Y)",
-                       math: pythonResults,
-                       data: patients.map(p => ({
-                         name: p.name,
-                         doctor_ward: p.doctor_ward,
-                         age: p.age,
-                         x_val: computeCompositeVal(p, selectedVars1, logicMode1),
-                         y_val: computeCompositeVal(p, selectedVars2, logicMode2)
-                       }))
-                     })}
-                     className="flex items-center gap-2.5 px-6 py-4 rounded-3xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs border border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 transition-all shadow-sm"
-                   >
-                     <Table className="h-4 w-4" />
-                     Download Tables (Excel)
-                   </button>
-
-                   <button 
-                     onClick={() => exportResearchToWord({
-                       objective: userObjective || "Doctor Narrative Report",
-                       varX: selectedVars1.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.label || "Indep" : "Composite (X)",
-                       varY: selectedVars2.length === 1 ? ALL_VARIABLES.find(v => v.id === selectedVars2[0])?.label || "Dep" : "Composite (Y)",
-                       math: pythonResults,
-                       aiReport: report,
-                       data: [] // Narrative doesn't need raw data
-                     })}
-                     className="flex items-center gap-2.5 px-6 py-4 rounded-3xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 font-bold text-xs border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 transition-all shadow-sm"
-                   >
-                     <FileText className="h-4 w-4" />
-                     Download Narrative (Word)
-                   </button>
-                 </>
-               )}
-
-               <button 
-                 onClick={runAnalysis} 
-                 disabled={isAnalyzing || selectedVars1.length === 0 || selectedVars2.length === 0}
-                 className="group relative overflow-hidden bg-slate-900 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white px-10 py-4.5 rounded-[2rem] font-black text-sm tracking-widest uppercase transition-all duration-300 shadow-xl hover:shadow-indigo-500/20 active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-               >
-                  <div className="flex items-center gap-3 relative z-10">
-                     {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sigma className="h-5 w-5 group-hover:rotate-12 transition-transform" />}
-                     <span>{pythonResults ? 'Refresh Computation' : 'Run Advanced Computation'}</span>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-               </button>
-            </div>
+          {/* Mode Switcher — scrollable on mobile, no wrapping */}
+          <div className="flex overflow-x-auto no-scrollbar gap-2 mt-5 sm:mt-8 -mx-1 px-1 pb-1">
+            {[
+              { id: 'insights', label: 'Quick Insights', icon: Zap },
+              { id: 'explorer', label: 'Explorer', icon: Activity },
+              { id: 'ai', label: 'AI Research', icon: Sparkles, disabled: !aiEnabled },
+            ].map(m => (
+              <button
+                key={m.id}
+                disabled={(m as any).disabled}
+                onClick={() => setMode(m.id as any)}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl border text-xs sm:text-sm font-bold transition-all whitespace-nowrap shrink-0 min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed ${
+                  mode === m.id
+                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                    : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:text-white hover:border-slate-600'
+                }`}
+              >
+                <m.icon className="h-4 w-4 shrink-0" />
+                <span>{m.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm">
-           {!aiEnabled ? (
-             <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400">
-                  <BrainCircuit className="h-8 w-8" />
-                </div>
-                <div className="text-center max-w-sm">
-                  <h4 className="font-bold text-slate-800 dark:text-slate-100">AI Investigator Restricted</h4>
-                  <p className="text-sm text-slate-500 mt-2">Natural language research synthesis is currently disabled for your account by the administrator.</p>
-                </div>
-             </div>
-           ) : (
-             <>
-               <textarea 
-                 value={userObjective} onChange={e => setUserObjective(e.target.value)}
-                 placeholder="Describe the clinical correlation you wish to discover in plain English..."
-                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 min-h-[160px] font-medium outline-none resize-none focus:border-indigo-500 transition"
-               />
-               <div className="mt-4 flex justify-end">
-                 <button 
-                   onClick={runAnalysis} disabled={isAnalyzing || !userObjective}
-                   className="bg-slate-900 dark:bg-violet-600 text-white px-8 py-3.5 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition"
-                 >
-                    {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    Synthesize Report
-                 </button>
-               </div>
-             </>
-           )}
+      </div>
+
+      {patients.length === 0 && (
+        <div className="flex items-center gap-3 p-5 bg-rose-950/30 border border-rose-800/40 rounded-2xl text-rose-400 mb-6">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <span className="font-semibold text-sm">No patient data loaded — check service role key configuration.</span>
         </div>
       )}
 
-      {pythonResults && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 mt-8 shadow-sm">
-           <div className="flex flex-wrap items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-800 gap-4">
-              <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100">Math Engine Results</h3>
-              <div className={`px-4 py-1.5 rounded-lg text-sm font-bold ${pythonResults.p_value < 0.05 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                 p = {pythonResults.p_value !== null ? pythonResults.p_value.toExponential(3) : 'N/A'}
-              </div>
-           </div>
-           
-           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-2xl">
-                 <div className="text-xs font-bold text-slate-500 mb-1">Applied Test</div>
-                 <div className="text-lg font-bold text-slate-900 dark:text-white truncate">{pythonResults.test_used}</div>
-              </div>
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-2xl">
-                 <div className="text-xs font-bold text-slate-500 mb-1">Statistic Matrix</div>
-                 <div className="text-lg font-bold text-slate-900 dark:text-white">{pythonResults.statistic !== null ? pythonResults.statistic.toFixed(4) : 'N/A'}</div>
-              </div>
-              <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-2xl">
-                 <div className="text-xs font-bold text-slate-500 mb-1">Valid Sample Pairs</div>
-                 <div className="text-lg font-bold text-slate-900 dark:text-white">n = {pythonResults.n_samples}</div>
-              </div>
-           </div>
+      {/* ── QUICK INSIGHTS TAB ──────────────────────────── */}
+      {mode === 'insights' && insights && (
+        <div className="space-y-8 animate-in fade-in duration-300">
 
-           {/* DYNAMIC INSIGHT BOX (Trend Detection) */}
-           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                 <div className="flex items-center gap-2 mb-4">
-                    <Activity className="h-4 w-4 text-indigo-500" />
-                    <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Clinical Trend Insight</h4>
-                 </div>
-                 <div className="space-y-4">
-                    {pythonResults.statistic !== null && (
-                       <div className="flex items-start gap-4">
-                          <div className={`p-2 rounded-xl bg-white dark:bg-slate-900 border ${Math.abs(pythonResults.statistic) > 0.3 ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-400'}`}>
-                             {pythonResults.statistic > 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6 text-rose-500" />}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-800 dark:text-slate-100">
-                               {Math.abs(pythonResults.statistic) > 0.5 ? 'Strong Relationship Detected' : 
-                                Math.abs(pythonResults.statistic) > 0.2 ? 'Moderate Correlation' : 'Weak/Negligible Direction'}
-                            </p>
-                            <p className="text-sm text-slate-500 mt-1 italic">
-                               {pythonResults.statistic > 0 ? 
-                                 "Proportional: As one variable increases, the other significantly trends upward." : 
-                                 "Inverse: An increase in one variable is associated with a decrease in the other."}
-                            </p>
-                          </div>
-                       </div>
-                    )}
-                    <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                       This mathematical insight is derived from current ward data. P-Value: <strong>{pythonResults.p_value?.toFixed(4)}</strong>. 
-                       {pythonResults.p_value < 0.05 ? " Result is statistically significant." : " Result is not statistically significant and may be due to chance."}
-                    </p>
-                 </div>
-              </div>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <InsightCard title="Total Patients" value={insights.total.toLocaleString()} sub="Across all wards" color="from-indigo-600 to-indigo-800 border-indigo-700/50" icon={Users} />
+            <InsightCard title="High Risk" value={insights.highRisk} sub={`${((insights.highRisk / insights.total) * 100).toFixed(1)}% of cohort`} color="from-rose-600 to-red-800 border-rose-700/50" icon={HeartPulse} trend="up" />
+            <InsightCard title="Avg. Age" value={`${insights.avgAge}y`} sub="Mean patient age" color="from-violet-600 to-purple-800 border-violet-700/50" icon={Stethoscope} />
+            <InsightCard title="Avg. Comorbidities" value={insights.avgComorbidity} sub="Per patient" color="from-teal-600 to-emerald-800 border-teal-700/50" icon={Activity} />
+          </div>
 
-              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                 <div className="flex items-center gap-2 mb-4">
-                    <Table className="h-4 w-4 text-indigo-500" />
-                    <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Visualization Settings</h4>
-                 </div>
-                 <div className="flex flex-wrap gap-2">
-                    {['Bar', 'Line', 'Area', 'Pie', 'Scatter'].map(m => (
-                      <button 
-                        key={m}
-                        onClick={() => setChartType(m as any)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition ${chartType === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800'}`}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            {/* Disease Prevalence */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="font-black text-white">Disease Prevalence</h3>
+                  <p className="text-slate-500 text-xs">Most common chronic conditions</p>
+                </div>
+                <div className="p-2 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                  <HeartPulse className="h-5 w-5 text-rose-400" />
+                </div>
+              </div>
+              <div className="space-y-1 divide-y divide-slate-800/50">
+                {insights.topDiseases.slice(0, 8).map(([name, count], i) => (
+                  <DiseaseBar key={name} name={name} count={count} total={insights.total} rank={i + 1} />
+                ))}
+              </div>
+            </div>
+
+            {/* Category & Gender Breakdown */}
+            <div className="space-y-5">
+              {/* Category Donut */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <h3 className="font-black text-white mb-1">Risk Category Distribution</h3>
+                <p className="text-slate-500 text-xs mb-4">Current clinical classification</p>
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(insights.catCounts).filter(([k]) => k !== 'Deceased/Archive').map(([name, value]) => ({ name, value }))}
+                        dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={3}
+                        label={({ name, percent }: any) => `${(name || '').replace(' Follow-up', '')}: ${((percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={false}
                       >
-                        {m} View
-                      </button>
-                    ))}
-                 </div>
-                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Insight Precision</p>
-                    <div className="flex items-center gap-2">
-                       <div className="h-1.5 flex-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (pythonResults.n_samples / 50) * 100)}%` }} />
-                       </div>
-                       <span className="text-[10px] font-bold text-slate-500">{pythonResults.n_samples} pairs</span>
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           {/* HIGH-IMPACT VISUALIZATION */}
-           <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-inner">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                   <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-                   <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Scientific Visualization Map</h4>
+                        {Object.entries(insights.catCounts).filter(([k]) => k !== 'Deceased/Archive').map(([name], i) => (
+                          <Cell key={name} fill={CATEGORY_COLOURS[name] || PALETTE[i]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<DarkTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-                {chartType === 'Bar' && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={showFrequencies} onChange={e => setShowFrequencies(e.target.checked)} className="rounded text-indigo-600" />
-                    <span className="text-[10px] font-bold text-slate-500">Enable Binning</span>
-                  </label>
-                )}
               </div>
-              {renderChart()}
-           </div>
+
+              {/* Gender split */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <h3 className="font-black text-white mb-4">Gender Distribution</h3>
+                <div className="space-y-3">
+                  {Object.entries(insights.genderCounts).map(([g, count], i) => (
+                    <div key={g}>
+                      <div className="flex justify-between text-sm mb-1.5">
+                        <span className="font-bold text-slate-300">{g}</span>
+                        <span className="text-slate-500 font-bold">{count} <span className="text-slate-600">({((count / insights.total) * 100).toFixed(1)}%)</span></span>
+                      </div>
+                      <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${(count / insights.total) * 100}%`, background: i === 0 ? '#6366f1' : '#ec4899' }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Ward breakdown bar chart */}
+          {distinctWards.length > 1 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="font-black text-white mb-1">Patient Distribution by Ward</h3>
+              <p className="text-slate-500 text-xs mb-6">Admitted patients per clinical unit</p>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={Object.entries(insights.wardCounts).map(([name, value]) => ({ name, value }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<DarkTooltip />} />
+                    <Bar dataKey="value" name="Patients" radius={[6, 6, 0, 0]}>
+                      {Object.keys(insights.wardCounts).map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={() => setMode('explorer')}
+              className="flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-indigo-500/20 group"
+            >
+              <Sigma className="h-5 w-5" />
+              Run Custom Correlation Analysis
+              <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
         </div>
       )}
 
-      {report && (
-        <div className="bg-slate-900 text-white rounded-3xl p-8 md:p-12 mt-8 shadow-2xl">
-           <div className="flex items-center gap-3 mb-8">
-              <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                <BrainCircuit className="h-6 w-6" />
+      {/* ── RELATIONSHIP EXPLORER TAB ────────────────────── */}
+      {mode === 'explorer' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+
+          {/* Ward Filter — horizontal scroll on mobile */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 sm:px-5 py-3 sm:py-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-2">Study Cohort</span>
+            <div className="flex overflow-x-auto no-scrollbar gap-2 -mx-1 px-1 pb-1">
+              {['All', ...distinctWards].map(w => (
+                <button
+                  key={w}
+                  onClick={() => setWardFilter(w)}
+                  className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 min-h-[36px] ${
+                    wardFilter === w ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >{w === 'All' ? `All (${patients.length})` : `${w} (${patients.filter(p => (p.doctor_ward || p.ward_name) === w).length})`}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Variable Pickers */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            <VariablePicker
+              label="X" accent="bg-indigo-600"
+              groups={categorizedGroups}
+              selected={selectedVars1} onToggle={id => setSelectedVars1(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+              search={search1} onSearch={setSearch1}
+              logicMode={logicMode1} onLogicToggle={() => setLogicMode1(m => m === 'any' ? 'all' : 'any')}
+            />
+            <VariablePicker
+              label="Y" accent="bg-violet-600"
+              groups={categorizedGroups}
+              selected={selectedVars2} onToggle={id => setSelectedVars2(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+              search={search2} onSearch={setSearch2}
+              logicMode={logicMode2} onLogicToggle={() => setLogicMode2(m => m === 'any' ? 'all' : 'any')}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-rose-950/30 border border-rose-800/40 rounded-2xl text-rose-400">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-semibold">{error}</span>
+            </div>
+          )}
+
+          {/* Action buttons — full width on mobile */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-end gap-3">
+            <button
+              onClick={runClientAnalysis}
+              disabled={selectedVars1.length === 0 || selectedVars2.length === 0}
+              className="flex items-center justify-center gap-2 px-4 sm:px-7 py-3.5 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black rounded-2xl transition-all disabled:opacity-40 shadow-lg shadow-teal-500/20 min-h-[48px]"
+            >
+              <Zap className="h-5 w-5 shrink-0" />
+              <span>Quick Analysis</span>
+            </button>
+            <button
+              onClick={runAdvancedAnalysis}
+              disabled={isAnalyzing || selectedVars1.length === 0 || selectedVars2.length === 0}
+              className="group flex items-center justify-center gap-2 px-4 sm:px-7 py-3.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-black rounded-2xl transition-all disabled:opacity-40 shadow-lg shadow-indigo-500/20 min-h-[48px]"
+            >
+              {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin shrink-0" /> : <Sigma className="h-5 w-5 shrink-0 group-hover:rotate-12 transition-transform" />}
+              <span>Python + AI</span>
+            </button>
+          </div>
+
+          {/* ── CLIENT RESULTS ───────── */}
+          {clientResults && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Result Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b border-slate-800 bg-slate-800/30">
+                <div>
+                  <h3 className="text-lg font-black text-white">{clientResults.xLabel} <span className="text-slate-500 font-medium">vs</span> {clientResults.yLabel}</h3>
+                  <p className="text-slate-500 text-xs mt-0.5">n = {clientResults.n} paired observations · Client-side χ² cross-tabulation</p>
+                </div>
+                {clientResults.chi && (
+                  <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm ${
+                    clientResults.chi.significant ? 'bg-emerald-950/40 border-emerald-700/40 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'
+                  }`}>
+                    {clientResults.chi.significant ? <CheckCircle2 className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+                    {clientResults.chi.significant ? 'Significant' : 'Not Significant'}
+                    <span className="font-normal opacity-70">p = {clientResults.chi.p}</span>
+                  </div>
+                )}
               </div>
-              <h3 className="text-2xl font-bold tracking-tight">AI Clinical Interpretation</h3>
-           </div>
-           <div className="prose prose-invert max-w-none prose-headings:font-bold prose-a:text-indigo-400">
-              <ReactMarkdown>{report}</ReactMarkdown>
-           </div>
+
+              {/* Stats row — stacks on mobile */}
+              {clientResults.chi && (
+                <div className="grid grid-cols-3 sm:grid-cols-3 divide-x divide-slate-800 border-b border-slate-800">
+                  {[
+                    { label: 'χ² Statistic', value: clientResults.chi.chi2 },
+                    { label: 'Degrees of Freedom', value: clientResults.chi.df },
+                    { label: 'p-Value', value: clientResults.chi.p },
+                  ].map(s => (
+                    <div key={s.label} className="px-6 py-4 text-center">
+                      <div className="text-2xl font-black text-white">{s.value}</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Chart type selector */}
+              <div className="flex items-center gap-2 px-6 py-4 border-b border-slate-800">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 mr-2">Chart</span>
+                {['Bar', 'Line', 'Area', 'Pie'].map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setChartType(t as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${chartType === t ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}`}
+                  >{t}</button>
+                ))}
+              </div>
+
+              {/* Chart */}
+              <div className="p-6">{renderChart(clientResults)}</div>
+
+              {/* Cross-tab table */}
+              <div className="px-6 pb-6 overflow-x-auto">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Frequency Table</p>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-3 py-2 text-slate-500 font-black uppercase tracking-wider border-b border-slate-800">X \ Y</th>
+                      {clientResults.yKeys.map((y: string) => (
+                        <th key={y} className="px-3 py-2 text-indigo-400 font-black border-b border-slate-800">{y}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientResults.xKeys.map((x: string) => (
+                      <tr key={x} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                        <td className="px-3 py-2 text-slate-300 font-semibold">{x}</td>
+                        {clientResults.yKeys.map((y: string) => (
+                          <td key={y} className="px-3 py-2 text-center text-slate-400 font-bold">{clientResults.table[x]?.[y] || 0}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Python Results */}
+          {pythonResults && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden animate-in fade-in duration-300">
+              <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b border-slate-800 bg-slate-800/30">
+                <div>
+                  <h3 className="text-lg font-black text-white">Python Math Engine Results</h3>
+                  <p className="text-slate-500 text-xs mt-0.5">{pythonResults.test_used} · n = {pythonResults.n_samples}</p>
+                </div>
+                <div className={`px-4 py-2 rounded-xl border font-bold text-sm ${pythonResults.p_value < 0.05 ? 'bg-emerald-950/40 border-emerald-700/40 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                  p = {pythonResults.p_value?.toExponential(3)}
+                </div>
+              </div>
+              {pythonResults.chart_data && <div className="p-6">{renderChart({ chartData: [], yKeys: [], ...pythonResults.chart_data })}</div>}
+            </div>
+          )}
+
+          {/* AI Report */}
+          {report && (
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/40 border border-indigo-900/40 rounded-2xl p-8 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-indigo-600/20 rounded-xl border border-indigo-500/20">
+                  <BrainCircuit className="h-5 w-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white">AI Clinical Interpretation</h3>
+                  <p className="text-slate-500 text-xs">Generated by Gemini · For research purposes only</p>
+                </div>
+              </div>
+              <div className="prose prose-sm prose-invert max-w-none prose-headings:font-black prose-p:text-slate-300 prose-strong:text-white">
+                <ReactMarkdown>{report}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── AI INVESTIGATOR TAB ──────────────────────────── */}
+      {mode === 'ai' && (
+        <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-violet-600/20 rounded-xl border border-violet-500/20">
+                <Sparkles className="h-5 w-5 text-violet-400" />
+              </div>
+              <div>
+                <h3 className="font-black text-white">Natural Language Research</h3>
+                <p className="text-slate-500 text-xs">Describe any clinical question in plain English</p>
+              </div>
+            </div>
+
+            {!aiEnabled ? (
+              <div className="py-10 text-center text-slate-500">
+                <Sparkles className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                <p className="font-bold text-sm">AI Investigator is disabled for your account.</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={userObjective} onChange={e => setUserObjective(e.target.value)}
+                  placeholder={`Describe the clinical correlation you want to discover...\n\nExamples:\n• "What is the relationship between diabetes and high-risk category?"\n• "Do female patients have better outcomes than male patients?"\n• "Which chronic diseases are most associated with mortality?"`}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 min-h-[180px] text-sm text-slate-200 placeholder:text-slate-600 outline-none resize-none focus:border-indigo-500 transition-colors"
+                />
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={runAI} disabled={isAnalyzing || !userObjective}
+                    className="flex items-center gap-2.5 px-7 py-3.5 bg-violet-600 hover:bg-violet-500 text-white font-black rounded-2xl transition-all disabled:opacity-40 shadow-lg shadow-violet-500/20"
+                  >
+                    {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                    Synthesize Report
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-rose-950/30 border border-rose-800/40 rounded-2xl text-rose-400">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-semibold">{error}</span>
+            </div>
+          )}
+
+          {report && (
+            <div className="bg-gradient-to-br from-slate-900 to-violet-950/30 border border-violet-900/40 rounded-2xl p-8 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-violet-600/20 rounded-xl border border-violet-500/20">
+                  <BrainCircuit className="h-5 w-5 text-violet-400" />
+                </div>
+                <h3 className="font-black text-white">AI Clinical Research Report</h3>
+              </div>
+              <div className="prose prose-sm prose-invert max-w-none prose-headings:font-black prose-p:text-slate-300">
+                <ReactMarkdown>{report}</ReactMarkdown>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

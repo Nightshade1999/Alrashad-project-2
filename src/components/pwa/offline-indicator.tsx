@@ -28,6 +28,9 @@ export function OfflineIndicator() {
   }>(() => deriveStatus(ps));
 
   const lastStatusRef = useRef<string>('');
+  // Controls whether the "syncing" banner is visible — auto-hides after 3s
+  const [showSyncBanner, setShowSyncBanner] = useState(false);
+  const syncBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!ps) return;
@@ -51,15 +54,26 @@ export function OfflineIndicator() {
         lastSyncedAt,
         isSyncing,
       });
+
+      // When actual data flows (upload or download), show the sync banner briefly
+      if (isSyncing) {
+        setShowSyncBanner(true);
+        // Clear any existing timer and restart the 3s countdown
+        if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
+        syncBannerTimerRef.current = setTimeout(() => {
+          setShowSyncBanner(false);
+        }, 3000);
+      }
     };
 
     updateStatus();
     const unsubscribe = ps.registerListener?.({ statusChanged: updateStatus });
-    const interval = setInterval(updateStatus, 1000); // Faster polling for first sync
+    const interval = setInterval(updateStatus, 1000);
 
     return () => {
       if (unsubscribe) unsubscribe();
       clearInterval(interval);
+      if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
     };
   }, [ps]);
 
@@ -109,15 +123,15 @@ export function OfflineIndicator() {
   }
 
   // --- 2. CONDITIONAL BOTTOM STATUS BAR ---
-  // Only show if offline or currently syncing
-  const isShow = !status.connected || status.isSyncing;
+  // Show when: offline, OR briefly when data is being synced (auto-hides after 3s)
+  const isShow = !status.connected || showSyncBanner;
   if (!isShow) return null;
 
   return (
      <div className="fixed bottom-0 left-0 right-0 z-[100] px-4 pb-[env(safe-area-inset-bottom,16px)] pointer-events-none mb-4 sm:mb-6 flex justify-center animate-in slide-in-from-bottom duration-500">
         <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900/90 dark:bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
            
-           {status.isSyncing ? (
+           {showSyncBanner && status.connected ? (
              <>
                <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
                <div className="flex flex-col">

@@ -1,11 +1,10 @@
 "use client"
 
 import { useState } from 'react'
-import { Users, Activity, BarChart3, Settings, ShieldAlert, TrendingUp, Shield, Calendar } from 'lucide-react'
+import { Users, Activity, BarChart3, Settings, ShieldAlert, Shield, Calendar } from 'lucide-react'
 import { UserManagement } from '@/components/admin/user-management'
 import { DoctorPerformance } from '@/components/admin/doctor-performance'
 import { MedicalStatistics } from '@/components/admin/medical-statistics'
-import { WardAnalytics } from '@/components/admin/ward-analytics'
 import { WardSettings } from '@/components/admin/ward-settings'
 import { ReminderArchive } from '@/components/admin/reminder-archive'
 import { NavigationButtons } from '@/components/layout/navigation-buttons'
@@ -30,7 +29,7 @@ export default function WardManagementClient({
   aiEnabled: boolean
   initialGlobalOffline: boolean
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'analytics' | 'wards' | 'reminders' | 'settings'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'wards' | 'reminders' | 'settings'>('users')
   const [globalOffline, setGlobalOffline] = useState(initialGlobalOffline)
 
   return (
@@ -86,16 +85,6 @@ export default function WardManagementClient({
           }`}
         >
           <Activity className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Doctor Performance</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
-            activeTab === 'analytics' 
-              ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-          }`}
-        >
-          <TrendingUp className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Analytics</span>
         </button>
         <button
           onClick={() => setActiveTab('research')}
@@ -174,7 +163,7 @@ export default function WardManagementClient({
           />
         )}
         {activeTab === 'performance' && <DoctorPerformance users={initialUsers} patients={patientsData} />}
-        {activeTab === 'analytics' && <WardAnalytics patients={patientsData} />}
+
         {activeTab === 'research' && <MedicalStatistics patients={patientsData} aiEnabled={aiEnabled} />}
         {activeTab === 'reminders' && <ReminderArchive />}
         {activeTab === 'wards' && <WardSettings settings={wardSettingsData} users={initialUsers} />}
