@@ -9,6 +9,9 @@ const withPWA = withPWAInit({
     document: "/offline.html",
     image: "/icon.png",
   },
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
   workboxOptions: {
     disableDevLogs: true,
     // skipWaiting intentionally removed — it caused random page reloads.
