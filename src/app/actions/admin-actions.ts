@@ -63,6 +63,19 @@ export async function createUserAction(formData: FormData) {
 
   if (!email || !password) return { error: 'Email and password required' }
   
+  // 0. Validate Wards against ward_settings
+  const { data: validWards } = await getSupabaseAdmin().from('ward_settings').select('ward_name')
+  const validNames = (validWards || []).map(w => w.ward_name)
+  
+  if (!validNames.includes(wardName)) {
+    return { error: `Invalid primary ward: "${wardName}". Wards must be created in Ward Setup first.` }
+  }
+  
+  const invalidWards = accessibleWards.filter(w => !validNames.includes(w))
+  if (invalidWards.length > 0) {
+    return { error: `Invalid accessible wards: ${invalidWards.join(', ')}. Wards must be created in Ward Setup first.` }
+  }
+  
   // 1. Create auth user
   const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
@@ -148,6 +161,22 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
   if (email) {
     const { error: authError } = await getSupabaseAdmin().auth.admin.updateUserById(userId, { email })
     if (authError) return { error: 'Failed to update email: ' + authError.message }
+  }
+
+  // Pre-validate Wards if they are being updated
+  if (wardName || accessibleWards) {
+     const { data: validWards } = await getSupabaseAdmin().from('ward_settings').select('ward_name')
+     const validNames = (validWards || []).map(w => w.ward_name)
+     
+     if (wardName && !validNames.includes(wardName)) {
+       return { error: `Invalid ward: "${wardName}". Create it in Ward Setup first.` }
+     }
+     if (accessibleWards) {
+       const invalid = accessibleWards.filter(w => !validNames.includes(w))
+       if (invalid.length > 0) {
+         return { error: `Invalid accessible wards: ${invalid.join(', ')}. Create them in Ward Setup first.` }
+       }
+     }
   }
 
   // Update profile data if provided

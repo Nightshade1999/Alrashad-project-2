@@ -24,7 +24,6 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   const [canSeeWardPatients, setCanSeeWardPatients] = useState(false)
   const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [tempWardInput, setTempWardInput] = useState('')
   const [wardSearch, setWardSearch] = useState('')
 
   const filteredUsers = (users || []).filter(u => 
@@ -57,23 +56,13 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setCanSeeWardPatients(false)
       setAccessibleWards([])
     }
-    setTempWardInput('')
     setWardSearch('')
   }
 
   const closeModal = () => {
     setActiveModal(null)
     setSelectedUser(null)
-    setTempWardInput('')
     setWardSearch('')
-  }
-
-  const addTempWard = (currentWards: string[]) => {
-    const val = tempWardInput.trim()
-    if (val && !currentWards.includes(val)) {
-      return [...currentWards, val]
-    }
-    return currentWards
   }
 
   // Actions
@@ -81,8 +70,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     e.preventDefault()
     setIsRefreshing(true)
     
-    // Capture any typed input that wasn't "Enter"ed
-    const updatedWards = addTempWard(accessibleWards)
+    const updatedWards = accessibleWards
     const primaryWard = updatedWards[0] || 'Unassigned'
 
     const formData = new FormData()
@@ -108,7 +96,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     e.preventDefault()
     setIsRefreshing(true)
     
-    const updatedWards = addTempWard(accessibleWards)
+    const updatedWards = accessibleWards
     const primaryWard = updatedWards[0] || 'Unassigned'
 
     const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, canSeeWardPatients, gender || null, updatedWards)
@@ -323,23 +311,11 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                           <button type="button" onClick={() => setAccessibleWards(prev => prev.filter(aw => aw !== w))} className="hover:scale-125 transition-transform"><X className="h-3 w-3" /></button>
                         </span>
                       ))}
-                      <input 
-                        type="text"
-                        value={tempWardInput}
-                        onChange={e => setTempWardInput(e.target.value)}
-                        placeholder={accessibleWards.length === 0 ? "Type new ward and press Enter..." : "Add another..."}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            const val = tempWardInput.trim()
-                            if (val && !accessibleWards.includes(val)) {
-                              setAccessibleWards(prev => [...prev, val])
-                              setTempWardInput('')
-                            }
-                          }
-                        }}
-                        className="flex-1 bg-transparent border-none outline-none text-sm font-bold p-1 placeholder:text-slate-400 min-w-[150px]"
-                      />
+                      {accessibleWards.length === 0 && (
+                        <span className="text-sm font-medium text-slate-400 p-1 italic">
+                          No wards selected...
+                        </span>
+                      )}
                     </div>
                     
                     <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">

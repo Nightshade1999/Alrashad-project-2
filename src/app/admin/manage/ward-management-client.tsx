@@ -170,11 +170,7 @@ export default function WardManagementClient({
         {activeTab === 'users' && (
           <UserManagement 
             users={initialUsers} 
-            wardNames={Array.from(new Set([
-              ...initialUsers.map(u => u.ward_name),
-              ...wardSettingsData.map(s => s.ward_name),
-              ...patientsData.map(p => p.ward_name)
-            ])).filter(Boolean).sort()} 
+            wardNames={wardSettingsData.map(s => s.ward_name).sort()} 
           />
         )}
         {activeTab === 'performance' && <DoctorPerformance users={initialUsers} patients={patientsData} />}
