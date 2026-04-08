@@ -4,13 +4,15 @@ import { useState, useMemo } from 'react'
 import { 
   BrainCircuit, Database, FileText, Loader2, ArrowRight, Table, 
   Sigma, Info, AlertCircle, CheckCircle2, FlaskConical, Calendar, 
-  Search, Filter, Sparkles, Activity, Divide, Users, LucideIcon, Download
+  Search, Filter, Sparkles, Activity, Divide, Users, LucideIcon, Download,
+  TrendingUp, TrendingDown, Trash2, X
 } from 'lucide-react'
 import { exportResearchToWord, exportResearchToExcel } from '@/lib/export-utils'
 import ReactMarkdown from 'react-markdown'
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell 
+  Tooltip, Legend, ScatterChart, Scatter, ZAxis, Cell, LineChart, Line,
+  AreaChart, Area, PieChart, Pie
 } from 'recharts'
 import { runComplexAIStudyAction } from '@/app/actions/research-actions'
 import { COMMON_DISEASES, ALL_SURGERIES } from '@/lib/medical-dictionary'
@@ -56,6 +58,8 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
 
   const [searchTerm1, setSearchTerm1] = useState('')
   const [searchTerm2, setSearchTerm2] = useState('')
+  const [chartType, setChartType] = useState<'Bar' | 'Line' | 'Area' | 'Scatter' | 'Pie'>('Bar')
+  const [showFrequencies, setShowFrequencies] = useState(false)
 
   // Helper to compute value for a patient
   const getPatientValue = (p: any, vId: string) => {
@@ -339,75 +343,50 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
   // --- CHART RENDERING LOGIC ---
   const renderChart = () => {
     if (!pythonResults || !pythonResults.chart_data) return null
-    const { type, groups, values, data, x, y } = pythonResults.chart_data
+    const { type: engineType, groups, values, data, x, y } = pythonResults.chart_data
 
-    if (type === 'boxplot' || (pythonResults.test_used && pythonResults.test_used.includes('T-Test') || pythonResults.test_used.includes('ANOVA'))) {
-      // For boxplot/ANOVA data, we'll show a Bar chart of means since Recharts doesn't have a native boxplot
-      const chartData = (groups || []).map((name: string, i: number) => {
-        const groupDesc = pythonResults.descriptives?.groups?.[name]
-        return {
-          name,
-          mean: groupDesc?.mean || 0,
-          n: groupDesc?.n || values?.[i]?.length || 0
-        }
+    // 1. FREQUENCY DISTRIBUTION (BINNING) - e.g. Age vs Disease
+    // If showFrequencies is on and we have meaningful keys
+    const indepKeys = Object.keys(data || {})
+    const isNumericalX = selectedVars1.length === 1 && ALL_VARIABLES.find(v => v.id === selectedVars1[0])?.type === 'continuous'
+    const isCategoricalY = selectedVars2.length >= 1 // Often disease Present/Absent
+
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+
+    // MODAL: PIE CHART (Proportions)
+    if (chartType === 'Pie') {
+      const pieData = indepKeys.map(k => {
+          const subKeys = Object.keys(data[k])
+          const totalInGroup = subKeys.reduce((acc, sk) => acc + data[k][sk], 0)
+          return { name: k, value: totalInGroup }
       })
-
       return (
-        <div className="h-[350px] w-full mt-6">
+        <div className="h-[400px] w-full mt-6">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-              <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis fontSize={12} tickLine={false} axisLine={false} label={{ value: pythonResults.dep_label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10, fill: '#64748b' } }} />
-              <Tooltip 
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
-              />
-              <Bar dataKey="mean" name="Mean Value" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40} />
-            </BarChart>
+            <PieChart>
+              <Pie 
+                data={pieData} 
+                dataKey="value" 
+                nameKey="name" 
+                cx="50%" cy="50%" 
+                outerRadius={120} 
+                innerRadius={60}
+                paddingAngle={5}
+                label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+              >
+                {pieData.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend verticalAlign="bottom" height={36}/>
+            </PieChart>
           </ResponsiveContainer>
         </div>
       )
     }
 
-    if (type === 'bar' || pythonResults.test_used === 'Chi-Square') {
-      // Flatten contingency table for Recharts
-      // data looks like { IndepVal1: { DepValA: 10, DepValB: 2 }, IndepVal2: { ... } }
-      const indepKeys = Object.keys(data || {})
-      if (indepKeys.length === 0) return null
-      
-      const depKeys = Object.keys(data[indepKeys[0]] || {})
-      const chartData = indepKeys.map(indepVal => ({
-        name: indepVal,
-        ...data[indepVal]
-      }))
-
-      const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-
-      return (
-        <div className="h-[350px] w-full mt-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-              <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-              <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px', fontSize: '11px' }} />
-              {depKeys.map((k, idx) => (
-                <Bar key={k} dataKey={k} stackId="a" fill={colors[idx % colors.length]} radius={idx === depKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )
-    }
-
-    if (type === 'scatter' || pythonResults.test_used === 'Pearson Correlation') {
-      const chartData = (x || []).map((val: number, i: number) => ({
-        x: val,
-        y: y[i]
-      }))
-
+    // SCATTER (Correlation Focus)
+    if (chartType === 'Scatter' || engineType === 'scatter' || pythonResults.test_used === 'Pearson Correlation') {
+      const scatterPoints = (x || []).map((val: number, i: number) => ({ x: val, y: y[i] }))
       return (
         <div className="h-[350px] w-full mt-6">
           <ResponsiveContainer width="100%" height="100%">
@@ -416,15 +395,90 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
               <XAxis type="number" dataKey="x" name={pythonResults.indep_label} fontSize={12} tickLine={false} axisLine={false} label={{ value: pythonResults.indep_label, position: 'insideBottom', offset: -5, fontSize: 10 }} />
               <YAxis type="number" dataKey="y" name={pythonResults.dep_label} fontSize={12} tickLine={false} axisLine={false} label={{ value: pythonResults.dep_label, angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: 10 }, offset: 10 }} />
               <ZAxis type="number" range={[64, 64]} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-              <Scatter name="Data Points" data={chartData} fill="#6366f1" opacity={0.6} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+              <Scatter name="Patients" data={scatterPoints} fill="#6366f1" opacity={0.6} />
             </ScatterChart>
           </ResponsiveContainer>
         </div>
       )
     }
 
-    return null
+    // PREPARE CATEGORICAL/SORTED DATA FOR BAR/LINE/AREA
+    const depKeys = indepKeys.length > 0 ? Object.keys(data[indepKeys[0]] || {}) : []
+    const sortedChartData = indepKeys.map(indepVal => ({
+      name: indepVal,
+      ...data[indepVal]
+    })).sort((a, b) => {
+       // Try numeric sort if possible
+       const na = parseFloat(a.name)
+       const nb = parseFloat(b.name)
+       if (!isNaN(na) && !isNaN(nb)) return na - nb
+       return a.name.localeCompare(b.name)
+    })
+
+    if (chartType === 'Line') {
+      return (
+        <div className="h-[350px] w-full mt-6 text-slate-900">
+           <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={sortedChartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+              <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+              <Legend verticalAlign="top" align="right" />
+              {depKeys.map((k, idx) => (
+                <Line key={k} type="monotone" dataKey={k} stroke={colors[idx % colors.length]} strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )
+    }
+
+    if (chartType === 'Area') {
+      return (
+        <div className="h-[350px] w-full mt-6">
+           <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sortedChartData}>
+              <defs>
+                {depKeys.map((k, idx) => (
+                  <linearGradient key={`grad-${k}`} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={colors[idx % colors.length]} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={colors[idx % colors.length]} stopOpacity={0}/>
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
+              <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis fontSize={11} tickLine={false} axisLine={false} />
+              <Tooltip />
+              <Legend verticalAlign="top" align="right" />
+              {depKeys.map((k, idx) => (
+                <Area key={k} type="monotone" dataKey={k} stroke={colors[idx % colors.length]} fillOpacity={1} fill={`url(#grad-${idx})`} strokeWidth={2} />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )
+    }
+
+    // DEFAULT: BAR CHART (Stacked by default for multi-outcomes)
+    return (
+      <div className="h-[350px] w-full mt-6">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={sortedChartData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+            <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+            <YAxis fontSize={12} tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+            <Legend verticalAlign="top" align="right" iconType="circle" />
+            {depKeys.map((k, idx) => (
+              <Bar key={k} dataKey={k} stackId="a" fill={colors[idx % colors.length]} radius={idx === depKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    )
   }
 
   return (
@@ -787,11 +841,80 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
               </div>
            </div>
 
+           {/* DYNAMIC INSIGHT BOX (Trend Detection) */}
+           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                 <div className="flex items-center gap-2 mb-4">
+                    <Activity className="h-4 w-4 text-indigo-500" />
+                    <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Clinical Trend Insight</h4>
+                 </div>
+                 <div className="space-y-4">
+                    {pythonResults.statistic !== null && (
+                       <div className="flex items-start gap-4">
+                          <div className={`p-2 rounded-xl bg-white dark:bg-slate-900 border ${Math.abs(pythonResults.statistic) > 0.3 ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-400'}`}>
+                             {pythonResults.statistic > 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6 text-rose-500" />}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800 dark:text-slate-100">
+                               {Math.abs(pythonResults.statistic) > 0.5 ? 'Strong Relationship Detected' : 
+                                Math.abs(pythonResults.statistic) > 0.2 ? 'Moderate Correlation' : 'Weak/Negligible Direction'}
+                            </p>
+                            <p className="text-sm text-slate-500 mt-1 italic">
+                               {pythonResults.statistic > 0 ? 
+                                 "Proportional: As one variable increases, the other significantly trends upward." : 
+                                 "Inverse: An increase in one variable is associated with a decrease in the other."}
+                            </p>
+                          </div>
+                       </div>
+                    )}
+                    <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                       This mathematical insight is derived from current ward data. P-Value: <strong>{pythonResults.p_value?.toFixed(4)}</strong>. 
+                       {pythonResults.p_value < 0.05 ? " Result is statistically significant." : " Result is not statistically significant and may be due to chance."}
+                    </p>
+                 </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                 <div className="flex items-center gap-2 mb-4">
+                    <Table className="h-4 w-4 text-indigo-500" />
+                    <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Visualization Settings</h4>
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                    {['Bar', 'Line', 'Area', 'Pie', 'Scatter'].map(m => (
+                      <button 
+                        key={m}
+                        onClick={() => setChartType(m as any)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition ${chartType === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800'}`}
+                      >
+                        {m} View
+                      </button>
+                    ))}
+                 </div>
+                 <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Insight Precision</p>
+                    <div className="flex items-center gap-2">
+                       <div className="h-1.5 flex-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (pythonResults.n_samples / 50) * 100)}%` }} />
+                       </div>
+                       <span className="text-[10px] font-bold text-slate-500">{pythonResults.n_samples} pairs</span>
+                    </div>
+                 </div>
+              </div>
+           </div>
+
            {/* HIGH-IMPACT VISUALIZATION */}
-           <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 mb-4">
-                 <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-                 <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Visual Correlation Map</h4>
+           <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-inner">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                   <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                   <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Scientific Visualization Map</h4>
+                </div>
+                {chartType === 'Bar' && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={showFrequencies} onChange={e => setShowFrequencies(e.target.checked)} className="rounded text-indigo-600" />
+                    <span className="text-[10px] font-bold text-slate-500">Enable Binning</span>
+                  </label>
+                )}
               </div>
               {renderChart()}
            </div>

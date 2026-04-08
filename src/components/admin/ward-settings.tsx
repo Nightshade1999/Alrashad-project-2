@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from 'react'
-import { Shield, Save, Trash2, RefreshCw, Search, Download, Plus, Loader2 } from 'lucide-react'
-import { upsertWardSettingAction, deleteWardSettingAction, syncWardSettingsAction, prepareBackupFilesAction } from '@/app/actions/admin-actions'
+import { upsertWardSettingAction, deleteWardSettingAction, findUnusedWardsAction, bulkDeleteWardsAction, prepareBackupFilesAction } from '@/app/actions/admin-actions'
+import { Shield, Save, Trash2, RefreshCw, Search, Download, Plus, Loader2, Activity, X } from 'lucide-react'
 
 export function WardSettings({ settings, users }: { settings: any[], users: any[] }) {
   const [isSaving, setIsSaving] = useState(false)
@@ -10,6 +10,8 @@ export function WardSettings({ settings, users }: { settings: any[], users: any[
   const [isSyncing, setIsSyncing] = useState(false)
   const [isBackupPreparing, setIsBackupPreparing] = useState(false)
   const [newWardInput, setNewWardInput] = useState('')
+  const [unusedWards, setUnusedWards] = useState<string[]>([])
+  const [showCleanupReview, setShowCleanupReview] = useState(false)
   
   // Extract unique ward names from users and current settings
   const uniqueWards = Array.from(new Set([
@@ -62,17 +64,34 @@ export function WardSettings({ settings, users }: { settings: any[], users: any[
     }
   }
 
-  const handleSync = async () => {
-    if (!confirm("This will permanently delete configurations for any ward that is not assigned to an active doctor. Proceed?")) return
-    
+  const handleSyncDetection = async () => {
     setIsSyncing(true)
-    const res = await syncWardSettingsAction()
+    const res = await findUnusedWardsAction()
     setIsSyncing(false)
     
     if (res?.error) {
-      alert("Sync failed: " + res.error)
+      alert("Search failed: " + res.error)
+    } else if (res.unused && res.unused.length > 0) {
+      setUnusedWards(res.unused)
+      setShowCleanupReview(true)
     } else {
-      alert("Ward configurations successfully synchronized with user accounts.")
+      alert("No unused wards detected. All configurations are currently mapped to active clinical staff.")
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to permanently delete these ${unusedWards.length} wards?`)) return
+    
+    setIsSyncing(true)
+    const res = await bulkDeleteWardsAction(unusedWards)
+    setIsSyncing(false)
+    
+    if (res?.error) {
+      alert("Cleanup failed: " + res.error)
+    } else {
+      setShowCleanupReview(false)
+      setUnusedWards([])
+      alert("Successfully removed unused clinical ward configurations.")
       window.location.reload()
     }
   }
@@ -112,64 +131,114 @@ export function WardSettings({ settings, users }: { settings: any[], users: any[
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* RENDER DEBUG CHECK - If you see this, the component is definitely rendering */}
+      <div className="bg-emerald-600/10 border border-emerald-200 p-2 rounded-lg text-center">
+         <p className="text-[10px] font-black uppercase text-emerald-600 tracking-[0.3em]">Institutional Configuration Engine v13.0 Active</p>
+      </div>
+
+      {showCleanupReview && (
+        <div className="bg-rose-600 p-10 rounded-[3rem] shadow-2xl shadow-rose-500/30 text-white animate-in slide-in-from-top duration-500 relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 blur-[80px] rounded-full -mr-32 -mt-32" />
+           <div className="relative z-10">
+              <div className="flex justify-between items-start mb-6">
+                 <div>
+                    <h3 className="text-3xl font-black tracking-tight">Review Unused Wards</h3>
+                    <p className="text-rose-100/80 font-medium">The following wards have zero active clinical staff assigned. You may safely prune them or cancel.</p>
+                 </div>
+                 <button onClick={() => setShowCleanupReview(false)} className="p-3 hover:bg-white/10 rounded-full transition">
+                    <X className="h-6 w-6" />
+                 </button>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                 {unusedWards.map(name => (
+                   <div key={name} className="px-5 py-3 bg-white/10 border border-white/20 rounded-2xl font-bold flex items-center justify-between">
+                      <span className="truncate">{name}</span>
+                   </div>
+                 ))}
+              </div>
+
+              <div className="flex gap-4">
+                 <button 
+                   onClick={handleBulkDelete}
+                   disabled={isSyncing}
+                   className="px-8 py-4 bg-white text-rose-600 hover:bg-rose-50 rounded-2xl text-lg font-black transition-all active:scale-95 shadow-xl shadow-black/20"
+                 >
+                   {isSyncing ? <Loader2 className="h-6 w-6 animate-spin" /> : "Delete Wards"}
+                 </button>
+                 <button 
+                   onClick={() => setShowCleanupReview(false)}
+                   className="px-8 py-4 bg-rose-700/50 hover:bg-rose-700 text-white rounded-2xl text-lg font-black transition-all"
+                 >
+                   Cancel
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+      {/* Manual Add Ward - High Visibility */}
+      <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-xl shadow-indigo-500/20 text-white flex flex-wrap items-center gap-6 mb-8">
+          <div className="flex-1 min-w-[250px]">
+             <div className="flex items-center gap-3 mb-1">
+                <div className="p-2 bg-white/20 rounded-xl">
+                   <Plus className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-lg font-black tracking-tight">Register New Clinical Ward</h3>
+             </div>
+             <p className="text-indigo-100/80 text-sm font-medium">Add a physical location (e.g. ICU, ER, Ward 5) to the institutional dropdown.</p>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <input 
+              type="text"
+              placeholder="Enter ward name..."
+              value={newWardInput}
+              onChange={(e) => setNewWardInput(e.target.value)}
+              className="flex-1 sm:w-64 px-5 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder:text-indigo-200/50 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all font-bold"
+            />
+            <button 
+              onClick={handleCreateNewWard}
+              disabled={!newWardInput.trim() || isSaving}
+              className="px-6 py-3 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl text-sm font-black transition-all active:scale-95 disabled:opacity-50 shadow-lg shadow-black/10"
+            >
+              Add Ward
+            </button>
+          </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <Shield className="h-5 w-5 text-indigo-500" /> Ward Configurations
+          <Shield className="h-5 w-5 text-indigo-500" /> Administrative Controls
         </h2>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input 
               type="text"
-              placeholder="Search wards..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all w-48 shadow-sm"
             />
           </div>
           <button 
-            onClick={handleSync}
+            onClick={handleSyncDetection}
             disabled={isSyncing}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition disabled:opacity-50"
-            title="Remove ward settings for wards that no longer have assigned doctors."
+            title="Cleanup: Detection scan for clinical areas that no longer have assigned doctors."
           >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            Cleanup Unused Wards
+            <Activity className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            Scan for Inactive Wards
           </button>
           <button 
             onClick={handleBackup}
             disabled={isBackupPreparing}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition disabled:opacity-50 shadow-md shadow-indigo-500/20"
-            title="Export all data and code as ZIP"
+            title="Rollback Export: Downloads every database record and all source code as a ZIP."
           >
             {isBackupPreparing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             System Backup
           </button>
         </div>
-      </div>
-
-      {/* Manual Add Ward */}
-      <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 p-4 rounded-2xl flex flex-wrap items-center gap-4">
-          <div className="flex-1 min-w-[200px]">
-             <h3 className="text-sm font-bold text-indigo-900 dark:text-indigo-400">Register New Ward</h3>
-             <p className="text-xs text-indigo-700/60 dark:text-indigo-500/60">Manually add a workstation name to the clinical dropdown.</p>
-          </div>
-          <div className="flex gap-2">
-            <input 
-              type="text"
-              placeholder="e.g. Intensive Care..."
-              value={newWardInput}
-              onChange={(e) => setNewWardInput(e.target.value)}
-              className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
-            />
-            <button 
-              onClick={handleCreateNewWard}
-              disabled={!newWardInput.trim() || isSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" /> Add Ward
-            </button>
-          </div>
       </div>
       
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm p-6">

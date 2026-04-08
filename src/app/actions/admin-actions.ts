@@ -432,6 +432,44 @@ export async function syncProfileWardAction(newWardName: string) {
   return { success: true }
 }
 
+export async function findUnusedWardsAction() {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+
+  // 1. Get all wards defined in settings
+  const { data: settings, error: sError } = await getSupabaseAdmin()
+    .from('ward_settings')
+    .select('ward_name')
+  
+  if (sError) return { error: sError.message }
+
+  // 2. Get all wards currently in use by profiles
+  const { data: profiles, error: pError } = await getSupabaseAdmin()
+    .from('user_profiles')
+    .select('ward_name')
+  
+  if (pError) return { error: pError.message }
+
+  const usedWards = new Set(profiles.map(p => p.ward_name).filter(Boolean))
+  const unused = settings
+    .map(s => s.ward_name)
+    .filter(name => !usedWards.has(name))
+
+  return { unused }
+}
+
+export async function bulkDeleteWardsAction(wardNames: string[]) {
+  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
+  
+  const { error } = await getSupabaseAdmin()
+    .from('ward_settings')
+    .delete()
+    .in('ward_name', wardNames)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/manage')
+  return { success: true }
+}
+
 
 export async function getGlobalOfflineSettingAction() {
   try {
