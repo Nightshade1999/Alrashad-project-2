@@ -2,8 +2,7 @@ import { ReactNode } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
-import { Stethoscope, Settings } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Stethoscope } from 'lucide-react'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
 import { WardHeader } from '@/components/dashboard/ward-header'
 import { DoctorNameModal } from '@/components/dashboard/doctor-name-modal'
@@ -50,9 +49,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             </Link>
           </div>
 
-          {/* Right: Status + Notifications + User Identity */}
+          {/* Right: Notifications + User Identity */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <OfflineIndicator />
             <NotificationCenter />
             <UserSettingsModal />
           </div>
@@ -62,10 +60,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       {/* Doctor Name Modal — shows on first sign-in of a session */}
       <DoctorNameModal />
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-safe">
+      {/* Main Content Area - Reduced bottom padding since Indicator is fixed bottom */}
+      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-32">
         {children}
       </main>
+      <OfflineIndicator />
       <Toaster richColors position="bottom-right" />
     </div>
   )

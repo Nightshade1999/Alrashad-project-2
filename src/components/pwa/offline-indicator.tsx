@@ -2,7 +2,7 @@
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useState, useEffect, useRef } from 'react'
-import { Cloud, CloudOff, RefreshCcw, Loader2, Wifi, WifiOff } from 'lucide-react'
+import { CloudOff, RefreshCw, Loader2, Wifi, WifiOff, Database, CheckCircle2 } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
 
 function deriveStatus(ps: any) {
@@ -55,7 +55,7 @@ export function OfflineIndicator() {
 
     updateStatus();
     const unsubscribe = ps.registerListener?.({ statusChanged: updateStatus });
-    const interval = setInterval(updateStatus, 3000);
+    const interval = setInterval(updateStatus, 1000); // Faster polling for first sync
 
     return () => {
       if (unsubscribe) unsubscribe();
@@ -65,45 +65,68 @@ export function OfflineIndicator() {
 
   if (!ps) return null;
 
-  const isConnecting = !status.connected && !status.hasSynced;
-
-  // Render Logic
-  if (status.isSyncing) {
+  // --- 1. FULL SCREEN INITIAL SYNC OVERLAY ---
+  // If the device has NEVER successfully synced clinical data, block the UI
+  if (!status.hasSynced && status.connected) {
     return (
-      <Badge variant="outline" className="text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9">
-        <RefreshCcw className="w-3.5 h-3.5 animate-spin" />
-        Syncing...
-      </Badge>
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-indigo-500/10 opacity-50" />
+        
+        <div className="relative">
+          <div className="h-32 w-32 rounded-full border-t-4 border-r-4 border-teal-500 animate-spin mb-8" />
+          <div className="absolute inset-0 flex items-center justify-center">
+             <Database className="h-12 w-12 text-teal-400" />
+          </div>
+        </div>
+
+        <h2 className="text-3xl font-black text-white tracking-tight mb-4">Initial Clinical Sync</h2>
+        <p className="text-slate-400 max-w-sm mb-8 font-medium">
+          Downloading ward database for full offline availability. This ensures your patient records are ready even without signal.
+        </p>
+
+        <div className="w-full max-w-xs h-2 bg-slate-800 rounded-full overflow-hidden mb-4">
+           <div className="h-full bg-teal-500 animate-pulse w-full" />
+        </div>
+        
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-teal-500">
+           <RefreshCw className="h-3 w-3 animate-spin" />
+           Syncing Patient Stream
+        </div>
+      </div>
     )
   }
 
-  if (status.connected) {
-    return (
-      <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest hidden sm:flex h-9 group relative cursor-help">
-        <Cloud className="w-3.5 h-3.5" />
-        Synced
-        {/* Tooltip on hover */}
-        <span className="absolute top-full right-0 mt-2 px-2 py-1 bg-slate-900 text-white text-[8px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
-          Last Updated: {status.lastSyncedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'Just now'}
-        </span>
-      </Badge>
-    )
-  }
-
-  if (isConnecting) {
-    return (
-      <Badge variant="outline" className="text-amber-600 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        Connecting...
-      </Badge>
-    )
-  }
+  // --- 2. CONDITIONAL BOTTOM STATUS BAR ---
+  // Only show if offline or currently syncing
+  const isShow = !status.connected || status.isSyncing;
+  if (!isShow) return null;
 
   return (
-    <Badge className="bg-rose-100 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9 border shadow-sm">
-      <CloudOff className="w-3.5 h-3.5" />
-      Offline Mode
-    </Badge>
+     <div className="fixed bottom-0 left-0 right-0 z-[100] px-4 pb-[env(safe-area-inset-bottom,16px)] pointer-events-none mb-4 sm:mb-6 flex justify-center animate-in slide-in-from-bottom duration-500">
+        <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900/90 dark:bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
+           
+           {status.isSyncing ? (
+             <>
+               <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
+               <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Cloud Syncing</span>
+                  <span className="text-[9px] font-bold text-slate-400">Updating medical records...</span>
+               </div>
+             </>
+           ) : (
+             <>
+               <div className="p-1.5 bg-rose-500/20 rounded-lg">
+                  <CloudOff className="h-4 w-4 text-rose-500" />
+               </div>
+               <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Offline Mode</span>
+                  <span className="text-[9px] font-bold text-slate-400">Working with local SQLite cache</span>
+               </div>
+             </>
+           )}
+
+        </div>
+     </div>
   )
 }
 

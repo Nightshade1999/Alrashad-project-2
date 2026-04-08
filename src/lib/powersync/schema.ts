@@ -90,3 +90,11 @@ export const AppSchema = new Schema({
   user_profiles,
   system_settings
 });
+
+/**
+ * SCHEMA_VERSION
+ * Increment this string whenever making changes to the Table definitions above.
+ * Changing this will trigger a full disconnectAndClear() for all clients on their next launch,
+ * ensuring they redownload the entire database matching the new structure.
+ */
+export const SCHEMA_VERSION = 'v14.0.0'; 

@@ -5,6 +5,7 @@ import { PowerSyncDatabase } from '@powersync/web';
 import { SupabaseConnector } from './SupabaseConnector';
 import { createClient } from '@/lib/supabase';
 import { getPowerSync, initPowerSync } from './db';
+import { SCHEMA_VERSION } from './schema';
 
 const PowerSyncContext = createContext<PowerSyncDatabase | null>(null);
 
@@ -30,6 +31,16 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const init = async () => {
       try {
+        // 1. Check for Schema Version Mismatch (Force Refresh if update pushed)
+        const storedVersion = localStorage.getItem('powersync_schema_version');
+        if (storedVersion !== SCHEMA_VERSION) {
+          console.log(`Schema mismatch (Local: ${storedVersion}, Code: ${SCHEMA_VERSION}). Clearing database...`);
+          await powerSync.disconnectAndClear();
+          localStorage.setItem('powersync_schema_version', SCHEMA_VERSION);
+          // Small delay to ensure clear is committed
+          await new Promise(r => setTimeout(r, 500));
+        }
+
         // Initializing via singleton helper (prevents duplicate init)
         await initPowerSync();
         
