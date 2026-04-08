@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { LayoutDashboard, CheckCircle2, ChevronRight, Stethoscope } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
 
 export const dynamic = 'force-dynamic'
@@ -57,9 +59,12 @@ export default async function SelectWardPage() {
         <p className="mt-4 text-slate-500 leading-relaxed font-medium">
           Your account is not currently assigned to any clinical wards. Please contact your system administrator to gain access.
         </p>
-        <Button asChild variant="ghost" className="mt-8 text-slate-400">
-          <a href="/dashboard">Return to Dashboard</a>
-        </Button>
+        <Link 
+          href="/dashboard" 
+          className={cn(buttonVariants({ variant: "ghost" }), "mt-8 text-slate-400")}
+        >
+          Return to Dashboard
+        </Link>
       </div>
     )
   }
