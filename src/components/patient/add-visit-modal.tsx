@@ -35,7 +35,7 @@ export function AddVisitModal({
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
   const router = useRouter()
-  const { isOfflineMode, visits: dbVisits } = useDatabase()
+  const { isOfflineMode, profile, visits: dbVisits } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,10 +58,11 @@ export function AddVisitModal({
     // ── Database Path ─────────────────────────────────────────
     try {
       if (isOfflineMode) {
-        const { data: { user } } = await createClient().auth.getUser()
+        if (!profile) throw new Error("User identity not loaded. Please wait a moment.")
+        
         await dbVisits.insert({
           ...payload,
-          doctor_id: user?.id,
+          doctor_id: profile.user_id,
           visit_date: `${payload.visit_date}T${payload.visit_time}:00`
         })
         toast.success('Saved to local database — syncing...')

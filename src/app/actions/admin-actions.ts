@@ -63,11 +63,6 @@ export async function createUserAction(formData: FormData) {
 
   if (!email || !password) return { error: 'Email and password required' }
   
-  // Ensure primary ward is in accessible list
-  if (wardName && !accessibleWards.includes(wardName)) {
-    accessibleWards.push(wardName)
-  }
-
   // 1. Create auth user
   const { data: authData, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
     email,
@@ -167,10 +162,6 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
     if (accessibleWards !== undefined) {
       updatePayload.accessible_wards = accessibleWards
-      // Ensure primary ward is ALWAYS in accessible_wards
-      if (wardName && !accessibleWards.includes(wardName)) {
-        updatePayload.accessible_wards = [...accessibleWards, wardName]
-      }
     }
 
     // 1. Fetch current profile to check if ward is changing

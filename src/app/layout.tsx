@@ -67,7 +67,6 @@ export default function RootLayout({
         </Suspense>
         <PowerSyncProvider>
           {children}
-          <SyncStatus />
           <InstallPrompt />
         </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />

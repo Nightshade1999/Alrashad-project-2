@@ -1,86 +1,108 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { processSyncQueue, getPendingCount } from "@/lib/offline-sync"
+import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
+import { useState, useEffect, useRef } from 'react'
+import { Cloud, CloudOff, RefreshCcw, Loader2, Wifi, WifiOff } from 'lucide-react'
 import { Badge } from "@/components/ui/badge"
-import { Wifi, WifiOff, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+
+function deriveStatus(ps: any) {
+  const currentStatus = ps?.currentStatus;
+  if (!currentStatus) return { connected: false, hasSynced: false, lastSyncedAt: null, isSyncing: false };
+  const isSyncing = !!(currentStatus.dataFlowStatus?.downloading || currentStatus.dataFlowStatus?.uploading);
+  const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
+  return {
+    connected: !!currentStatus.connected,
+    hasSynced: !!currentStatus.hasSynced,
+    lastSyncedAt,
+    isSyncing,
+  };
+}
 
 export function OfflineIndicator() {
-  const [isOnline, setIsOnline] = useState(true)
-  const [pendingCount, setPendingCount] = useState(0)
-  const [isSyncing, setIsSyncing] = useState(false)
+  const ps = usePowerSync();
+  const [status, setStatus] = useState<{
+    connected: boolean;
+    hasSynced: boolean;
+    lastSyncedAt: Date | null;
+    isSyncing: boolean;
+  }>(() => deriveStatus(ps));
+
+  const lastStatusRef = useRef<string>('');
 
   useEffect(() => {
-    setIsOnline(navigator.onLine)
-    getPendingCount().then(setPendingCount)
+    if (!ps) return;
 
-    const handleOnline = async () => {
-      setIsOnline(true)
-      const count = await getPendingCount()
-      if (count > 0) {
-        setIsSyncing(true)
-        toast.info(`Back online! Syncing ${count} items...`)
-        const syncedCount = await processSyncQueue()
-        setIsSyncing(false)
-        setPendingCount(0)
-        if (syncedCount > 0) {
-          toast.success(`Sync complete: ${syncedCount} items uploaded.`)
-        } else {
-          toast.info("Sync check finished.")
-        }
-      }
-    }
-    
-    const handleOffline = () => {
-      setIsOnline(false)
-      toast.warning("You are offline. Working from local cache.")
-    }
+    const updateStatus = () => {
+      const currentStatus = ps.currentStatus;
+      if (!currentStatus) return;
 
-    window.addEventListener("online", handleOnline)
-    window.addEventListener("offline", handleOffline)
+      const isSyncing = !!(currentStatus.dataFlowStatus?.downloading || currentStatus.dataFlowStatus?.uploading);
+      const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
+      const lastSyncedTime = lastSyncedAt?.getTime() || 0;
 
-    // Poll for pending count while offline
-    const interval = setInterval(() => {
-      if (!navigator.onLine) {
-        getPendingCount().then(setPendingCount)
-      }
-    }, 2000)
+      const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${lastSyncedTime}`;
+
+      if (statusKey === lastStatusRef.current) return;
+      lastStatusRef.current = statusKey;
+
+      setStatus({
+        connected: !!currentStatus.connected,
+        hasSynced: !!currentStatus.hasSynced,
+        lastSyncedAt,
+        isSyncing,
+      });
+    };
+
+    updateStatus();
+    const unsubscribe = ps.registerListener?.({ statusChanged: updateStatus });
+    const interval = setInterval(updateStatus, 3000);
 
     return () => {
-      window.removeEventListener("online", handleOnline)
-      window.removeEventListener("offline", handleOffline)
-      clearInterval(interval)
-    }
-  }, [])
+      if (unsubscribe) unsubscribe();
+      clearInterval(interval);
+    };
+  }, [ps]);
 
-  if (isOnline) {
-    if (isSyncing) {
-      return (
-        <Badge variant="outline" className="text-blue-600 bg-blue-50 border-blue-200 gap-1 rounded-full px-3 py-1 text-sm flex h-9">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Syncing...
-        </Badge>
-      )
-    }
+  if (!ps) return null;
+
+  const isConnecting = !status.connected && !status.hasSynced;
+
+  // Render Logic
+  if (status.isSyncing) {
     return (
-      <Badge variant="outline" className="text-emerald-600 bg-emerald-50 border-emerald-200 gap-1 rounded-full px-3 py-1 text-sm hidden sm:flex h-9">
-        <Wifi className="w-4 h-4" />
-        Online
+      <Badge variant="outline" className="text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9">
+        <RefreshCcw className="w-3.5 h-3.5 animate-spin" />
+        Syncing...
+      </Badge>
+    )
+  }
+
+  if (status.connected) {
+    return (
+      <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest hidden sm:flex h-9 group relative cursor-help">
+        <Cloud className="w-3.5 h-3.5" />
+        Synced
+        {/* Tooltip on hover */}
+        <span className="absolute top-full right-0 mt-2 px-2 py-1 bg-slate-900 text-white text-[8px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-[100]">
+          Last Updated: {status.lastSyncedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || 'Just now'}
+        </span>
+      </Badge>
+    )
+  }
+
+  if (isConnecting) {
+    return (
+      <Badge variant="outline" className="text-amber-600 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        Connecting...
       </Badge>
     )
   }
 
   return (
-    <Badge className="bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-300 gap-2 rounded-full px-3 py-1 text-sm flex h-9 border font-semibold">
-      <WifiOff className="w-4 h-4" />
-      {pendingCount > 0 ? (
-        <span className="flex items-center gap-1">
-          Offline <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" /> {pendingCount} Pending
-        </span>
-      ) : (
-        "Offline"
-      )}
+    <Badge className="bg-rose-100 dark:bg-rose-950/40 hover:bg-rose-200 dark:hover:bg-rose-900/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800 gap-2 rounded-xl px-3 py-1 text-[10px] font-black uppercase tracking-widest flex h-9 border shadow-sm">
+      <CloudOff className="w-3.5 h-3.5" />
+      Offline Mode
     </Badge>
   )
 }

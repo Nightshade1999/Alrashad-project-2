@@ -33,7 +33,7 @@ export function NavigationButtons() {
       
       {!isDashboard && (
         <>
-          <Link href="/dashboard">
+          <Link href="/dashboard" prefetch={true}>
             <Button
               variant="ghost"
               size="icon"

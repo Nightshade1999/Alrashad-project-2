@@ -138,7 +138,13 @@ export interface Database {
           tsb: number | null;
           hba1c: number | null;
           rbs: number | null;
+          ldl: number | null;
+          hdl: number | null;
+          tg: number | null;
+          esr: number | null;
+          crp: number | null;
           is_er: boolean;
+          doctor_id?: string | null;
           doctor_name?: string | null;
         };
         Insert: Omit<Database['public']['Tables']['investigations']['Row'], 'id' | 'date'> & { date?: string };

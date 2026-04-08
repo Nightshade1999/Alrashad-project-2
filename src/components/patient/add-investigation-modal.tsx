@@ -22,6 +22,9 @@ const LAB_FIELDS = [
   { key: 'tsb',          label: 'TSB',       placeholder: 'e.g. 0.8' },
   { key: 'hba1c',        label: 'HbA1c (%)', placeholder: 'e.g. 6.5' },
   { key: 'rbs',          label: 'RBS',       placeholder: 'e.g. 145' },
+  { key: 'ldl',          label: 'LDL',       placeholder: 'e.g. 100' },
+  { key: 'hdl',          label: 'HDL',       placeholder: 'e.g. 45' },
+  { key: 'tg',           label: 'TG',        placeholder: 'e.g. 150' },
   { key: 'esr',          label: 'ESR',       placeholder: 'e.g. 15' },
   { key: 'crp',          label: 'CRP',       placeholder: 'e.g. 5' },
 ]
@@ -44,7 +47,7 @@ export function AddInvestigationModal({
   const [values, setValues] = useState<Record<string, string>>({})
   const [otherLabs, setOtherLabs] = useState<{name: string, value: string}[]>([])
   const router = useRouter()
-  const { isOfflineMode, investigations: dbLabs } = useDatabase()
+  const { isOfflineMode, profile, investigations: dbLabs } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,14 +74,12 @@ export function AddInvestigationModal({
     // ── Database Path ─────────────────────────────────────────
     try {
       if (isOfflineMode) {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: profile } = await supabase.from('user_profiles').select('doctor_name').eq('user_id', user?.id || '').single()
+        if (!profile) throw new Error("User identity not loaded. Please wait a moment.")
         
         await dbLabs.insert({
           ...payload,
-          doctor_id: user?.id,
-          doctor_name: (profile as any)?.doctor_name || user?.email?.split('@')[0],
+          doctor_id: profile.user_id,
+          doctor_name: profile.doctor_name || profile.user_id,
           date: `${payload.date}T${payload.time}:00`
         })
         toast.success('Saved to local database — syncing...')

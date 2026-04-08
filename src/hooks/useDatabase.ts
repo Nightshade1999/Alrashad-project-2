@@ -14,32 +14,39 @@ export function useDatabase() {
 
   useEffect(() => {
     async function loadSettings() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      // 1. Check Global Setting
-      const { data: globalSettings } = await supabase
-        .from('system_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-      
-      setGlobalEnabled((globalSettings as any)?.global_offline_enabled ?? true);
+        // 1. Try Global Setting from Supabase/PowerSync
+        let globalSettings;
+        if (navigator.onLine) {
+           const { data } = await supabase.from('system_settings').select('*').eq('id', 1).single();
+           globalSettings = data;
+        } else if (ps) {
+           globalSettings = await ps.get('SELECT * FROM system_settings WHERE id = 1');
+        }
+        setGlobalEnabled((globalSettings as any)?.global_offline_enabled ?? true);
 
-      // 2. Check User Profile & Offline Toggle
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (userProfile) {
-        setProfile(userProfile as any);
-        setOfflineEnabled((userProfile as any).offline_mode_enabled ?? false);
+        // 2. Try User Profile from Supabase/PowerSync
+        let userProfile;
+        if (navigator.onLine) {
+           const { data } = await supabase.from('user_profiles').select('*').eq('user_id', user.id).single();
+           userProfile = data;
+        } else if (ps) {
+           userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+        }
+        
+        if (userProfile) {
+          setProfile(userProfile as any);
+          setOfflineEnabled((userProfile as any).offline_mode_enabled ?? false);
+        }
+      } catch (err) {
+        console.error("Failed to load database settings", err);
       }
     }
     loadSettings();
-  }, []);
+  }, [ps]);
 
   const isOfflineMode = globalEnabled && offlineEnabled;
 
@@ -121,8 +128,22 @@ export function useDatabase() {
       },
       insert: async (data: any) => {
         if (isOfflineMode && ps) {
-          return ps.execute('INSERT INTO visits (id, patient_id, doctor_id, visit_date, exam_notes, is_er) VALUES (?, ?, ?, ?, ?, ?)',
-            [crypto.randomUUID(), data.patient_id, data.doctor_id, new Date().toISOString(), data.exam_notes, data.is_er ? 1 : 0]);
+          return ps.execute(
+            'INSERT INTO visits (id, patient_id, doctor_id, visit_date, exam_notes, bp_sys, bp_dia, pr, spo2, temp, is_er) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              crypto.randomUUID(), 
+              data.patient_id, 
+              data.doctor_id, 
+              new Date().toISOString(), 
+              data.exam_notes, 
+              data.bp_sys, 
+              data.bp_dia, 
+              data.pr, 
+              data.spo2, 
+              data.temp, 
+              data.is_er ? 1 : 0
+            ]
+          );
         } else {
           return (supabase.from('visits') as any).insert(data);
         }
@@ -139,8 +160,32 @@ export function useDatabase() {
       },
       insert: async (data: any) => {
         if (isOfflineMode && ps) {
-          return ps.execute('INSERT INTO investigations (id, patient_id, date, wbc, hb, s_urea, s_creatinine, ast, alt, tsb, hba1c, rbs, is_er, doctor_id, doctor_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [crypto.randomUUID(), data.patient_id, data.date, data.wbc, data.hb, data.s_urea, data.s_creatinine, data.ast, data.alt, data.tsb, data.hba1c, data.rbs, data.is_er ? 1 : 0, data.doctor_id, data.doctor_name]);
+          return ps.execute(
+            'INSERT INTO investigations (id, patient_id, date, wbc, hb, s_urea, s_creatinine, ast, alt, tsb, hba1c, rbs, ldl, hdl, tg, esr, crp, other_labs, is_er, doctor_id, doctor_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              crypto.randomUUID(), 
+              data.patient_id, 
+              data.date, 
+              data.wbc, 
+              data.hb, 
+              data.s_urea, 
+              data.s_creatinine, 
+              data.ast, 
+              data.alt, 
+              data.tsb, 
+              data.hba1c, 
+              data.rbs, 
+              data.ldl, 
+              data.hdl, 
+              data.tg, 
+              data.esr, 
+              data.crp, 
+              JSON.stringify(data.other_labs || []), 
+              data.is_er ? 1 : 0, 
+              data.doctor_id, 
+              data.doctor_name
+            ]
+          );
         } else {
           return (supabase.from('investigations') as any).insert([data]);
         }

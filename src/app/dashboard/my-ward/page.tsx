@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, Clock, Activity, CalendarClock } from 'lucide-react'
 import { ExportButton } from '@/components/dashboard/export-button'
@@ -80,6 +81,11 @@ export default async function MyWardPage() {
     .select('*')
     .eq('user_id', user?.id)
     .maybeSingle()
+    
+  // REDIRECT IF NO WARD SELECTED:
+  if (!profile?.ward_name) {
+    redirect('/dashboard/select-ward')
+  }
     
   const { data: patients } = await supabase
     .from('patients')

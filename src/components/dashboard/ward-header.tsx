@@ -86,10 +86,10 @@ export function WardHeader() {
               ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-900/50' 
               : 'bg-transparent'
           }`}
-          onClick={accessibleWards.length > 1 ? () => setShowSwitcher(!showSwitcher) : undefined}
+          onClick={accessibleWards.length > 1 ? () => setShowSwitcher(!showSwitcher) : (wardName === DEFAULT_WARD_NAME || !wardName) ? () => window.location.href = '/dashboard/select-ward' : undefined}
         >
-          <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest">
-            {wardName}
+          <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest ${(!wardName || wardName === DEFAULT_WARD_NAME) ? 'text-amber-600 animate-pulse' : 'text-slate-500'}`}>
+            {(!wardName || wardName === DEFAULT_WARD_NAME) ? 'Select Workstation' : wardName}
           </span>
           {accessibleWards.length > 1 && (
             <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-300 ${showSwitcher ? 'rotate-180' : ''}`} />

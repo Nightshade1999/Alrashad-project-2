@@ -18,6 +18,7 @@ export function PatientCard({ patient }: { patient: PatientSummary }) {
       <Link
         href={`/patient/${patient.id}`}
         className="block"
+        prefetch={true}
       >
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 hover:shadow-md hover:border-teal-300 dark:hover:border-teal-700 transition-all duration-300">
           {/* Bed + Age row */}

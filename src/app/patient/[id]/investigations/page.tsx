@@ -20,6 +20,9 @@ const LAB_FIELDS = [
   { key: 'tsb', label: 'TSB', alertHigh: 1.2 },
   { key: 'hba1c', label: 'HbA1c', unit: '%', alertHigh: 6.5 },
   { key: 'rbs', label: 'RBS', alertHigh: 200 },
+  { key: 'ldl', label: 'LDL', alertHigh: 130 },
+  { key: 'hdl', label: 'HDL', alertLow: 40 },
+  { key: 'tg', label: 'TG', alertHigh: 150 },
   { key: 'esr', label: 'ESR', alertHigh: 20 },
   { key: 'crp', label: 'CRP', alertHigh: 10 },
 ] as const

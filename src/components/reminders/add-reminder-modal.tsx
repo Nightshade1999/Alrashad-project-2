@@ -62,7 +62,7 @@ export function AddReminderModal({
       if (result.data) {
         const profile = result.data
         
-        // Lock gender by the doctor's own profile gender
+        // Default gender by the doctor's own profile gender (chosen during session start)
         if (profile.gender && (profile.gender === 'Male' || profile.gender === 'Female')) {
           setAssignedUserGender(profile.gender)
           setGender(profile.gender as any)
