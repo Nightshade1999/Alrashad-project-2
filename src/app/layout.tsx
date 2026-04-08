@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PowerSyncProvider } from "@/lib/powersync/PowerSyncProvider";
-import { SyncStatus } from "@/components/pwa/SyncStatus";
 import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import "./globals.css";
