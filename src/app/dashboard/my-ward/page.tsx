@@ -224,7 +224,7 @@ export default function MyWardPage() {
           const Icon = cat.icon
           const count = counts[cat.dbValue as keyof typeof counts] as number
           return (
-            <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`}>
+            <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`} prefetch={true}>
               <div
                 className={`group relative rounded-2xl border ${cat.border} ${cat.lightBg} p-6 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 active:translate-y-0 overflow-hidden animate-in fade-in slide-in-from-bottom-2`}
                 style={{ animationDelay: `${index * 60}ms` }}
@@ -254,7 +254,7 @@ export default function MyWardPage() {
       </div>
 
       {/* Archive / Deceased Section */}
-      <Link href="/dashboard/category/archive">
+      <Link href="/dashboard/category/archive" prefetch={true}>
         <div className="group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-6 cursor-pointer transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: '260ms' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -282,7 +282,7 @@ export default function MyWardPage() {
       </Link>
       
       {/* ── ER Patients Section ── */}
-      <Link href="/dashboard/er">
+      <Link href="/dashboard/er" prefetch={true}>
         <div className="group relative rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-6 cursor-pointer transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: '310ms' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
