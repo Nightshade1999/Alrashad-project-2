@@ -42,7 +42,7 @@ export default function SelectWardPage() {
         } else {
           // 1. Try PowerSync SQLite first
           if (ps) {
-            const psResult = await ps.get('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id])
+            const psResult = (await ps.getAll('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id]))[0]
             if (psResult) activeProfile = psResult
           }
           // 2. Fall back to localStorage cache (works even if SQLite is empty)

@@ -124,7 +124,7 @@ export default function MyWardPage() {
           // 1. Try PowerSync SQLite
           if (ps) {
             try {
-              const psResult = await ps.get('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id]) as any
+              const psResult = (await ps.getAll('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id]))[0] as any
               if (psResult?.ward_name) profile = psResult
             } catch (err) {
               console.warn('PowerSync SQLite empty, trying cache...')

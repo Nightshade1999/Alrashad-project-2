@@ -24,7 +24,7 @@ export function useDatabase() {
            const { data } = await supabase.from('system_settings').select('*').eq('id', 1).single();
            globalSettings = data;
         } else if (ps) {
-           globalSettings = await ps.get('SELECT * FROM system_settings WHERE id = 1');
+           globalSettings = (await ps.getAll('SELECT * FROM system_settings WHERE id = 1'))[0];
         }
         setGlobalEnabled((globalSettings as any)?.global_offline_enabled ?? true);
 
@@ -39,7 +39,7 @@ export function useDatabase() {
            // 1. Try PowerSync SQLite
            if (ps) {
              try {
-               userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+               userProfile = (await ps.getAll('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]))[0];
              } catch (err) {
                console.warn('SQLite profile fetch threw empty exception, falling back to cache');
              }
@@ -83,7 +83,7 @@ export function useDatabase() {
       },
       get: async (id: string) => {
         if (isOfflineMode && ps) {
-          return await ps.get('SELECT * FROM patients WHERE id = ?', [id]) as unknown as Patient;
+          return (await ps.getAll('SELECT * FROM patients WHERE id = ?', [id]))[0] as unknown as Patient;
         } else {
           const { data } = await supabase.from('patients').select('*').eq('id', id).single();
           return data as unknown as Patient;
