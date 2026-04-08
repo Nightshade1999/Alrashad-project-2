@@ -37,10 +37,23 @@ export default function SelectWardPage() {
             .eq('user_id', user.id)
             .single()
           activeProfile = p
-        } else if (ps) {
-          activeProfile = await ps.get('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id])
+          // Save to localStorage so offline fallback always has latest ward assignment
+          if (p) localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(p))
+        } else {
+          // 1. Try PowerSync SQLite first
+          if (ps) {
+            const psResult = await ps.get('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id])
+            if (psResult) activeProfile = psResult
+          }
+          // 2. Fall back to localStorage cache (works even if SQLite is empty)
+          if (!activeProfile?.ward_name) {
+            const cached = localStorage.getItem(`profile_cache_${user.id}`)
+            if (cached) {
+              try { activeProfile = JSON.parse(cached) } catch {}
+            }
+          }
           if (activeProfile && typeof activeProfile.accessible_wards === 'string') {
-            activeProfile.accessible_wards = JSON.parse(activeProfile.accessible_wards)
+            try { activeProfile.accessible_wards = JSON.parse(activeProfile.accessible_wards) } catch {}
           }
         }
 

@@ -28,13 +28,23 @@ export function useDatabase() {
         }
         setGlobalEnabled((globalSettings as any)?.global_offline_enabled ?? true);
 
-        // 2. Try User Profile from Supabase/PowerSync
-        let userProfile;
+        // 2. Try User Profile — with localStorage cache fallback
+        let userProfile: any = null;
         if (navigator.onLine) {
            const { data } = await supabase.from('user_profiles').select('*').eq('user_id', user.id).single();
            userProfile = data;
-        } else if (ps) {
-           userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+           // Always write to localStorage so offline mode has the latest profile
+           if (data) localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(data));
+        } else {
+           // 1. Try PowerSync SQLite
+           if (ps) {
+             userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+           }
+           // 2. Fall back to localStorage cache if SQLite had nothing
+           if (!userProfile?.ward_name) {
+             const cached = localStorage.getItem(`profile_cache_${user.id}`);
+             if (cached) { try { userProfile = JSON.parse(cached); } catch {} }
+           }
         }
         
         if (userProfile) {

@@ -117,9 +117,20 @@ export default function MyWardPage() {
             .select('ward_name')
             .eq('user_id', user.id)
             .maybeSingle()
-          profile = data
-        } else if (ps) {
-          profile = await ps.get('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id])
+          profile = data as any
+          // Cache so offline mode always knows the current ward
+          if ((data as any)?.ward_name) localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(data))
+        } else {
+          // 1. Try PowerSync SQLite
+          if (ps) {
+            const psResult = await ps.get('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id]) as any
+            if (psResult?.ward_name) profile = psResult
+          }
+          // 2. Fall back to localStorage cache
+          if (!(profile as any)?.ward_name) {
+            const cached = localStorage.getItem(`profile_cache_${user.id}`)
+            if (cached) { try { profile = JSON.parse(cached) } catch {} }
+          }
         }
 
         if (!profile?.ward_name) {
