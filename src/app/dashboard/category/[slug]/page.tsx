@@ -182,7 +182,12 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
           const userId = user?.id || ''
           let profilePs: any = null
           if (ps) {
-            profilePs = await ps.get('SELECT ward_name, role FROM user_profiles WHERE user_id = ?', [userId]) as any
+            try {
+              profilePs = await ps.get('SELECT ward_name, role FROM user_profiles WHERE user_id = ?', [userId]) as any
+            } catch (err) {
+              // ps.get throws 'Result set is empty' if no rows match. Ignore so we hit the localStorage fallback.
+              console.warn("PowerSync profile get failed, falling back to cache.", err)
+            }
           }
           // 2. Fall back to localStorage cache if PS had nothing
           if (!profilePs?.ward_name) {

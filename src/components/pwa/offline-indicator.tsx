@@ -39,6 +39,10 @@ export function OfflineIndicator() {
   const lastStatusRef = useRef<string>('');
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const syncBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Track if we've EVER completed a sync to prevent the full screen 
+  // initialization gate from flashing during navigations or background reconnects.
+  const hasEverSyncedRef = useRef(false);
 
   useEffect(() => {
     if (!ps) return;
@@ -63,6 +67,10 @@ export function OfflineIndicator() {
         isSyncing,
       });
 
+      if (currentStatus.hasSynced) {
+        hasEverSyncedRef.current = true;
+      }
+
       if (isSyncing) {
         setShowSyncBanner(true);
         if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
@@ -85,8 +93,8 @@ export function OfflineIndicator() {
 
   // --- 1. FULL-SCREEN GATE ---
   // Show while PowerSync is booting OR until the first sync completes.
-  // This covers: cold starts, schema version resets, and new-install first runs.
-  if (!psReady || !status.hasSynced) {
+  // We use hasEverSyncedRef so that temporary disconnects don't plunge the user back into the loading screen.
+  if (!psReady || (!hasEverSyncedRef.current && !status.hasSynced)) {
     const isInitialising = !psReady;
     const isWaitingOffline = psReady && !status.connected;
 

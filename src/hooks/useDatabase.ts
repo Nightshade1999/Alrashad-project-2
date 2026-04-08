@@ -38,7 +38,11 @@ export function useDatabase() {
         } else {
            // 1. Try PowerSync SQLite
            if (ps) {
-             userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+             try {
+               userProfile = await ps.get('SELECT * FROM user_profiles WHERE user_id = ?', [user.id]);
+             } catch (err) {
+               console.warn('SQLite profile fetch threw empty exception, falling back to cache');
+             }
            }
            // 2. Fall back to localStorage cache if SQLite had nothing
            if (!userProfile?.ward_name) {
