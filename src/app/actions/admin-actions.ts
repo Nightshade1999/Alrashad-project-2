@@ -536,3 +536,25 @@ export async function prepareBackupFilesAction() {
     return { error: e.message }
   }
 }
+
+/** Bulk-enable PowerSync offline mode for every user in user_profiles. */
+export async function enableOfflineForAllUsersAction() {
+  try {
+    await verifyAdmin()
+  } catch (e: any) {
+    return { error: e.message }
+  }
+
+  try {
+    const admin = getSupabaseAdmin()
+    const { error } = await admin
+      .from('user_profiles')
+      .update({ offline_mode_enabled: true })
+      .neq('user_id', '00000000-0000-0000-0000-000000000000') // matches all rows
+
+    if (error) throw error
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}

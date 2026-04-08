@@ -9,7 +9,7 @@ import { WardSettings } from '@/components/admin/ward-settings'
 import { ReminderArchive } from '@/components/admin/reminder-archive'
 import { NavigationButtons } from '@/components/layout/navigation-buttons'
 import { Switch } from '@/components/ui/switch'
-import { updateGlobalOfflineSettingAction } from '@/app/actions/admin-actions'
+import { updateGlobalOfflineSettingAction, enableOfflineForAllUsersAction } from '@/app/actions/admin-actions'
 import { toast } from 'sonner'
 
 export default function WardManagementClient({
@@ -31,6 +31,7 @@ export default function WardManagementClient({
 }) {
   const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'wards' | 'reminders' | 'settings'>('users')
   const [globalOffline, setGlobalOffline] = useState(initialGlobalOffline)
+  const [bulkEnabling, setBulkEnabling] = useState(false)
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in-up">
@@ -214,6 +215,34 @@ export default function WardManagementClient({
                        </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Bulk enable */}
+                <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-200/60 dark:border-slate-700/50">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-slate-900 dark:text-slate-100">Enable Offline Sync for All Users</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md">
+                      Activates PowerSync Local-First mode for every doctor account in one step. Each device will begin its initial sync on next login.
+                    </p>
+                  </div>
+                  <button
+                    disabled={bulkEnabling}
+                    onClick={async () => {
+                      if (!confirm('Enable offline sync for ALL users? Each device will download a local copy of ward data on next login.')) return
+                      setBulkEnabling(true)
+                      const res = await enableOfflineForAllUsersAction()
+                      setBulkEnabling(false)
+                      if (res.success) toast.success('Offline sync enabled for all users')
+                      else toast.error(res.error || 'Failed')
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-black rounded-2xl transition-all shadow-lg shadow-emerald-500/20 whitespace-nowrap shrink-0 ml-6"
+                  >
+                    {bulkEnabling ? (
+                      <><Shield className="h-4 w-4 animate-pulse" /> Enabling...</>
+                    ) : (
+                      <><Shield className="h-4 w-4" /> Enable for All</>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
