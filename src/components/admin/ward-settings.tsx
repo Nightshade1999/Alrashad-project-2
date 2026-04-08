@@ -131,9 +131,10 @@ export function WardSettings({ settings, users }: { settings: any[], users: any[
             onClick={handleSync}
             disabled={isSyncing}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-bold transition disabled:opacity-50"
+            title="Remove ward settings for wards that no longer have assigned doctors."
           >
             <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            Sync & Cleanup
+            Cleanup Unused Wards
           </button>
           <button 
             onClick={handleBackup}

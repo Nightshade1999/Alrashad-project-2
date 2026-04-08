@@ -432,33 +432,6 @@ export async function syncProfileWardAction(newWardName: string) {
   return { success: true }
 }
 
-export async function repairWardDiscrepanciesAction() {
-  try { await verifyAdmin() } catch (e: any) { return { error: e.message } }
-
-  // 1. Fetch all current user profiles
-  const { data: profiles, error: profError } = await (getSupabaseAdmin()
-    .from('user_profiles') as any)
-    .select('user_id, ward_name')
-  
-  if (profError) return { error: profError.message }
-
-  // 2. Reconciliation: For each profile, ensure their patients match their CURRENT ward_name
-  let totalMigrated = 0
-  for (const prof of profiles) {
-    const { data: migData, error: migError } = await getSupabaseAdmin()
-      .from('patients')
-      .update({ ward_name: prof.ward_name })
-      .eq('user_id', prof.user_id)
-      .neq('ward_name', prof.ward_name)
-      .select()
-    
-    if (migError) console.error(`Failed repair for user ${prof.user_id}:`, migError)
-    else if (migData) totalMigrated += migData.length
-  }
-
-  revalidatePath('/admin/manage')
-  return { success: true, count: totalMigrated }
-}
 
 export async function getGlobalOfflineSettingAction() {
   try {
