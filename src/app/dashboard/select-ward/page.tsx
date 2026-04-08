@@ -1,54 +1,110 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+"use client"
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, CheckCircle2, ChevronRight, Stethoscope } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { LayoutDashboard, CheckCircle2, ChevronRight, Stethoscope, Loader2 } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
+import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 
-export const dynamic = 'force-dynamic'
+export default function SelectWardPage() {
+  const router = useRouter()
+  const ps = usePowerSync()
+  
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(null)
+  const [accessibleWards, setAccessibleWards] = useState<string[]>([])
+  const [isSyncing, setIsSyncing] = useState<string | null>(null)
 
-export default async function SelectWardPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/login'); return }
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+        let activeProfile: any = null
+        let wards: string[] = []
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('ward_name, accessible_wards, role')
-    .eq('user_id', user.id)
-    .single()
+        if (navigator.onLine) {
+          const { data: p } = await supabase
+            .from('user_profiles')
+            .select('ward_name, accessible_wards, role')
+            .eq('user_id', user.id)
+            .single()
+          activeProfile = p
+        } else if (ps) {
+          activeProfile = await ps.get('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id])
+          if (activeProfile && typeof activeProfile.accessible_wards === 'string') {
+            activeProfile.accessible_wards = JSON.parse(activeProfile.accessible_wards)
+          }
+        }
 
-  const isAdmin = profile?.role === 'admin'
-  let accessibleWards = profile?.accessible_wards || (profile?.ward_name ? [profile.ward_name] : [])
+        const isAdmin = activeProfile?.role === 'admin'
+        wards = activeProfile?.accessible_wards || (activeProfile?.ward_name ? [activeProfile.ward_name] : [])
 
-  // If Admin: show ALL wards from settings
-  if (isAdmin) {
-    const { data: allWards } = await supabase.from('ward_settings').select('ward_name')
-    if (allWards && allWards.length > 0) {
-      accessibleWards = allWards.map(w => w.ward_name)
+        if (isAdmin) {
+          if (navigator.onLine) {
+            const { data: allWards } = await supabase.from('ward_settings').select('ward_name')
+            if (allWards) wards = allWards.map(w => w.ward_name)
+          } else if (ps) {
+            const allWards = await ps.getAll('SELECT ward_name FROM ward_settings')
+            wards = allWards.map((w: any) => w.ward_name)
+          }
+        }
+
+        setProfile(activeProfile)
+        setAccessibleWards(wards)
+
+        // Auto-select logic
+        if (wards.length === 1 && activeProfile?.ward_name !== wards[0]) {
+          handleSelectWard(wards[0])
+        } else if (wards.length === 1 && activeProfile?.ward_name === wards[0]) {
+          router.push('/dashboard/my-ward')
+        }
+
+      } catch (err) {
+        console.error("Select Ward Load Error:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [ps, router])
+
+  async function handleSelectWard(wardName: string) {
+    setIsSyncing(wardName)
+    try {
+      if (navigator.onLine) {
+        await syncProfileWardAction(wardName)
+      } else if (ps) {
+        // Offline transition: Update local profile immediately
+        await ps.execute(
+          'UPDATE user_profiles SET ward_name = ? WHERE user_id = (SELECT user_id FROM user_profiles LIMIT 1)',
+          [wardName]
+        )
+      }
+      router.push('/dashboard/my-ward')
+    } catch (err) {
+      console.error("Ward sync error:", err)
+    } finally {
+      setIsSyncing(null)
     }
   }
 
-  // SKIP LOGIC: If exactly 1 ward, auto-select it and go to my-ward
-  if (accessibleWards.length === 1) {
-    // If it's already the active ward, just redirect
-    if (profile?.ward_name === accessibleWards[0]) {
-      redirect('/dashboard/my-ward')
-    }
-    // Otherwise, sync and redirect
-    await syncProfileWardAction(accessibleWards[0])
-    redirect('/dashboard/my-ward')
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <Loader2 className="h-12 w-12 animate-spin text-teal-500" />
+        <p className="text-slate-500 font-medium font-bold uppercase tracking-widest text-[10px]">Initializing Workstations...</p>
+      </div>
+    )
   }
 
-  // If no wards at all (Error state or new user)
   if (accessibleWards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center max-w-md mx-auto">
@@ -83,26 +139,30 @@ export default async function SelectWardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {accessibleWards.map((wardName: string) => {
           const isActive = profile?.ward_name === wardName
+          const loadingThis = isSyncing === wardName
           
           return (
-            <form key={wardName} action={async () => {
-              'use server'
-              await syncProfileWardAction(wardName)
-              redirect('/dashboard/my-ward')
-            }}>
+            <div key={wardName}>
               <button
-                type="submit"
+                disabled={!!isSyncing}
+                onClick={() => handleSelectWard(wardName)}
                 className={`group relative w-full text-left p-8 rounded-[2.5rem] border-2 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 active:scale-95 flex flex-col items-start ${
                   isActive 
                     ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-950/20' 
                     : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-teal-300 dark:hover:border-teal-700'
-                }`}
+                } ${isSyncing && !loadingThis ? 'opacity-50 grayscale' : ''}`}
               >
                 {/* Active Indicator Pin */}
-                {isActive && (
+                {isActive && !loadingThis && (
                   <div className="absolute top-6 right-8 flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-teal-600/20">
                     <CheckCircle2 className="h-3 w-3" />
                     Currently Active
+                  </div>
+                )}
+
+                {loadingThis && (
+                  <div className="absolute top-6 right-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
                   </div>
                 )}
 
@@ -117,12 +177,12 @@ export default async function SelectWardPage() {
                     {wardName}
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-                    Manage Patients 
-                    <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
+                    {loadingThis ? 'Syncing...' : 'Manage Patients'}
+                    <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${isActive || loadingThis ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
                   </p>
                 </div>
               </button>
-            </form>
+            </div>
           )
         })}
       </div>
@@ -136,3 +196,4 @@ export default async function SelectWardPage() {
     </div>
   )
 }
+

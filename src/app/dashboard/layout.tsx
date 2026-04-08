@@ -33,7 +33,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <div className="h-1 w-full bg-gradient-to-r from-teal-500 via-emerald-400 to-cyan-500" />
 
       {/* Top Navigation */}
-      <header data-pwa-header className="sticky top-0 z-50 w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm">
+      <header data-pwa-header className="sticky top-0 z-50 w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm pt-safe">
         <div className="flex h-14 sm:h-18 items-center justify-between px-3 sm:px-8 max-w-screen-2xl mx-auto w-full gap-2">
           
           {/* Left: Nav Controls + Logo + Ward Name */}
@@ -61,7 +61,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <DoctorNameModal />
 
       {/* Main Content Area - Reduced bottom padding since Indicator is fixed bottom */}
-      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-32">
+      <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-safe mb-32">
         {children}
       </main>
       <OfflineIndicator />

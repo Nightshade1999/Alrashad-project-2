@@ -223,12 +223,16 @@ button, a, input, select, textarea, [role="button"] {
 }
 
 /* Safe-area utility classes (use on sticky headers/footers) */
-.pt-safe  { padding-top:    env(safe-area-inset-top); }
-.pb-safe  { padding-bottom: env(safe-area-inset-bottom); }
-.pl-safe  { padding-left:   env(safe-area-inset-left); }
-.pr-safe  { padding-right:  env(safe-area-inset-right); }
-.mt-safe  { margin-top:     env(safe-area-inset-top); }
-.mb-safe  { margin-bottom:  env(safe-area-inset-bottom); }
+.pt-safe  { padding-top:    env(safe-area-inset-top, 0px); }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pl-safe  { padding-left:   env(safe-area-inset-left, 0px); }
+.pr-safe  { padding-right:  env(safe-area-inset-right, 0px); }
+.mt-safe  { margin-top:     env(safe-area-inset-top, 0px); }
+.mb-safe  { margin-bottom:  env(safe-area-inset-bottom, 0px); }
+
+/* Compound safe area support for Tailwind in Next.js */
+.h-screen-safe { height: calc(100vh - (env(safe-area-inset-top) + env(safe-area-inset-bottom))); }
+.min-h-screen-safe { min-height: calc(100vh - (env(safe-area-inset-top) + env(safe-area-inset-bottom))); }
 
 /* Standalone PWA styles (applies when installed to home screen) */
 @media (display-mode: standalone) {

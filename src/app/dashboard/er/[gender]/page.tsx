@@ -1,57 +1,99 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+"use client"
+
+import { useState, useEffect, use } from 'react'
+import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
-import { ArrowLeft, AlertCircle, Activity, HeartPulse } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Activity, HeartPulse, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 
-export const dynamic = 'force-dynamic'
-
-export default async function GenderErPage({ params }: { params: Promise<{ gender: string }> }) {
-  const { gender: rawGender } = await params
+export default function GenderErPage({ params }: { params: Promise<{ gender: string }> }) {
+  const { gender: rawGender } = use(params)
+  const ps = usePowerSync()
   
-  // Normalize gender to 'Male' or 'Female' (case-insensitive)
+  const [patients, setPatients] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const gender = rawGender.toLowerCase() === 'male' ? 'Male' : 
                  rawGender.toLowerCase() === 'female' ? 'Female' : 
                  null
+
+  useEffect(() => {
+    if (!gender) return;
+
+    async function load() {
+      setLoading(true)
+      try {
+        const supabase = createClient()
+        
+        // 1. Fetch wards configured for this gender
+        let validWards: string[] = []
+        if (navigator.onLine) {
+          const { data: wards } = await supabase
+            .from('ward_settings')
+            .select('ward_name')
+            .eq('gender', gender)
+          validWards = wards?.map(w => w.ward_name) || []
+        } else if (ps) {
+          const wards = await ps.getAll('SELECT ward_name FROM ward_settings WHERE gender = ?', [gender])
+          validWards = wards.map((w: any) => w.ward_name)
+        }
+
+        // 2. Fetch patients
+        if (validWards.length > 0) {
+          if (navigator.onLine) {
+            const { data } = await supabase
+              .from('patients')
+              .select('id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint')
+              .eq('is_in_er', true)
+              .in('ward_name', validWards)
+              .order('created_at', { ascending: false })
+            setPatients(data || [])
+          } else if (ps) {
+            const placeholders = validWards.map(() => '?').join(',')
+            const p = await ps.getAll(
+              `SELECT id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint 
+               FROM patients 
+               WHERE is_in_er = 1 AND ward_name IN (${placeholders})
+               ORDER BY created_at DESC`,
+              validWards
+            ) as any[]
+            setPatients(p.map(item => ({
+              ...(item as object),
+              chronic_diseases: typeof (item as any).chronic_diseases === 'string' ? JSON.parse((item as any).chronic_diseases) : (item as any).chronic_diseases
+            })))
+          }
+        } else {
+          setPatients([])
+        }
+      } catch (err: any) {
+        console.error("ER Load Error:", err)
+        setError(err.message || "Failed to load ER data")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [ps, gender])
 
   if (!gender) {
     return <div className="p-8 text-center text-red-500 font-bold">Invalid ER specified: {rawGender}</div>
   }
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  )
-
-  // 1. Fetch wards configured for this gender
-  const { data: wards } = await supabase
-    .from('ward_settings')
-    .select('ward_name')
-    .eq('gender', gender)
-    
-  const validWards = wards?.map(w => w.ward_name) || []
-
-  // 2. Fetch patients who are in ER AND whose ward is in the validWards array. 
-  // If validWards is empty, it means no wards of this gender are configured.
-  let patients: any[] = []
-  
-  if (validWards.length > 0) {
-    const { data: p } = await supabase
-      .from('patients')
-      .select('id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint')
-      .eq('is_in_er', true)
-      .in('ward_name', validWards)
-      .order('created_at', { ascending: false })
-      
-    patients = p || []
-  }
-
   const colorConfig = gender === 'Male' ? 'blue' : 'pink'
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <Loader2 className={`h-12 w-12 animate-spin text-${colorConfig}-500`} />
+        <p className="text-slate-500 font-medium">Loading {gender} ER Patients...</p>
+      </div>
+    )
+  }
   
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-4">
+    <div className="space-y-6 max-w-5xl mx-auto py-4 px-4 sm:px-0">
       {/* Top Bar */}
       <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <Link href="/dashboard/er">
@@ -77,7 +119,7 @@ export default async function GenderErPage({ params }: { params: Promise<{ gende
           </div>
           <h3 className={`text-xl font-bold text-${colorConfig}-900 dark:text-${colorConfig}-100 mb-2`}>No Patients in ER</h3>
           <p className={`text-${colorConfig}-600 dark:text-${colorConfig}-400 max-w-md mx-auto`}>
-            There are currently no patients originating from {gender} wards in the Emergency Room. Great job keeping the ER clear!
+            There are currently no patients originating from {gender} wards in the Emergency Room.
           </p>
         </div>
       ) : (
@@ -138,3 +180,4 @@ export default async function GenderErPage({ params }: { params: Promise<{ gende
     </div>
   )
 }
+

@@ -302,15 +302,17 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
 
           {/* Rows */}
           <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col">
-            {sorted.map(p => (
+            {sorted.map((p, i) => (
               <PatientCard 
                 key={p.id} 
                 p={p} 
+                index={i}
                 isSelected={selectedIds.has(p.id)} 
                 onToggleSelect={toggleSelect} 
               />
             ))}
           </div>
+
         </div>
       )}
 
@@ -326,7 +328,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
  * MEMOIZED PATIENT CARD
  * extracted for high-performance rendering (prevents full list flicker on sync)
  */
-const PatientCard = memo(({ p, isSelected, onToggleSelect }: { p: PatientRow; isSelected: boolean; onToggleSelect: (id: string) => void }) => {
+const PatientCard = memo(({ p, index, isSelected, onToggleSelect }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void }) => {
   const handleRowClick = () => {
     window.location.href = `/patient/${p.id}`
   }
@@ -340,11 +342,16 @@ const PatientCard = memo(({ p, isSelected, onToggleSelect }: { p: PatientRow; is
     return <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">On Track</span>
   }
 
+  // Stagger only first 20 rows — beyond that instant render to avoid janky scroll
+  const delay = index < 20 ? `${index * 35}ms` : '0ms'
+
   return (
     <div
-      className={`group relative transition-all cursor-pointer border-l-2 ${isSelected ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
+      className={`group relative transition-all cursor-pointer border-l-2 animate-fade-in-up ${isSelected ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
       onClick={handleRowClick}
+      style={{ animationDelay: delay, animationFillMode: 'both' }}
     >
+
       {/* --- Desktop Row --- */}
       <div className="hidden xl:flex xl:flex-col">
         {/* Main desktop grid row */}
