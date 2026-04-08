@@ -82,14 +82,15 @@ async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> 
   return (data as PatientSummary[]) || []
 }
 
-async function fetchPatientsOffline(ps: any, wardName: string): Promise<PatientSummary[]> {
+async function fetchPatientsOffline(ps: any, wardName: string): Promise<{ pts: PatientSummary[], err: string | null }> {
   try {
-    return await ps.getAll(
+    const data = await ps.getAll(
       `SELECT id, name, room_number, category, is_in_er FROM patients WHERE ward_name = ?`,
       [wardName]
-    ) as PatientSummary[]
-  } catch {
-    return []
+    )
+    return { pts: data as PatientSummary[], err: null }
+  } catch (e: any) {
+    return { pts: [], err: e.message || 'Unknown SQLite error' }
   }
 }
 
@@ -99,6 +100,7 @@ export default function MyWardPage() {
   const [patients, setPatients] = useState<PatientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [offlineFetchError, setOfflineFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -147,8 +149,19 @@ export default function MyWardPage() {
         let pts: PatientSummary[] = []
         if (navigator.onLine) {
           pts = await fetchPatientsOnline(profile.ward_name)
+          setOfflineFetchError(null)
         } else if (ps) {
-          pts = await fetchPatientsOffline(ps, profile.ward_name)
+          const res = await fetchPatientsOffline(ps, profile.ward_name)
+          pts = res.pts
+          setOfflineFetchError(res.err)
+          
+          if (pts.length === 0 && !res.err) {
+            // Check if ANY patients exist in DB
+            try {
+              const all = await ps.getAll('SELECT count(*) as c FROM patients')
+              setOfflineFetchError(`DB total patients: ${(all as any)[0]?.c}`)
+            } catch {}
+          }
         }
         setPatients(pts)
       } catch (e: any) {
@@ -210,9 +223,16 @@ export default function MyWardPage() {
             {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted
           </p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <ExportButton />
-          <AddPatientModal />
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <ExportButton />
+            <AddPatientModal />
+          </div>
+          {offlineFetchError && (
+            <div className="text-sm font-bold text-red-500 bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded">
+              Debug offline: {offlineFetchError}
+            </div>
+          )}
         </div>
       </div>
 
