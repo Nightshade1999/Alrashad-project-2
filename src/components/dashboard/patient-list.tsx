@@ -14,7 +14,10 @@ import { format, parseISO } from 'date-fns'
 import { exportPatientsToExcel, exportToWord } from '@/lib/export-utils'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { useEffect, memo } from 'react'
+import { useEffect, memo, useCallback } from 'react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { OfflinePatientDetail } from '@/components/patient/OfflinePatientDetail'
+import { useRouter } from 'next/navigation'
 
 export interface PatientRow {
   id: string
@@ -90,6 +93,9 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
   )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isExporting, setIsExporting] = useState(false)
+  const [offlineViewId, setOfflineViewId] = useState<string | null>(null)
+  
+  const router = useRouter();
 
   function handleSort(col: SortKey) {
     if (sortCol === col) {
@@ -309,6 +315,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                 index={i}
                 isSelected={selectedIds.has(p.id)} 
                 onToggleSelect={toggleSelect} 
+                onViewOffline={setOfflineViewId}
               />
             ))}
           </div>
@@ -320,6 +327,23 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         Showing {sorted.length} of {patients.length} patient{patients.length !== 1 ? 's' : ''}
         {sortCol && <span> · Sorted by <strong>{sortCol === 'lastVisit' ? 'last visit' : sortCol === 'lastHba1c' ? 'HbA1c' : sortCol === 'lastHb' ? 'Hb' : sortCol}</strong> ({sortDir})</span>}
       </p>
+
+      {/* Offline Dialog Intercept */}
+      <Dialog open={!!offlineViewId} onOpenChange={(open) => !open && setOfflineViewId(null)}>
+        <DialogContent className="max-w-[100vw] w-screen h-[100dvh] m-0 p-0 sm:p-0 rounded-none border-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 flex flex-col pb-16 outline-none">
+          <DialogTitle className="sr-only">Offline Patient Viewer</DialogTitle>
+          {offlineViewId && (
+            <div className="flex-1 w-full relative pt-10 sm:pt-4">
+              <OfflinePatientDetail 
+                initialPatient={{ id: offlineViewId } as any}
+                initialVisits={[]}
+                initialInvestigations={[]}
+                view="ward"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -328,9 +352,13 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
  * MEMOIZED PATIENT CARD
  * extracted for high-performance rendering (prevents full list flicker on sync)
  */
-const PatientCard = memo(({ p, index, isSelected, onToggleSelect }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void }) => {
+const PatientCard = memo(({ p, index, isSelected, onToggleSelect, onViewOffline }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void; onViewOffline: (id: string) => void }) => {
   const handleRowClick = () => {
-    window.location.href = `/patient/${p.id}`
+    if (!navigator.onLine) {
+      onViewOffline(p.id)
+    } else {
+      window.location.href = `/patient/${p.id}`
+    }
   }
 
   const OverdueTag = () => {
