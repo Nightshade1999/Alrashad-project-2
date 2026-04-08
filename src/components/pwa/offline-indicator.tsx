@@ -2,8 +2,7 @@
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useState, useEffect, useRef } from 'react'
-import { CloudOff, RefreshCw, Loader2, Wifi, WifiOff, Database, CheckCircle2 } from 'lucide-react'
-import { Badge } from "@/components/ui/badge"
+import { CloudOff, RefreshCw, Loader2, Database, CheckCircle2 } from 'lucide-react'
 
 function deriveStatus(ps: any) {
   const currentStatus = ps?.currentStatus;
@@ -20,6 +19,16 @@ function deriveStatus(ps: any) {
 
 export function OfflineIndicator() {
   const ps = usePowerSync();
+
+  // ── PowerSync not yet initialised ──────────────────────────
+  // Show an initialising overlay rather than returning null.
+  // This way the full-screen gate is visible from the very first render
+  // and the disconnectAndClear / version-check path is always covered.
+  const [psReady, setPsReady] = useState(false);
+  useEffect(() => {
+    if (ps) setPsReady(true);
+  }, [ps]);
+
   const [status, setStatus] = useState<{
     connected: boolean;
     hasSynced: boolean;
@@ -28,7 +37,6 @@ export function OfflineIndicator() {
   }>(() => deriveStatus(ps));
 
   const lastStatusRef = useRef<string>('');
-  // Controls whether the "syncing" banner is visible — auto-hides after 3s
   const [showSyncBanner, setShowSyncBanner] = useState(false);
   const syncBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,10 +63,8 @@ export function OfflineIndicator() {
         isSyncing,
       });
 
-      // When actual data flows (upload or download), show the sync banner briefly
       if (isSyncing) {
         setShowSyncBanner(true);
-        // Clear any existing timer and restart the 3s countdown
         if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
         syncBannerTimerRef.current = setTimeout(() => {
           setShowSyncBanner(false);
@@ -77,28 +83,66 @@ export function OfflineIndicator() {
     };
   }, [ps]);
 
-  if (!ps) return null;
+  // --- 1. FULL-SCREEN GATE ---
+  // Show while PowerSync is booting OR until the first sync completes.
+  // This covers: cold starts, schema version resets, and new-install first runs.
+  if (!psReady || !status.hasSynced) {
+    const isInitialising = !psReady;
+    const isWaitingOffline = psReady && !status.connected;
 
-  // --- 1. FULL SCREEN INITIAL SYNC OVERLAY ---
-  // Block UI until device has successfully synced at least once
-  if (!status.hasSynced) {
-    const isWaitingOffline = !status.connected;
+    const spinnerColor = isInitialising
+      ? 'border-slate-500'
+      : isWaitingOffline
+        ? 'border-amber-500'
+        : 'border-teal-500';
+
+    const iconColor = isInitialising
+      ? 'text-slate-400'
+      : isWaitingOffline
+        ? 'text-amber-400'
+        : 'text-teal-400';
+
+    const accentColor = isInitialising
+      ? 'text-slate-500'
+      : isWaitingOffline
+        ? 'text-amber-500'
+        : 'text-teal-500';
+
+    const barColor = isInitialising
+      ? 'bg-slate-600'
+      : isWaitingOffline
+        ? 'bg-amber-500'
+        : 'bg-teal-500';
+
+    const label = isInitialising
+      ? 'Starting System...'
+      : isWaitingOffline
+        ? 'Awaiting Network...'
+        : 'Syncing Patient Stream';
+
     return (
-      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+      <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
         <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-indigo-500/10 opacity-50" />
-        
+
         <div className="relative">
-          <div className={`h-32 w-32 rounded-full border-t-4 border-r-4 ${isWaitingOffline ? 'border-amber-500' : 'border-teal-500'} animate-spin mb-8`} />
+          <div className={`h-32 w-32 rounded-full border-t-4 border-r-4 ${spinnerColor} animate-spin mb-8`} />
           <div className="absolute inset-0 flex items-center justify-center">
-             <Database className={`h-12 w-12 ${isWaitingOffline ? 'text-amber-400' : 'text-teal-400'}`} />
+            <Database className={`h-12 w-12 ${iconColor}`} />
           </div>
         </div>
 
-        {isWaitingOffline ? (
+        {isInitialising ? (
+          <>
+            <h2 className="text-3xl font-black text-white tracking-tight mb-4">Starting Clinical System</h2>
+            <p className="text-slate-400 max-w-sm mb-8 font-medium">
+              Initialising local database engine. This takes a moment on first load.
+            </p>
+          </>
+        ) : isWaitingOffline ? (
           <>
             <h2 className="text-3xl font-black text-white tracking-tight mb-4">Waiting for Connection</h2>
             <p className="text-slate-400 max-w-sm mb-8 font-medium">
-              This is your first time opening the app. A network connection is needed to download the ward database before offline mode can work.
+              A network connection is required to download your ward database before offline mode can work.
             </p>
           </>
         ) : (
@@ -111,48 +155,46 @@ export function OfflineIndicator() {
         )}
 
         <div className="w-full max-w-xs h-2 bg-slate-800 rounded-full overflow-hidden mb-4">
-           <div className={`h-full ${isWaitingOffline ? 'bg-amber-500' : 'bg-teal-500'} animate-pulse w-full`} />
+          <div className={`h-full ${barColor} animate-pulse w-full`} />
         </div>
-        
-        <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] ${isWaitingOffline ? 'text-amber-500' : 'text-teal-500'}`}>
-           <RefreshCw className={`h-3 w-3 ${isWaitingOffline ? '' : 'animate-spin'}`} />
-           {isWaitingOffline ? 'Awaiting Network...' : 'Syncing Patient Stream'}
+
+        <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] ${accentColor}`}>
+          <RefreshCw className={`h-3 w-3 ${!isInitialising && !isWaitingOffline ? 'animate-spin' : ''}`} />
+          {label}
         </div>
       </div>
     )
   }
 
   // --- 2. CONDITIONAL BOTTOM STATUS BAR ---
-  // Show when: offline, OR briefly when data is being synced (auto-hides after 3s)
   const isShow = !status.connected || showSyncBanner;
   if (!isShow) return null;
 
   return (
-     <div className="fixed bottom-0 left-0 right-0 z-[100] px-4 pb-[env(safe-area-inset-bottom,16px)] pointer-events-none mb-4 sm:mb-6 flex justify-center animate-in slide-in-from-bottom duration-500">
-        <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900/90 dark:bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
-           
-           {showSyncBanner && status.connected ? (
-             <>
-               <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
-               <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Cloud Syncing</span>
-                  <span className="text-[9px] font-bold text-slate-400">Updating medical records...</span>
-               </div>
-             </>
-           ) : (
-             <>
-               <div className="p-1.5 bg-rose-500/20 rounded-lg">
-                  <CloudOff className="h-4 w-4 text-rose-500" />
-               </div>
-               <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white">Offline Mode</span>
-                  <span className="text-[9px] font-bold text-slate-400">Working with local SQLite cache</span>
-               </div>
-             </>
-           )}
+    <div className="fixed bottom-0 left-0 right-0 z-[100] px-4 pb-[env(safe-area-inset-bottom,16px)] pointer-events-none mb-4 sm:mb-6 flex justify-center animate-in slide-in-from-bottom duration-500">
+      <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900/90 dark:bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
 
-        </div>
-     </div>
+        {showSyncBanner && status.connected ? (
+          <>
+            <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">Cloud Syncing</span>
+              <span className="text-[9px] font-bold text-slate-400">Updating medical records...</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-1.5 bg-rose-500/20 rounded-lg">
+              <CloudOff className="h-4 w-4 text-rose-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">Offline Mode</span>
+              <span className="text-[9px] font-bold text-slate-400">Working with local SQLite cache</span>
+            </div>
+          </>
+        )}
+
+      </div>
+    </div>
   )
 }
-

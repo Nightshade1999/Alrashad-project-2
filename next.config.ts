@@ -11,7 +11,8 @@ const withPWA = withPWAInit({
   },
   workboxOptions: {
     disableDevLogs: true,
-    skipWaiting: true,
+    // skipWaiting intentionally removed — it caused random page reloads.
+    // New service workers now wait until all tabs are closed before activating.
   },
 });
 
