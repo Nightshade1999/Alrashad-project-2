@@ -620,10 +620,30 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     visitsForDoc.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
     const targetVisit = visitsForDoc[0] || p.visits?.[0] || null;
 
+    // --- ONE PAGE RULE: LINE PROJECTION ENGINE ---
+    const noteLines = targetVisit ? (targetVisit.exam_notes || "").split("\n").length : 1;
+    const admissionNoteLines = (p.er_admission_notes || "").split("\n").length;
+    const medsCount = parseArr(p.medical_drugs).length + parseArr(p.psych_drugs).length;
+    const erTxCount = parseArr(p.er_treatment).length;
+
+    const projectedLines = 6 +
+      Math.max(5 + medsCount, isER ? 6 + admissionNoteLines : 8) +
+      Math.max(5, 2 + noteLines) +
+      (isER ? 2 + erTxCount : 0) +
+      10; // Extra buffer for headers/demographics/vitals
+
+    let fontSizeRem = 0.82;
+    let limitLabs = false;
+    const threshold = isER ? 36 : 50; // Slightly higher than Word for PDF compactness
+    if (projectedLines > threshold) {
+       fontSizeRem = 0.72; // Reduce by ~1pt equivalent in rem
+       if (projectedLines > (threshold + 12)) limitLabs = true;
+    }
+
     let docLabs = (p.investigations || []).filter((inv: any) => isER ? inv.is_er : !inv.is_er);
     if (docLabs.length === 0 && p.investigations?.length > 0) docLabs = [p.investigations[0]];
     docLabs.sort((a: any, b: any) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
-    const labsToPrint = docLabs.slice(0, 5);
+    const labsToPrint = limitLabs ? docLabs.slice(0, 1) : docLabs.slice(0, 5);
 
     // Wraps Arabic text in an RTL span; browser renders it correctly natively
     const field = (val: string | null | undefined, fallback = "N/A"): string => {
@@ -684,7 +704,7 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
       <div class="section-header" style="background:${themeHex};color:#fff;">V. EMERGENCY PHARMACOLOGICAL TREATMENT</div>
       <ul class="drug-list">${drugsHtml(parseArr(p.er_treatment))}</ul>` : "";
 
-    return `<div class="page">
+    return `<div class="page" style="font-size: ${fontSizeRem}rem !important;">
       <div class="header-bar">
         <div class="doctor-name" style="color:${tealHex};">Dr. ${doctorName}</div>
         <div class="report-title">${isER ? "CLINICAL SUMMARY &amp; EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY"}</div>
