@@ -172,15 +172,34 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
           const { data: profile } = await supabase.from('user_profiles').select('role, ward_name').eq('user_id', userId).maybeSingle()
           isAdmin = (profile as any)?.role === 'admin'
           targetWard = isAdmin ? null : ((profile as any)?.ward_name || null)
+          // Cache so offline mode always knows the current ward
+          if ((profile as any)?.ward_name) localStorage.setItem(`profile_cache_${userId}`, JSON.stringify(profile))
+          
           const data = await fetchRowsOnline(supabase, category.dbValue, targetWard, isAdmin)
           setRows(data)
-        } else if (ps) {
-          // In offline mode, get ward from PS
+        } else {
+          // 1. Try PowerSync SQLite first
           const userId = user?.id || ''
-          const profilePs = await ps.get('SELECT ward_name, role FROM user_profiles WHERE user_id = ?', [userId]) as any
-          targetWard = profilePs?.role === 'admin' ? null : (profilePs?.ward_name || null)
-          const data = await fetchRowsOffline(ps, category.dbValue, targetWard)
-          setRows(data)
+          let profilePs: any = null
+          if (ps) {
+            profilePs = await ps.get('SELECT ward_name, role FROM user_profiles WHERE user_id = ?', [userId]) as any
+          }
+          // 2. Fall back to localStorage cache if PS had nothing
+          if (!profilePs?.ward_name) {
+            const cached = localStorage.getItem(`profile_cache_${userId}`)
+            if (cached) { try { profilePs = JSON.parse(cached) } catch {} }
+          }
+          
+          isAdmin = profilePs?.role === 'admin'
+          targetWard = isAdmin ? null : (profilePs?.ward_name || null)
+          
+          // Use fetchRowsOffline with our guaranteed targetWard
+          if (ps) {
+            const data = await fetchRowsOffline(ps, category.dbValue, targetWard)
+            setRows(data)
+          } else {
+            setRows([])
+          }
         }
       } catch (e) {
         console.error('Category page load error:', e)
