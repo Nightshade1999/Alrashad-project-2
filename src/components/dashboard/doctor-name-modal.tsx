@@ -50,14 +50,20 @@ export function DoctorNameModal() {
 
       if (data?.doctor_name) {
         setName(data.doctor_name)
-      }
-      if (data?.gender && (data.gender === 'Male' || data.gender === 'Female')) {
-        setGender(data.gender)
+        if (data?.gender && (data.gender === 'Male' || data.gender === 'Female')) {
+          setGender(data.gender)
+        }
+        
+        // If we found a name, consider this session "pre-authed" and don't show the modal
+        sessionStorage.setItem('wardManager_sessionActive', 'true')
+        setOpen(false)
+        return
       }
       
-      // Always open the modal on every "fresh" session
+      // If no name found in DB, we MUST show the modal
       setOpen(true)
     } catch {
+      // On error (e.g. offline and no local profile yet), show modal to capture name
       setOpen(true)
     }
   }
