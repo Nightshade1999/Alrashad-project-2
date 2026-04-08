@@ -1,0 +1,303 @@
+[
+  {
+    "id": "a5002ad2-4830-4566-b537-bf6450343282",
+    "room_number": "2",
+    "name": "ياسر ياسين حميد",
+    "age": 33,
+    "gender": "Male",
+    "category": "Normal",
+    "past_surgeries": [
+      "Leg amputation"
+    ],
+    "chronic_diseases": [
+      {
+        "name": "Asthma",
+        "type": "preset"
+      }
+    ],
+    "psych_drugs": [],
+    "medical_drugs": [
+      {
+        "name": "Metformin",
+        "dosage": "500mg",
+        "frequency": "OD (Once daily)"
+      }
+    ],
+    "allergies": [],
+    "created_at": "2026-04-05T18:15:19.237236+00:00",
+    "updated_at": "2026-04-05T18:15:19.237236+00:00",
+    "user_id": "23a6cd63-2f20-4c69-95d0-d57fca58042e",
+    "province": "Nineveh",
+    "education_level": "Bachelor's Degree",
+    "relative_status": "Unknown",
+    "relative_visits": null,
+    "date_of_death": null,
+    "cause_of_death": null,
+    "previous_category": null,
+    "high_risk_date": null,
+    "ward_name": "Kindi 5",
+    "is_in_er": false,
+    "er_admission_date": null,
+    "er_admission_doctor": null,
+    "er_chief_complaint": null,
+    "er_history": [],
+    "er_admission_notes": null,
+    "er_treatment": [],
+    "is_referred": false,
+    "referral_hospital": null,
+    "referral_date": null
+  },
+  {
+    "id": "84c74788-0d7a-43c4-b201-30cd88d3cd35",
+    "room_number": "2",
+    "name": "زهراء محمد احمد",
+    "age": 28,
+    "gender": "Female",
+    "category": "Normal",
+    "past_surgeries": [
+      "Cesarean Section (C-Section)"
+    ],
+    "chronic_diseases": [
+      {
+        "name": "Asthma",
+        "type": "preset"
+      },
+      {
+        "name": "Rheumatoid Arthritis",
+        "type": "preset"
+      }
+    ],
+    "psych_drugs": [
+      {
+        "name": "Clonazepam",
+        "dosage": "1mg",
+        "frequency": "OD (Once daily)"
+      }
+    ],
+    "medical_drugs": [
+      {
+        "name": "Methotraxate tab",
+        "dosage": "5mg",
+        "frequency": "OD (Once daily)"
+      },
+      {
+        "name": "Salbutamol (Albuterol)",
+        "dosage": "100mcg/puff",
+        "frequency": "PRN (As needed)"
+      }
+    ],
+    "allergies": [
+      "Unknown"
+    ],
+    "created_at": "2026-04-05T13:00:09.851086+00:00",
+    "updated_at": "2026-04-07T02:39:59.870736+00:00",
+    "user_id": "087ab9ca-f728-42e7-8b26-625b7e0ed11c",
+    "province": "Anbar",
+    "education_level": "Bachelor's Degree",
+    "relative_status": "Known",
+    "relative_visits": "3",
+    "date_of_death": null,
+    "cause_of_death": null,
+    "previous_category": null,
+    "high_risk_date": null,
+    "ward_name": "Kindi 6",
+    "is_in_er": false,
+    "er_admission_date": null,
+    "er_admission_doctor": null,
+    "er_chief_complaint": null,
+    "er_history": [
+      {
+        "doctor": "Ahmed Muhammed",
+        "admission_date": "2026-04-07T02:23:33.161744+00:00",
+        "discharge_date": "2026-04-07T02:39:59.870736+00:00",
+        "admission_notes": "",
+        "chief_complaint": "ss"
+      }
+    ],
+    "er_admission_notes": null,
+    "er_treatment": [],
+    "is_referred": false,
+    "referral_hospital": null,
+    "referral_date": null
+  },
+  {
+    "id": "b4e35d73-8576-4e14-9559-1c5e4fa000d7",
+    "room_number": "1",
+    "name": "احمد محمد حسين",
+    "age": 55,
+    "gender": "Male",
+    "category": "Close Follow-up",
+    "past_surgeries": [],
+    "chronic_diseases": [
+      {
+        "name": "Diabetes Mellitus Type 2 (T2DM)",
+        "type": "preset"
+      },
+      {
+        "name": "Hypertension (HTN)",
+        "type": "preset"
+      }
+    ],
+    "psych_drugs": [],
+    "medical_drugs": [],
+    "allergies": [],
+    "created_at": "2026-04-07T01:13:07.322687+00:00",
+    "updated_at": "2026-04-07T01:13:07.322687+00:00",
+    "user_id": "b25993a9-095c-454b-ba03-615ff87a7596",
+    "province": "Nineveh",
+    "education_level": "Can Read & Write",
+    "relative_status": "Unknown",
+    "relative_visits": null,
+    "date_of_death": null,
+    "cause_of_death": null,
+    "previous_category": null,
+    "high_risk_date": null,
+    "ward_name": "Al Ameri",
+    "is_in_er": false,
+    "er_admission_date": null,
+    "er_admission_doctor": null,
+    "er_chief_complaint": null,
+    "er_history": [],
+    "er_admission_notes": null,
+    "er_treatment": [],
+    "is_referred": false,
+    "referral_hospital": null,
+    "referral_date": null
+  },
+  {
+    "id": "1a124c90-da62-4d97-8291-5351a638c5df",
+    "room_number": "1",
+    "name": "علي محمد علي",
+    "age": 44,
+    "gender": "Male",
+    "category": "Normal",
+    "past_surgeries": [
+      "Appendectomy"
+    ],
+    "chronic_diseases": [
+      {
+        "name": "Hypertension (HTN)",
+        "type": "preset"
+      },
+      {
+        "name": "Diabetes Mellitus Type 2 (T2DM)",
+        "type": "preset"
+      }
+    ],
+    "psych_drugs": [
+      {
+        "name": "Sertraline",
+        "dosage": "50mg",
+        "frequency": "BID (Twice daily)"
+      }
+    ],
+    "medical_drugs": [
+      {
+        "name": "Metformin",
+        "dosage": "500mg",
+        "frequency": "BID (Twice daily)"
+      },
+      {
+        "name": "Amlodipine",
+        "dosage": "5mg",
+        "frequency": "Daily"
+      }
+    ],
+    "allergies": [
+      "Pencillin allergy"
+    ],
+    "created_at": "2026-04-05T11:55:48.712618+00:00",
+    "updated_at": "2026-04-07T02:24:11.346175+00:00",
+    "user_id": "087ab9ca-f728-42e7-8b26-625b7e0ed11c",
+    "province": "Baghdad",
+    "education_level": "Middle School",
+    "relative_status": "Known",
+    "relative_visits": "2",
+    "date_of_death": null,
+    "cause_of_death": null,
+    "previous_category": null,
+    "high_risk_date": null,
+    "ward_name": "Kindi 6",
+    "is_in_er": true,
+    "er_admission_date": "2026-04-07T02:24:11.346175+00:00",
+    "er_admission_doctor": "Ahmed Muhammed",
+    "er_chief_complaint": "dd",
+    "er_history": [
+      {
+        "doctor": "Unknown Doctor",
+        "admission_date": "2026-04-06T15:12:07.993+00:00",
+        "discharge_date": "2026-04-07T00:24:22.419Z",
+        "chief_complaint": "Decreased oral intake"
+      },
+      {
+        "doctor": "Unknown Doctor",
+        "admission_date": "2026-04-07T00:24:35.249+00:00",
+        "discharge_date": "2026-04-07T00:36:46.789964+00:00",
+        "admission_notes": null,
+        "chief_complaint": "chest pain"
+      },
+      {
+        "doctor": "Ahmed s",
+        "admission_date": "2026-04-07T00:39:32.678894+00:00",
+        "discharge_date": "2026-04-07T00:43:29.2154+00:00",
+        "admission_notes": "",
+        "chief_complaint": "ddd"
+      },
+      {
+        "doctor": "Ahmed s",
+        "admission_date": "2026-04-07T00:44:50.976653+00:00",
+        "discharge_date": "2026-04-07T00:45:02.375359+00:00",
+        "admission_notes": "",
+        "chief_complaint": "d"
+      },
+      {
+        "doctor": "Ahmed s",
+        "admission_date": "2026-04-07T00:47:09.309074+00:00",
+        "discharge_date": "2026-04-07T00:47:16.40944+00:00",
+        "admission_notes": "",
+        "chief_complaint": "f"
+      }
+    ],
+    "er_admission_notes": "",
+    "er_treatment": [
+      {
+        "name": "Ceftriaxone",
+        "dosage": "1g (IV)",
+        "frequency": "1x1 once daily"
+      },
+      {
+        "name": "Paracetamol",
+        "dosage": "1g (IV)",
+        "frequency": "PRN (as needed)"
+      },
+      {
+        "name": "Normal Saline 0.9%",
+        "dosage": "500mL",
+        "frequency": "1x3 "
+      },
+      {
+        "name": "Fuscidin Cream",
+        "dosage": "2%",
+        "frequency": "1x2 twice daily"
+      },
+      {
+        "name": "Furosemide",
+        "dosage": "20mg (Inj)",
+        "frequency": "1x2 twice daily"
+      },
+      {
+        "name": "Meropenem",
+        "dosage": "1g (IV)",
+        "frequency": "1x3 thrice daily"
+      },
+      {
+        "name": "Omeprazole",
+        "dosage": "40mg",
+        "frequency": "1x1 once daily"
+      }
+    ],
+    "is_referred": false,
+    "referral_hospital": null,
+    "referral_date": null
+  }
+]

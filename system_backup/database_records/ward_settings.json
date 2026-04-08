@@ -1,0 +1,163 @@
+[
+  {
+    "id": "b0a28aa4-a1d4-4cb9-854d-f67c55146e8f",
+    "ward_name": "Kindi 5",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:22:52.179299+00:00",
+    "updated_at": "2026-04-06T15:22:52.179299+00:00"
+  },
+  {
+    "id": "44822f2a-dc70-47db-a984-fa119ae5b2f9",
+    "ward_name": "Kindi 6",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:22:55.531058+00:00",
+    "updated_at": "2026-04-06T15:22:55.531058+00:00"
+  },
+  {
+    "id": "a9a6f30e-e554-445e-b917-49cd225a9ffc",
+    "ward_name": "Kindi 7",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:24:16.147695+00:00",
+    "updated_at": "2026-04-06T15:24:16.147695+00:00"
+  },
+  {
+    "id": "e5f4174a-940f-474c-b62b-cb1f7d10f532",
+    "ward_name": "Kindi 8",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:25:22.319607+00:00",
+    "updated_at": "2026-04-06T15:25:22.319607+00:00"
+  },
+  {
+    "id": "2a301e26-ef58-458f-9ce9-050710dc72e4",
+    "ward_name": "Razi 10",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:30:08.425161+00:00",
+    "updated_at": "2026-04-06T15:30:08.425161+00:00"
+  },
+  {
+    "id": "ae67f5c3-21d2-4611-9386-2bd42a06abe2",
+    "ward_name": "Razi 11",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:30:11.470265+00:00",
+    "updated_at": "2026-04-06T15:30:11.470265+00:00"
+  },
+  {
+    "id": "201d7ae5-381b-4a7d-ae00-ea8c477dd3e8",
+    "ward_name": "Razi 12",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:30:13.257028+00:00",
+    "updated_at": "2026-04-06T15:30:13.257028+00:00"
+  },
+  {
+    "id": "bc027cf3-d10e-4d95-8655-24d9e7815184",
+    "ward_name": "Razi 9",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:30:14.928666+00:00",
+    "updated_at": "2026-04-06T15:30:14.928666+00:00"
+  },
+  {
+    "id": "09bee45c-8c21-4c98-a3ea-2ee68ee4854f",
+    "ward_name": "Prison 1",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:33:35.855953+00:00",
+    "updated_at": "2026-04-06T15:33:35.855953+00:00"
+  },
+  {
+    "id": "8ed17443-8d7c-4afa-843b-f5a2c6b553a4",
+    "ward_name": "Prison 2",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:33:37.623372+00:00",
+    "updated_at": "2026-04-06T15:33:37.623372+00:00"
+  },
+  {
+    "id": "596d4d68-20ef-40c0-bfab-ce3dd184a2a4",
+    "ward_name": "Prison 3",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:33:39.091071+00:00",
+    "updated_at": "2026-04-06T15:33:39.091071+00:00"
+  },
+  {
+    "id": "441da1ed-1941-4393-8ff6-0d83f405f51c",
+    "ward_name": "Zainab 1",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:36:34.592094+00:00",
+    "updated_at": "2026-04-06T15:36:34.592094+00:00"
+  },
+  {
+    "id": "e49bb38c-0adf-45c6-bd5d-fb688fc7d531",
+    "ward_name": "Zainab 2",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:36:36.643365+00:00",
+    "updated_at": "2026-04-06T15:36:36.643365+00:00"
+  },
+  {
+    "id": "908d3af0-5922-478c-a25b-3104166d241a",
+    "ward_name": "Zainab 3",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:36:37.937757+00:00",
+    "updated_at": "2026-04-06T15:36:37.937757+00:00"
+  },
+  {
+    "id": "32675c98-06bc-4742-8e57-0eaafe949957",
+    "ward_name": "Zainab 4",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:36:39.273825+00:00",
+    "updated_at": "2026-04-06T15:36:39.273825+00:00"
+  },
+  {
+    "id": "747674bb-e73f-4414-84eb-9537a57c55ef",
+    "ward_name": "Omran private",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:42:21.267238+00:00",
+    "updated_at": "2026-04-06T15:42:21.267238+00:00"
+  },
+  {
+    "id": "181de81f-3db9-4b11-94b3-dfb3ff5eb566",
+    "ward_name": "Omran public",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:42:22.583206+00:00",
+    "updated_at": "2026-04-06T15:42:22.583206+00:00"
+  },
+  {
+    "id": "32d17cb4-c770-4f20-a350-fdaf923f04f9",
+    "ward_name": "Taj Aldin 1",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:42:28.47054+00:00",
+    "updated_at": "2026-04-06T15:42:28.47054+00:00"
+  },
+  {
+    "id": "324dd507-d991-4676-aa1c-5e7d41ed2fbe",
+    "ward_name": "Taj Aldin 2",
+    "gender": "Female",
+    "created_at": "2026-04-06T15:42:29.860538+00:00",
+    "updated_at": "2026-04-06T15:42:29.860538+00:00"
+  },
+  {
+    "id": "aacbf942-50d6-4bd3-b222-981647899b0a",
+    "ward_name": "Al Ameri",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:45:22.217063+00:00",
+    "updated_at": "2026-04-06T15:45:22.217063+00:00"
+  },
+  {
+    "id": "fde9b302-7319-4b88-b046-265615595780",
+    "ward_name": "Al Atraqji 1",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:45:23.884102+00:00",
+    "updated_at": "2026-04-06T15:45:23.884102+00:00"
+  },
+  {
+    "id": "cdb1dc17-fc49-42b3-bee8-f6cc14974a70",
+    "ward_name": "Al Atraqji 2",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:45:25.265752+00:00",
+    "updated_at": "2026-04-06T15:45:25.265752+00:00"
+  },
+  {
+    "id": "cd932c38-56de-4233-8654-6056b91959bf",
+    "ward_name": "Amir Abo private",
+    "gender": "Male",
+    "created_at": "2026-04-06T15:45:26.564093+00:00",
+    "updated_at": "2026-04-06T15:45:26.564093+00:00"
+  }
+]

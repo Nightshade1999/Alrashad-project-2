@@ -490,3 +490,38 @@ export async function updateGlobalOfflineSettingAction(enabled: boolean) {
     return { error: e.message }
   }
 }
+import * as fs from 'fs/promises'
+import * as path from 'path'
+
+export async function prepareBackupFilesAction() {
+  try {
+    await verifyAdmin()
+    
+    // 1. Setup backup directory
+    const backupDir = path.join(process.cwd(), 'system_backup')
+    const dataDir = path.join(backupDir, 'database_records')
+    await fs.mkdir(dataDir, { recursive: true })
+    
+    const admin = getSupabaseAdmin()
+    const tables = ['patients', 'visits', 'investigations', 'user_profiles', 'ward_settings', 'reminders']
+    
+    // 2. Export each table to JSON
+    for (const table of tables) {
+      const { data, error } = await admin.from(table).select('*')
+      if (error) {
+        console.error(`Backup error exporting ${table}:`, error.message)
+        continue
+      }
+      await fs.writeFile(
+        path.join(dataDir, `${table}.json`),
+        JSON.stringify(data, null, 2),
+        'utf-8'
+      )
+    }
+    
+    // 3. Revalidate and return success
+    return { success: true, path: backupDir }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
