@@ -21,7 +21,6 @@ const patients = new Table({
   allergies: column.text,
   // ER
   is_in_er: column.integer,
-  er_history: column.text,        // JSON array of ER history entries
   er_admission_date: column.text,
   er_admission_doctor: column.text,
   er_chief_complaint: column.text,
@@ -116,6 +115,6 @@ export const AppSchema = new Schema({
  * 
  * v15.0.0 — Added missing columns: doctor_ward, er_history, is_referred, referral_*,
  *            date_of_death, cause_of_death, high_risk_date, visit_time, other_labs,
- *            accessible_wards, gender. Forces full re-sync & initial overlay for all users.
+ * v16.0.0 — Removed hallucinated er_history column causing patient sync failure. Forces full re-sync.
  */
-export const SCHEMA_VERSION = 'v15.0.0';
+export const SCHEMA_VERSION = 'v16.0.0';

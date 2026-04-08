@@ -121,7 +121,7 @@ async function fetchRowsOffline(ps: any, categoryDbValue: string | null, wardNam
       params.push(categoryDbValue)
     }
     if (categoryDbValue !== 'Deceased/Archive') {
-      conditions.push('is_in_er = 0')
+      conditions.push('(is_in_er = 0 OR is_in_er IS NULL)')
     }
     if (wardName) {
       conditions.push('ward_name = ?')
