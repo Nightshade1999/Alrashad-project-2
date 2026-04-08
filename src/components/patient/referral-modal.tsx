@@ -110,7 +110,7 @@ export function ReferralModal({ patientId, isReferred, referralHospital, referra
       {open && (
         <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{touchAction:'none'}} onClick={() => setOpen(false)} />
 
           <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md animate-scale-in">
             {/* Header */}

@@ -108,7 +108,7 @@ export function AddVisitModal({
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{touchAction:'none'}} onClick={() => setOpen(false)} />
 
       <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg flex flex-col max-h-[95dvh] animate-scale-in">
         {/* Header */}
@@ -124,7 +124,7 @@ export function AddVisitModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 shrink min-h-0">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 modal-scroll flex-1 shrink min-h-0">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="visit-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Date</Label>

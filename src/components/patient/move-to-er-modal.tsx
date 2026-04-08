@@ -172,7 +172,7 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
       {open && (
          <ModalPortal>
          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{touchAction:'none'}} onClick={() => setOpen(false)} />
            
            <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg flex flex-col max-h-[95dvh] animate-scale-in">
              {/* Header */}
@@ -188,7 +188,7 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
                </button>
              </div>
 
-             <form onSubmit={handleMoveToEr} className="p-6 space-y-5 overflow-y-auto flex-1 shrink min-h-0">
+             <form onSubmit={handleMoveToEr} className="p-6 space-y-5 modal-scroll flex-1 shrink min-h-0">
                 {/* Chief Complaint */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chief Complaint <span className="text-rose-500">*</span></Label>

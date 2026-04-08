@@ -190,6 +190,26 @@
   animation: scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ── Modal inner scroll — iOS/Android compatible ───────────── */
+/* Apply to the scrollable content pane inside a modal.           */
+/* -webkit-overflow-scrolling: touch  → momentum scroll on iOS   */
+/* overscroll-behavior: contain       → stops scroll leaking to  */
+/*                                      the background page      */
+.modal-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ── Horizontal scroll utility (no visible scrollbar) ─────── */
+.no-scrollbar {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari/Opera */
+}
+
 /* ============================================================
    PWA / Mobile Native Optimizations
    ============================================================ */
