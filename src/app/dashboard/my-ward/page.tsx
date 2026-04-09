@@ -139,9 +139,10 @@ export default function MyWardPage() {
           }
         }
 
-        if (!profile?.ward_name) {
-          window.location.href = '/dashboard/select-ward'
-          return
+        if (!loading && !profile?.ward_name) {
+          recordEvent(`Redirect: No Ward Found (Navigating to /select-ward)`);
+          router.replace('/dashboard/select-ward');
+          return;
         }
 
         setWardName(profile.ward_name)

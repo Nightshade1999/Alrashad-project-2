@@ -9,13 +9,11 @@ const withPWA = withPWAInit({
     document: "/offline.html",
     image: "/icon.png",
   },
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: false,
+  reloadOnOnline: false, // Prevents reloads when network status changes
   workboxOptions: {
     disableDevLogs: true,
-    // skipWaiting intentionally removed — it caused random page reloads.
-    // New service workers now wait until all tabs are closed before activating.
+    skipWaiting: false,    // Critical: prevents automatic reloads on new SW detection
+    clientsClaim: false,   // Critical: prevents new SW from taking control of open tabs immediately
   },
 });
 

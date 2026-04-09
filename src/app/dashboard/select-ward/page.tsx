@@ -100,8 +100,9 @@ export default function SelectWardPage() {
               localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify({ ward_name: activeWard }))
             }
           }
-          router.push('/dashboard/my-ward')
-          return
+          recordEvent(`SelectWard: Auto-selecting ward ${activeWard}`);
+          router.replace('/dashboard/my-ward');
+          return;
         }
 
       } catch (err) {
