@@ -42,6 +42,7 @@ export interface Database {
           er_admission_notes: string | null;
           er_treatment: MedicalDrugParams[] | null;
           er_history: any[] | null;
+          admission_date: string | null;
           mother_name: string | null;
           medical_record_number: string | null;
           psychological_diagnosis: string | null;
@@ -75,6 +76,7 @@ export interface Database {
           er_admission_notes?: string | null;
           er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
+          admission_date?: string | null;
           mother_name?: string | null;
           medical_record_number?: string | null;
           psychological_diagnosis?: string | null;
@@ -108,6 +110,7 @@ export interface Database {
           er_admission_notes?: string | null;
           er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
+          admission_date?: string | null;
           mother_name?: string | null;
           medical_record_number?: string | null;
           psychological_diagnosis?: string | null;

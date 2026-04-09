@@ -33,6 +33,7 @@ const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
   "Kirkuk", "Anbar", "Diyala", "Saladin", "Babylon", "Karbala",
   "Najaf", "Wasit", "Dhi Qar", "Muthanna", "Qadisiyyah", "Maysan",
+  "Other",
 ]
 
 const EDUCATION_LEVELS = [
@@ -69,6 +70,7 @@ interface EditPatientModalProps {
     mother_name?: string | null
     medical_record_number?: string | null
     psychological_diagnosis?: string | null
+    admission_date?: string | null
   }
   disabled?: boolean
 }
@@ -78,7 +80,9 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [gender, setGender] = useState(patient.gender)
   const [category, setCategory] = useState<PatientCategory>(patient.category)
-  const [province, setProvince] = useState(patient.province || "")
+  const [province, setProvince] = useState(IRAQ_PROVINCES.includes(patient.province || "") ? (patient.province || "") : (patient.province ? "Other" : ""))
+  const [customProvince, setCustomProvince] = useState(IRAQ_PROVINCES.includes(patient.province || "") ? "" : (patient.province || ""))
+  const [admissionDate, setAdmissionDate] = useState(patient.admission_date || "")
   const [educationLevel, setEducationLevel] = useState(patient.education_level || "")
   
   const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>(patient.relative_status || 'Unknown')
@@ -96,7 +100,9 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
     if (open) {
       setGender(patient.gender)
       setCategory(patient.category)
-      setProvince(patient.province || "")
+      setProvince(IRAQ_PROVINCES.includes(patient.province || "") ? (patient.province || "") : (patient.province ? "Other" : ""))
+      setCustomProvince(IRAQ_PROVINCES.includes(patient.province || "") ? "" : (patient.province || ""))
+      setAdmissionDate(patient.admission_date || "")
       setEducationLevel(patient.education_level || "")
       setRelativeStatus(patient.relative_status || 'Unknown')
       setRelativeVisits(patient.relative_visits || "")
@@ -131,7 +137,8 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
       age: parseInt(convertArabicNumbers(formData.get('age') as string)),
       gender: gender,
       category: category,
-      province: province || null,
+      province: province === 'Other' ? (customProvince || 'Other') : (province || null),
+      admission_date: admissionDate || null,
       education_level: educationLevel || null,
       relative_status: relativeStatus,
       relative_visits: relativeStatus === 'Known' ? relativeVisits || null : null,
@@ -226,6 +233,29 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {province === 'Other' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Label htmlFor="customProvince">Specific Province</Label>
+                  <Input 
+                    id="customProvince" 
+                    value={customProvince || ""} 
+                    onChange={(e) => setCustomProvince(e.target.value)} 
+                    placeholder="Enter province name" 
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="admissionDate">Date of Admission (Optional)</Label>
+                <Input 
+                  id="admissionDate" 
+                  name="admissionDate" 
+                  type="date" 
+                  value={admissionDate}
+                  onChange={(e) => setAdmissionDate(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="educationLevel">Education Level</Label>

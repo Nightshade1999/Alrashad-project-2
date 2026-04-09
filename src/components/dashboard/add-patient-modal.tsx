@@ -34,6 +34,7 @@ const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
   "Kirkuk", "Anbar", "Diyala", "Saladin", "Babylon", "Karbala",
   "Najaf", "Wasit", "Dhi Qar", "Muthanna", "Qadisiyyah", "Maysan",
+  "Other",
 ]
 
 const EDUCATION_LEVELS = [
@@ -54,6 +55,8 @@ export function AddPatientModal() {
   const [gender, setGender] = useState("")
   const [category, setCategory] = useState<PatientCategory>("Normal")
   const [province, setProvince] = useState("")
+  const [customProvince, setCustomProvince] = useState("")
+  const [admissionDate, setAdmissionDate] = useState("")
   const [educationLevel, setEducationLevel] = useState("")
   const router = useRouter()
   
@@ -114,7 +117,8 @@ export function AddPatientModal() {
       age: parseInt(convertArabicNumbers(formData.get('age') as string)),
       gender,
       category,
-      province: province || null,
+      province: province === 'Other' ? (customProvince || 'Other') : (province || null),
+      admission_date: admissionDate || null,
       education_level: educationLevel || null,
       relative_status: relativeStatus,
       relative_visits: relativeStatus === 'Known' ? relativeVisits || null : null,
@@ -155,6 +159,8 @@ export function AddPatientModal() {
     setGender("")
     setCategory("Normal")
     setProvince("")
+    setCustomProvince("")
+    setAdmissionDate("")
     setEducationLevel("")
     setRelativeStatus('Unknown')
     setRelativeVisits("")
@@ -219,6 +225,29 @@ export function AddPatientModal() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {province === 'Other' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Label htmlFor="customProvince">Specific Province</Label>
+                  <Input 
+                    id="customProvince" 
+                    value={customProvince || ""} 
+                    onChange={(e) => setCustomProvince(e.target.value)} 
+                    placeholder="Enter province name" 
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="admissionDate">Date of Admission (Optional)</Label>
+                <Input 
+                  id="admissionDate" 
+                  name="admissionDate" 
+                  type="date" 
+                  value={admissionDate}
+                  onChange={(e) => setAdmissionDate(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="educationLevel">Education Level</Label>

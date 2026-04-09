@@ -196,6 +196,7 @@ export function WardPatientDetail({
             <InfoRow label="Mother Name" value={patient.mother_name} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
             <InfoRow label="Province" value={patient.province} />
+            <InfoRow label="Date of Admission" value={patient.admission_date ? format(parseISO(patient.admission_date), "dd MMM yyyy") : "Unknown"} />
             <InfoRow label="Education" value={patient.education_level} />
             <div className="col-span-2 border-t pt-2 mt-1">
               <InfoRow label="Psychological Diagnosis" value={patient.psychological_diagnosis} />
