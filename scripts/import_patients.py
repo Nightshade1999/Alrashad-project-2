@@ -42,16 +42,16 @@ PROVINCE_MAP = {
 DIAGNOSIS_MAP = {
     'ذهان': 'Psychosis',
     'الذهان': 'Psychosis',
-    'ذهان مزمن': 'Chronic Psychosis',
-    'اضطراب ذهاني': 'Psychotic Disorder',
-    'ذهان اضطرابي': 'Delusional Disorder',
+    'ذهان مزمن': 'Psychosis',
+    'اضطراب ذهاني': 'Psychosis',
+    'ذهان اضطرابي': 'Psychosis',
     'فصام': 'Schizophrenia',
-    'فصام مزمن': 'Chronic Schizophrenia',
+    'فصام مزمن': 'Schizophrenia',
     'تخلف عقلي': 'Intellectual Disability',
-    'التخلف العقلي مع اعراض ذهانية': 'Intellectual Disability with Psychosis',
-    'هلاوس': 'Hallucinations',
-    'هلوسة': 'Hallucinations',
-    'هلاوس سمعية': 'Auditory Hallucinations',
+    'التخلف العقلي مع اعراض ذهانية': 'Intellectual Disability',
+    'هلاوس': 'Psychosis',
+    'هلوسة': 'Psychosis',
+    'هلاوس سمعية': 'Psychosis',
     'كآبة': 'Depression',
     'صرع': 'Epilepsy',
     'ثنائي القطب': 'Bipolar Disorder',
@@ -61,15 +61,12 @@ DIAGNOSIS_MAP = {
 }
 
 WARD_GENDER_MAP = {
-    'Kindi': 'Male',
-    'Razi': 'Male',
-    'Prison': 'Male',
-    'Al Ameri': 'Male',
-    'Al Atraqji': 'Male',
-    'Amir Abo': 'Male',
-    'Zainab': 'Female',
-    'Omran': 'Female',
-    'Taj Aldin': 'Female'
+    'Basra': 'Female',
+    'Taj Aldin 1': 'Female',
+    'Taj Aldin 2': 'Female',
+    'Taj Aldin 3': 'Female',
+    'Taj Aldin 4': 'Female',
+    'General Ward': 'Male' # Default
 }
 
 def get_gender_from_ward(ward_name):
@@ -88,9 +85,33 @@ def translate_province(p):
     return PROVINCE_MAP.get(p_str, p_str)
 
 def translate_diagnosis(d):
-    if pd.isna(d): return None
-    d_str = str(d).strip()
-    return DIAGNOSIS_MAP.get(d_str, d_str)
+    if pd.isna(d): return 'Psychosis'
+    diag_str = str(d).strip()
+    return DIAGNOSIS_MAP.get(diag_str, 'Psychosis') # Unify to English Psychosis category
+
+def calculate_age(dob):
+    if pd.isna(dob): return None
+    dob_str = str(dob).strip()
+    if not dob_str or dob_str.lower() == 'unknown': return None
+    
+    try:
+        # 1. Handle 4-digit year strings (e.g. "1973")
+        if len(dob_str) == 4 and dob_str.isdigit():
+            year = int(dob_str)
+            current_year = 2026
+            age = current_year - year
+            return int(age) if age >= 0 else None
+            
+        # 2. Handle full dates
+        dt = pd.to_datetime(dob_str, dayfirst=True, errors='coerce')
+        if not pd.isna(dt):
+            current_year = 2026
+            age = current_year - dt.year - ((4, 10) < (dt.month, dt.day)) # Today is April 10, 2026
+            return int(age) if age >= 0 else None
+            
+        return None
+    except:
+        return None
 
 def normalize_date(d):
     if pd.isna(d): return None
@@ -98,17 +119,6 @@ def normalize_date(d):
         dt = pd.to_datetime(d, dayfirst=True, errors='coerce')
         if pd.isna(dt): return None
         return dt.strftime('%Y-%m-%d')
-    except:
-        return None
-
-def calculate_age(dob):
-    if pd.isna(dob): return None
-    try:
-        dt = pd.to_datetime(dob, dayfirst=True, errors='coerce')
-        if pd.isna(dt): return None
-        today = datetime.now()
-        age = today.year - dt.year - ((today.month, today.day) < (dt.month, dt.day))
-        return int(age) if age >= 0 else None
     except:
         return None
 
