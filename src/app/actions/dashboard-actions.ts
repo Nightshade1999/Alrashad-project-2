@@ -13,7 +13,7 @@ export async function getUrgentInsights() {
   )
 
   // Fetch all patients
-  const { data: patients } = await supabase.from("patients").select("*")
+  const { data: patients } = await supabase.from("patients").select("*").limit(5000)
   if (!patients || patients.length === 0) return "No patients found to analyze."
 
   // Fetch all latest investigations

@@ -48,8 +48,8 @@ export function WardAnalytics({ patients }: { patients: any[] }) {
     let survivalCount = 0
 
     patients.forEach(p => {
-      // Ward counts
-      const w = p.doctor_ward || 'Unknown'
+      // Ward counts - prioritize patient's actual ward over doctor's ward
+      const w = p.ward_name || p.doctor_ward || 'Unknown'
       wardCounts[w] = (wardCounts[w] || 0) + 1
 
       // Category counts

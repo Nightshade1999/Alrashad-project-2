@@ -174,44 +174,48 @@ export default async function AdminWardsPage() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {wardGroups.map(([name, stats]) => (
-            <div key={name} className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:shadow-xl transition-all">
-               <div className="flex items-center justify-between mb-6">
-                 <div className="flex items-center gap-2 mt-1">
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <Building2 className="h-3.5 w-3.5 text-slate-500" />
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{name}</span>
-                  </div>
+            <Link key={name} href={`/dashboard/category/pending-follow-up?ward=${encodeURIComponent(name)}`}>
+              <div className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer">
+                 <div className="flex items-center justify-between mb-6">
+                   <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{name}</span>
+                    </div>
+                   </div>
+                   <div className="flex items-center gap-1 text-[10px] font-black text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                     VIEW ALL <ArrowLeft className="h-3 w-3 rotate-180" />
+                   </div>
                  </div>
-                 <span className="text-xs font-black text-slate-400 p-1 bg-slate-50 dark:bg-slate-800 uppercase rounded">Ward ID</span>
-               </div>
 
-               <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium text-slate-500">Total Admitted</span>
-                    <span className="font-bold">{stats.total} Patients</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium text-slate-500">Critical Monitor</span>
-                    <span className={`font-bold ${stats.highRisk > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {stats.highRisk} High Risk
-                    </span>
-                  </div>
-               </div>
+                 <div className="space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-medium text-slate-500">Total Admitted</span>
+                      <span className="font-bold">{stats.total} Patients</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-medium text-slate-500">Critical Monitor</span>
+                      <span className={`font-bold ${stats.highRisk > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {stats.highRisk} High Risk
+                      </span>
+                    </div>
+                 </div>
 
-               <div className="mt-6 flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-                  <div className="h-full bg-rose-500" style={{ width: `${(stats.highRisk / stats.total) * 100}%` }} />
-                  <div className="h-full bg-amber-500" style={{ width: `${(stats.close / stats.total) * 100}%` }} />
-                  <div className="h-full bg-emerald-500" style={{ width: `${(stats.normal / stats.total) * 100}%` }} />
-               </div>
-               
-               <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                  <div className="flex gap-1 text-[10px] font-black uppercase">
-                    <span className="text-rose-600">🔴 Critical</span>
-                    <span className="text-amber-600">🟡 Close</span>
-                  </div>
-                  <div className="text-xs font-bold text-emerald-600 opacity-60 italic">Global System Metric</div>
-               </div>
-            </div>
+                 <div className="mt-6 flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <div className="h-full bg-rose-500" style={{ width: `${(stats.highRisk / stats.total) * 100}%` }} />
+                    <div className="h-full bg-amber-500" style={{ width: `${(stats.close / stats.total) * 100}%` }} />
+                    <div className="h-full bg-emerald-500" style={{ width: `${(stats.normal / stats.total) * 100}%` }} />
+                 </div>
+                 
+                 <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                    <div className="flex gap-1 text-[10px] font-black uppercase">
+                      <span className="text-rose-600">🔴 Critical</span>
+                      <span className="text-amber-600">🟡 Close</span>
+                    </div>
+                    <div className="text-xs font-bold text-emerald-600 opacity-60 italic">Click to Filter</div>
+                 </div>
+              </div>
+            </Link>
           ))}
         </div>
       </div>

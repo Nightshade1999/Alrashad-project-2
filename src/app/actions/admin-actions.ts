@@ -292,7 +292,8 @@ export async function getAllPatientsForAdminAction() {
     getSupabaseAdmin()
       .from('patients')
       .select('*, visits(*), investigations(*)')
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(5000),
     (getSupabaseAdmin()
       .from('user_profiles') as any)
       .select('user_id, ward_name')
@@ -386,7 +387,7 @@ export async function searchAllPatientsAction(query: string) {
       .from('patients')
       .select('id, name, age, room_number, ward_name, category, is_in_er')
       .ilike('name', `%${query}%`)
-      .limit(10)
+      .limit(50)
 
     if (error) {
       console.error('Global search admin error:', error.message)

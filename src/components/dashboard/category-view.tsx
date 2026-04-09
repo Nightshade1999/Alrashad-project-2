@@ -79,7 +79,12 @@ export function CategoryView({ slug, rows, isPending }: CategoryViewProps) {
       </div>
 
       {/* Patient List */}
-      <PatientList patients={rows} defaultSort={isPending ? 'overdue' : 'name'} categorySlug={slug} />
+      <PatientList 
+        patients={rows} 
+        defaultSort={isPending ? 'overdue' : 'name'} 
+        categorySlug={slug}
+        availableWards={Array.from(new Set(rows.map(r => (r as any).ward_name).filter(Boolean).sort())) as string[]}
+      />
     </div>
   )
 }

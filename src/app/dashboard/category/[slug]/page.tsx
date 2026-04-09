@@ -29,6 +29,7 @@ async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, ta
     .from('patients')
     .select('id, name, age, room_number, chronic_diseases, category, is_in_er, created_at, date_of_death, cause_of_death, previous_category')
     .order('created_at', { ascending: false })
+    .limit(5000)
 
   if (categoryDbValue !== 'Deceased/Archive') {
     query = query.eq('is_in_er', false)
@@ -77,8 +78,15 @@ async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, ta
   }))
 }
 
-export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CategoryPage({ 
+  params, 
+  searchParams 
+}: { 
+  params: Promise<{ slug: string }>, 
+  searchParams: Promise<{ ward?: string }> 
+}) {
   const { slug } = await params
+  const { ward: wardFilter } = await searchParams
   if (!(slug in SERVER_CATEGORY_DB_MAP)) notFound()
 
   const cookieStore = await cookies()
@@ -104,7 +112,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
     .maybeSingle() as any
 
   const isAdmin = (profile as any)?.role === 'admin'
-  const targetWard = isAdmin ? null : ((profile as any)?.ward_name || null)
+  const targetWard = wardFilter || (isAdmin ? null : ((profile as any)?.ward_name || null))
   
   const dbValue = SERVER_CATEGORY_DB_MAP[slug]
   const rows = await fetchRowsOnline(supabase, dbValue, targetWard)

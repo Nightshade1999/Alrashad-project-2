@@ -270,8 +270,8 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
   const [userObjective, setUserObjective] = useState('')
 
   // ── Cohort ────────────────────────────────────────────────
-  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.doctor_ward || p.ward_name))).filter(Boolean).sort(), [patients])
-  const cohort = useMemo(() => wardFilter === 'All' ? patients : patients.filter(p => (p.doctor_ward || p.ward_name) === wardFilter), [patients, wardFilter])
+  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.ward_name || p.doctor_ward))).filter(Boolean).sort(), [patients])
+  const cohort = useMemo(() => wardFilter === 'All' ? patients : patients.filter(p => (p.ward_name || p.doctor_ward) === wardFilter), [patients, wardFilter])
 
   // ─────────────────────────────────────────────────────────
   // QUICK INSIGHTS (auto-computed)
@@ -298,7 +298,7 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
 
     // Ward breakdown
     const wardCounts: Record<string, number> = {}
-    patients.forEach(p => { const w = p.doctor_ward || p.ward_name || 'Unknown'; wardCounts[w] = (wardCounts[w] || 0) + 1 })
+    patients.forEach(p => { const w = p.ward_name || p.doctor_ward || 'Unknown'; wardCounts[w] = (wardCounts[w] || 0) + 1 })
 
     // Deceased count
     const deceased = patients.filter(p => p.category === 'Deceased/Archive').length

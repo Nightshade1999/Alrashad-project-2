@@ -82,8 +82,20 @@ function SortableHeader({
   )
 }
 
-export function PatientList({ patients, defaultSort = 'name', categorySlug }: { patients: PatientRow[]; defaultSort?: SortKey; categorySlug?: string }) {
+export function PatientList({ 
+  patients, 
+  defaultSort = 'name', 
+  categorySlug,
+  availableWards = []
+}: { 
+  patients: PatientRow[]; 
+  defaultSort?: SortKey; 
+  categorySlug?: string;
+  availableWards?: string[];
+}) {
   const [search, setSearch] = useState('')
+  const [wardFilter, setWardFilter] = useState('All')
+  const [viewLimit, setViewLimit] = useState(20)
   const [sortCol, setSortCol] = useState<SortKey>(defaultSort)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
     defaultSort === 'lastVisit' || defaultSort === 'overdue' ? 'desc' : 'asc'
@@ -105,14 +117,20 @@ export function PatientList({ patients, defaultSort = 'name', categorySlug }: { 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     return patients.filter(p => {
+      // Ward filter
+      if (wardFilter !== 'All' && (p as any).ward_name !== wardFilter) return false
+
       const diseasesArr = parseJSONArray(p.chronic_diseases)
       const diseasesStr = diseasesArr.map((d: any) => d.name).join(', ').toLowerCase();
+      const wardStr = (p as any).ward_name?.toLowerCase() || ''
+      
       return !q ||
       p.name.toLowerCase().includes(q) ||
       p.room_number.toLowerCase().includes(q) ||
-      diseasesStr.includes(q)
+      diseasesStr.includes(q) ||
+      wardStr.includes(q)
     })
-  }, [search, patients])
+  }, [search, wardFilter, patients])
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filtered.length) {
@@ -230,6 +248,8 @@ export function PatientList({ patients, defaultSort = 'name', categorySlug }: { 
 
   const headerProps = { sortCol, sortDir, onSort: handleSort }
 
+  const displayed = useMemo(() => sorted.slice(0, viewLimit), [sorted, viewLimit])
+
   return (
     <div className="space-y-4">
       {/* Search & Actions Bar */}
@@ -242,6 +262,37 @@ export function PatientList({ patients, defaultSort = 'name', categorySlug }: { 
             placeholder="Search by name, ward, or disease..."
             className="pl-10 h-11 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm focus-visible:ring-teal-500"
           />
+        </div>
+
+        {availableWards.length > 0 && (
+          <div className="flex items-center gap-2">
+            <select 
+              value={wardFilter}
+              onChange={(e) => setWardFilter(e.target.value)}
+              className="h-11 px-4 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-teal-500 outline-none"
+            >
+              <option value="All">All Wards</option>
+              {availableWards.map(w => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Show:</span>
+          <select 
+            value={viewLimit}
+            onChange={(e) => setViewLimit(Number(e.target.value))}
+            className="h-11 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold focus:ring-2 focus:ring-teal-500 outline-none"
+          >
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+            <option value={500}>500</option>
+            <option value={99999}>All</option>
+          </select>
         </div>
 
         {selectedIds.size > 0 && (
@@ -307,7 +358,7 @@ export function PatientList({ patients, defaultSort = 'name', categorySlug }: { 
 
           {/* Rows */}
           <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col stagger-fade-in">
-            {sorted.map((p, i) => (
+            {displayed.map((p, i) => (
               <PatientCard 
                 key={p.id} 
                 p={p} 
@@ -323,7 +374,7 @@ export function PatientList({ patients, defaultSort = 'name', categorySlug }: { 
       )}
 
       <p className="text-xs text-muted-foreground px-1">
-        Showing {sorted.length} of {patients.length} patient{patients.length !== 1 ? 's' : ''}
+        Showing {displayed.length} of {sorted.length} patient{sorted.length !== 1 ? 's' : ''} (Total {patients.length})
         {sortCol && <span> · Sorted by <strong>{sortCol === 'lastVisit' ? 'last visit' : sortCol === 'lastHba1c' ? 'HbA1c' : sortCol === 'lastHb' ? 'Hb' : sortCol}</strong> ({sortDir})</span>}
       </p>
 
