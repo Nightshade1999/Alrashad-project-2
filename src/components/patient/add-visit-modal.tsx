@@ -25,6 +25,12 @@ export function AddVisitModal({
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const getMinDate = () => {
+    const d = new Date()
+    d.setDate(d.getDate() - 2)
+    return d.toISOString().split('T')[0]
+  }
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [time, setTime] = useState(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
   const [notes, setNotes] = useState('')
@@ -33,6 +39,14 @@ export function AddVisitModal({
   const [pr, setPr] = useState('')
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
+
+  // Clinical Status Flags
+  const [isConscious, setIsConscious] = useState(true)
+  const [isOriented, setIsOriented] = useState(true)
+  const [isAmbulatory, setIsAmbulatory] = useState(true)
+  const [isDyspnic, setIsDyspnic] = useState(false)
+  const [isSoftAbdomen, setIsSoftAbdomen] = useState(true)
+
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +64,18 @@ export function AddVisitModal({
       pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
       spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
       temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
-      is_er: isEr
+      is_er: isEr,
+      is_conscious: isConscious,
+      is_oriented: isOriented,
+      is_ambulatory: isAmbulatory,
+      is_dyspnic: isDyspnic,
+      is_soft_abdomen: isSoftAbdomen
+    }
+
+    if (payload.visit_date < getMinDate()) {
+      toast.error('Visit date cannot be earlier than 2 days ago')
+      setLoading(false)
+      return
     }
 
     try {
@@ -113,7 +138,7 @@ export function AddVisitModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="visit-date" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Date</Label>
-              <Input id="visit-date" type="date" value={date} onChange={e => setDate(e.target.value)} required className="mt-1.5" />
+              <Input id="visit-date" type="date" value={date} min={getMinDate()} onChange={e => setDate(e.target.value)} required className="mt-1.5" />
             </div>
             <div>
               <Label htmlFor="visit-time" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Visit Time</Label>
@@ -147,6 +172,61 @@ export function AddVisitModal({
                 <Label htmlFor="temp" className="text-xs font-semibold text-muted-foreground">Temp (°C)</Label>
                 <Input id="temp" placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-10 text-sm mt-1" />
               </div>
+            </div>
+          </div>
+
+          {/* Clinical Status Flags Section */}
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-blue-500" />
+              Clinical Status
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4">
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isConscious} 
+                  onChange={e => setIsConscious(e.target.checked)} 
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Conscious</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isOriented} 
+                  onChange={e => setIsOriented(e.target.checked)} 
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Oriented</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isAmbulatory} 
+                  onChange={e => setIsAmbulatory(e.target.checked)} 
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Ambulatory</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isDyspnic} 
+                  onChange={e => setIsDyspnic(e.target.checked)} 
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Dyspnic</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isSoftAbdomen} 
+                  onChange={e => setIsSoftAbdomen(e.target.checked)} 
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                />
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Soft Abdomen</span>
+              </label>
             </div>
           </div>
 

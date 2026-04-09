@@ -119,6 +119,11 @@ export interface Database {
           spo2: number | null;
           temp: number | null;
           is_er: boolean;
+          is_conscious: boolean;
+          is_oriented: boolean;
+          is_ambulatory: boolean;
+          is_dyspnic: boolean;
+          is_soft_abdomen: boolean;
         };
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'visit_date'> & { visit_date?: string };
         Update: Partial<Database['public']['Tables']['visits']['Insert']>;

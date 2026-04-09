@@ -10,6 +10,7 @@ interface PatientDetailProps {
   initialPatient: Patient;
   initialVisits: Visit[];
   initialInvestigations: Investigation[];
+  initialProfile?: UserProfile | null;
   view?: string;
 }
 
@@ -17,44 +18,26 @@ export function PatientDetail({
   initialPatient, 
   initialVisits, 
   initialInvestigations,
+  initialProfile,
   view 
 }: PatientDetailProps) {
-  const { patients, visits, investigations, profile } = useDatabase();
-  const [patient, setPatient] = useState<Patient>(initialPatient);
-  const [visitList, setVisitList] = useState<Visit[]>(initialVisits);
-  const [invList, setInvList] = useState<Investigation[]>(initialInvestigations);
-  const [loading, setLoading] = useState(true);
+  const { profile: contextProfile } = useDatabase();
+  
+  // Use props directly for the most reliable sync with server revalidations
+  const patient = initialPatient;
+  const visitList = initialVisits;
+  const invList = initialInvestigations;
+  const profile = initialProfile || contextProfile;
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [initialPatient.id])
 
-  useEffect(() => {
-    async function fetchOnline() {
-      setLoading(true);
-      try {
-        const [p, v, i] = await Promise.all([
-          patients.get(initialPatient.id),
-          visits.list(initialPatient.id),
-          investigations.list(initialPatient.id)
-        ]);
-        if (p) setPatient(p);
-        setVisitList(v as Visit[]);
-        setInvList(i as Investigation[]);
-      } catch (err) {
-        console.error("Patient detail fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchOnline();
-  }, [initialPatient.id, patients, visits, investigations]);
-
   const isErView = patient.is_in_er && view !== 'ward';
   const aiEnabled = profile?.ai_enabled ?? true;
   const wardName = patient.ward_name || 'General Ward';
 
-  if (loading && !patient.name) {
+  if (!patient.name) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="h-12 w-12 rounded-full border-t-2 border-teal-500 animate-spin" />

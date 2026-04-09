@@ -112,25 +112,55 @@ export async function getTodayRemindersAction() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized', data: [] }
 
-  const { data: profile } = await (supabase.from('user_profiles') as any).select('specialty, gender').eq('user_id', user.id).single()
+  const { data: profile } = await (supabase.from('user_profiles') as any).select('role, specialty, gender').eq('user_id', user.id).single()
   if (!profile) return { error: 'Profile not found', data: [] }
 
   const today = await getBaghdadDate()
 
   let query = (supabase.from('reminders') as any)
     .select('*, patients(name)')
-    .eq('reminder_date', today)
+    .lte('reminder_date', today)
     .eq('status', 'pending')
-    .eq('target_specialty', profile.specialty)
-
-  if (profile.specialty === 'internal_medicine' && profile.gender) {
-    query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+  
+  // Enforcement: Only Admins see everything. Doctors are filtered by specialty/gender.
+  if (profile.role !== 'admin') {
+    query = query.eq('target_specialty', profile.specialty)
+    if (profile.specialty === 'internal_medicine' && profile.gender) {
+      query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+    }
   }
 
   const { data, error } = await query
 
   if (error) return { error: error.message, data: [] }
   return { data }
+}
+
+export async function getTodayRemindersCountAction() {
+  const supabase = await getSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { count: 0 }
+
+  const { data: profile } = await (supabase.from('user_profiles') as any).select('role, specialty, gender').eq('user_id', user.id).single()
+  if (!profile) return { count: 0 }
+
+  const today = await getBaghdadDate()
+
+  let query = (supabase.from('reminders') as any)
+    .select('*', { count: 'exact', head: true })
+    .lte('reminder_date', today)
+    .eq('status', 'pending')
+
+  if (profile.role !== 'admin') {
+    query = query.eq('target_specialty', profile.specialty)
+    if (profile.specialty === 'internal_medicine' && profile.gender) {
+      query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+    }
+  }
+
+  const { count, error } = await query
+  if (error) return { count: 0 }
+  return { count: count || 0 }
 }
 
 export async function getRemindersArchiveAction() {

@@ -224,6 +224,23 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
                     new Paragraph({ children: [new TextRun({ text: "PR: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.pr ? `${targetVisit.pr} bpm` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
                     new Paragraph({ children: [new TextRun({ text: "SpO2: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.spo2 ? `${targetVisit.spo2}%` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
                     new Paragraph({ children: [new TextRun({ text: "Temp: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.temp ? `${targetVisit.temp}°C` : "N/A", size: sz(22) })], }),
+                    new Paragraph({ 
+                      children: [
+                        new TextRun({ text: "Status: ", bold: true, size: sz(16), color: "64748B" }), 
+                        new TextRun({ 
+                          text: [
+                            targetVisit.is_conscious ? "Conscious" : "Unconscious",
+                            targetVisit.is_oriented ? "Oriented" : "Disoriented",
+                            targetVisit.is_ambulatory ? "Ambulatory" : "Bed-bound",
+                            targetVisit.is_dyspnic ? "Dyspnic" : "Not Dyspnic",
+                            targetVisit.is_soft_abdomen ? "Soft Abdomen" : "Abdomen Not Soft"
+                          ].join(", "), 
+                          size: sz(16), 
+                          color: "64748B" 
+                        })
+                      ],
+                      spacing: { before: 100 }
+                    }),
                   ] : [new Paragraph({ children: [new TextRun({ text: "No current vitals.", size: sz(22), italics: true })] })])
                 ]
               }),
@@ -264,6 +281,23 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
                     new Paragraph({ children: [new TextRun({ text: "PR: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.pr ? `${targetVisit.pr} bpm` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
                     new Paragraph({ children: [new TextRun({ text: "SpO2: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.spo2 ? `${targetVisit.spo2}%` : "N/A", size: sz(22) })], spacing: { after: 60 } }),
                     new Paragraph({ children: [new TextRun({ text: "Temp: ", bold: true, size: sz(22) }), new TextRun({ text: targetVisit.temp ? `${targetVisit.temp}°C` : "N/A", size: sz(22) })], }),
+                    new Paragraph({ 
+                      children: [
+                        new TextRun({ text: "Status: ", bold: true, size: sz(16), color: "64748B" }), 
+                        new TextRun({ 
+                          text: [
+                            targetVisit.is_conscious ? "Conscious" : "Unconscious",
+                            targetVisit.is_oriented ? "Oriented" : "Disoriented",
+                            targetVisit.is_ambulatory ? "Ambulatory" : "Bed-bound",
+                            targetVisit.is_dyspnic ? "Dyspnic" : "Not Dyspnic",
+                            targetVisit.is_soft_abdomen ? "Soft Abdomen" : "Abdomen Not Soft"
+                          ].join(", "), 
+                          size: sz(16), 
+                          color: "64748B" 
+                        })
+                      ],
+                      spacing: { before: 100 }
+                    }),
                   ] : [new Paragraph({ children: [new TextRun({ text: "No current vitals.", size: sz(22), italics: true })] })])
                 ]
               }),

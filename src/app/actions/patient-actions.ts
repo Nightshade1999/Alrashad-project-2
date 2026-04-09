@@ -47,6 +47,11 @@ export async function addVisitAction(payload: any) {
       pr: typeof payload.pr === 'number' && !isNaN(payload.pr) ? payload.pr : null,
       spo2: typeof payload.spo2 === 'number' && !isNaN(payload.spo2) ? payload.spo2 : null,
       temp: typeof payload.temp === 'number' && !isNaN(payload.temp) ? payload.temp : null,
+      is_conscious: !!payload.is_conscious,
+      is_oriented: !!payload.is_oriented,
+      is_ambulatory: !!payload.is_ambulatory,
+      is_dyspnic: !!payload.is_dyspnic,
+      is_soft_abdomen: !!payload.is_soft_abdomen,
     }
 
     // 3. Primary Insert

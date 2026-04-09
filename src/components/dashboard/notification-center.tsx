@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase"
+import { getTodayRemindersCountAction } from "@/app/actions/reminder-actions"
 
 export function NotificationCenter() {
   const [pendingCount, setPendingCount] = useState(0)
@@ -12,12 +12,7 @@ export function NotificationCenter() {
   useEffect(() => {
     async function fetchCount() {
       try {
-        const supabase = createClient()
-        const { count } = await supabase
-          .from('reminders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-        
+        const { count } = await getTodayRemindersCountAction()
         setPendingCount(count || 0)
       } catch (e) {
         console.error("Notification fetch error:", e)

@@ -164,7 +164,16 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
             ? `<p><strong>BP:</strong> ${targetVisit.bp_sys || "?"}/${targetVisit.bp_dia || "?"}mmHg</p>
                <p><strong>PR:</strong> ${targetVisit.pr ? targetVisit.pr + " bpm" : "N/A"}</p>
                <p><strong>SpO2:</strong> ${targetVisit.spo2 ? targetVisit.spo2 + "%" : "N/A"}</p>
-               <p><strong>Temp:</strong> ${targetVisit.temp ? targetVisit.temp + "C" : "N/A"}</p>`
+               <p><strong>Temp:</strong> ${targetVisit.temp ? targetVisit.temp + "C" : "N/A"}</p>
+               <p style="margin-top:4px; font-size:0.7rem; color:#64748B;">
+                 <strong>Status:</strong> ${[
+                   targetVisit.is_conscious ? "Conscious" : "Unconscious",
+                   targetVisit.is_oriented ? "Oriented" : "Disoriented",
+                   targetVisit.is_ambulatory ? "Ambulatory" : "Bed-bound",
+                   targetVisit.is_dyspnic ? "Dyspnic" : "Not Dyspnic",
+                   targetVisit.is_soft_abdomen ? "Soft Abdomen" : "Abdomen Not Soft"
+                 ].join(", ")}
+               </p>`
             : `<p style="color:#94a3b8;font-style:italic;">No current vitals.</p>`}
         </div>
         <div class="cell" style="width:50%;">
