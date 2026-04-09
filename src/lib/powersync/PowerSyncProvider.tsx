@@ -6,6 +6,7 @@ import { SupabaseConnector } from './SupabaseConnector';
 import { createClient } from '@/lib/supabase';
 import { getPowerSync, initPowerSync } from './db';
 import { SCHEMA_VERSION } from './schema';
+import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
 
 const PowerSyncContext = createContext<PowerSyncDatabase | null>(null);
 
@@ -15,6 +16,7 @@ export const usePowerSync = () => {
 
 export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [db, setDb] = useState<PowerSyncDatabase | null>(null);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
   const connectingRef = useRef(false);
   const initialized = useRef(false);
 
@@ -34,13 +36,9 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // 1. Check for Schema Version Mismatch (Force Refresh if update pushed)
         const storedVersion = localStorage.getItem('powersync_schema_version');
         if (storedVersion !== SCHEMA_VERSION) {
-          console.log(`Schema mismatch (Local: ${storedVersion}, Code: ${SCHEMA_VERSION}). Clearing database...`);
-          await powerSync.disconnectAndClear();
-          localStorage.setItem('powersync_schema_version', SCHEMA_VERSION);
-          // Force a hard reload so the app restarts with a clean database slate.
-          // Without this, React components would try to read from the freshly-wiped
-          // SQLite DB and crash or show empty data.
-          window.location.reload();
+          console.log(`Schema mismatch (Local: ${storedVersion}, Code: ${SCHEMA_VERSION}). Update required.`);
+          // STOP! No more automated reloads.
+          setNeedsUpdate(true);
           return;
         }
 
@@ -99,6 +97,7 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   return (
     <PowerSyncContext.Provider value={db}>
+      {needsUpdate && <UpdatePrompt onUpdate={() => window.location.reload()} />}
       {children}
     </PowerSyncContext.Provider>
   );

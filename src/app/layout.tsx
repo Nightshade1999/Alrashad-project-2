@@ -7,6 +7,7 @@ import { DatabaseProvider } from "@/hooks/useDatabase";
 import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
+import { VConsoleProvider } from "@/components/pwa/VConsoleProvider";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -75,9 +76,11 @@ export default function RootLayout({
         </Suspense>
         <PowerSyncProvider>
           <DatabaseProvider>
-            {children}
-            <InstallPrompt />
-            <ServiceWorkerRegistry />
+            <VConsoleProvider>
+              {children}
+              <InstallPrompt />
+              <ServiceWorkerRegistry />
+            </VConsoleProvider>
           </DatabaseProvider>
         </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />
