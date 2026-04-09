@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
 
+  // 1. Initialize Supabase
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -27,20 +28,23 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  // 2. Fetch User with CRITICAL SECURITY CATCH
+  // Stale cookies from dev environment can throw "refresh_token_not_found".
+  // Catching this prevents the entire server process from crashing.
   let user = null;
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    user = session?.user
+    const { data: { session } } = await supabase.auth.getSession();
+    user = session?.user;
   } catch (error: any) {
-    // Network error — allow the request through to the Service Worker
-    // which will serve cached offline content. Don't boot the user to /login.
-    console.warn('Middleware auth check failed (likely offline):', error?.message);
+    console.warn('Middleware: Auth check suppressed crash:', error?.message);
     return supabaseResponse;
   }
 
-  // Public paths that must be accessible without authentication
+  // 3. Define Access Paths
+  const isDashboard = request.nextUrl.pathname.startsWith('/dashboard')
+  const isAdmin = request.nextUrl.pathname.startsWith('/admin')
+  const isProtected = isDashboard || isAdmin || request.nextUrl.pathname.startsWith('/patient')
+
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
@@ -50,17 +54,38 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname === '/workbox-*.js' ||
     request.nextUrl.pathname === '/offline.html';
 
-  if (!user && !isPublicPath) {
+  // 4. Handle Redirection
+  if (!user && isProtected && !isPublicPath) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // If user is signed in and trying to access /login, redirect to /dashboard
   if (user && request.nextUrl.pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
+  }
+
+  // 5. Hardened Role Check
+  if (user && isAdmin) {
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single()
+
+      if (profile?.role !== 'admin') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+      }
+    } catch {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
@@ -68,13 +93,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - PWA files: manifest, service worker, offline page
-     */
-    '/((?!_next/static|_next/image|favicon.ico|manifest\.webmanifest|manifest\.json|sw\.js|workbox-.*\.js|offline\.html|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|manifest\\.json|sw\\.js|workbox-.*\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
