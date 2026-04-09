@@ -178,7 +178,8 @@ export function OfflineIndicator() {
   }
 
   // --- 2. CONDITIONAL BOTTOM STATUS BAR ---
-  const isShow = !status.connected || showSyncBanner;
+  // For debugging the refresh loop, we force the bar to be always visible.
+  const isShow = true; 
   if (!isShow) return null;
 
   return (
