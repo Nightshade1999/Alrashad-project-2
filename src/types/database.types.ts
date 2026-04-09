@@ -20,6 +20,7 @@ export interface Database {
           user_id: string;
           ward_number: string;
           ward_name: string;
+          room_number: string;
           name: string;
           age: number;
           gender: string;
@@ -54,6 +55,7 @@ export interface Database {
           user_id: string;
           ward_number: string;
           ward_name: string;
+          room_number: string;
           name: string;
           age: number;
           gender: string;
@@ -88,6 +90,7 @@ export interface Database {
           user_id?: string;
           ward_number?: string;
           ward_name?: string;
+          room_number?: string;
           name?: string;
           age?: number;
           gender?: string;
