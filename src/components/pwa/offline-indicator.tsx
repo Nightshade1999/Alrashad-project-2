@@ -186,14 +186,26 @@ export function OfflineIndicator() {
     <div className="fixed bottom-0 left-0 right-0 z-[100] px-4 pb-[env(safe-area-inset-bottom,16px)] pointer-events-none mb-4 sm:mb-6 flex justify-center animate-in slide-in-from-bottom duration-500">
       <div className="pointer-events-auto flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-900/90 dark:bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
 
-        {showSyncBanner && status.connected ? (
-          <>
-            <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">Cloud Syncing</span>
-              <span className="text-[9px] font-bold text-slate-400">Updating medical records...</span>
-            </div>
-          </>
+        {status.connected ? (
+          showSyncBanner ? (
+            <>
+              <RefreshCw className="h-4 w-4 text-teal-400 animate-spin" />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Cloud Syncing</span>
+                <span className="text-[9px] font-bold text-slate-400">Updating medical records...</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-1.5 bg-teal-500/20 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 text-teal-500" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">System Online</span>
+                <span className="text-[9px] font-bold text-slate-400">Verified & Synchronized</span>
+              </div>
+            </>
+          )
         ) : (
           <>
             <div className="p-1.5 bg-rose-500/20 rounded-lg">

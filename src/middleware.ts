@@ -69,6 +69,12 @@ export async function middleware(request: NextRequest) {
 
   // 5. Hardened Role Check
   if (user && isAdmin) {
+    // A. Priority Fallback: Check Supabase Auth Metadata (Instant)
+    if (user.user_metadata?.role === 'admin') {
+      return supabaseResponse;
+    }
+
+    // B. Database Profile Check
     try {
       const { data: profile } = await supabase
         .from('user_profiles')

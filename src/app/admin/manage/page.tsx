@@ -65,7 +65,8 @@ export default async function AdminManagePage() {
     .single()
 
   // 2. Strict Role Check: Bounce non-admins out immediately
-  if (userProfile?.role !== 'admin') {
+  const isAdmin = userProfile?.role === 'admin' || authUser.user_metadata?.role === 'admin'
+  if (!isAdmin) {
     redirect('/dashboard?error=admin_only')
   }
 

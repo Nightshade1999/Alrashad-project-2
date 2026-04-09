@@ -52,21 +52,20 @@ export function OfflineDashboard() {
 
   useEffect(() => {
     // Check localStorage directly for an emergency fallback if the reactive profile hasn't synced yet.
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && profile?.user_id) {
       try {
-        const keys = Object.keys(localStorage);
-        const profileKey = keys.find(k => k.startsWith('profile_cache_'));
-        if (profileKey) {
-          const cached = JSON.parse(localStorage.getItem(profileKey) || '{}');
+        const cachedRaw = localStorage.getItem(`profile_cache_${profile.user_id}`);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
           if (cached.role === 'admin') setIsCachedAdmin(true);
         }
       } catch (e) {
         console.debug('Dashboard: Cache check failed', e);
       }
     }
-  }, []);
+  }, [profile?.user_id]);
 
-  const isAdmin = profile?.role === 'admin' || isCachedAdmin || (profile as any)?.metadataRole === 'admin';
+  const isAdmin = profile?.role === 'admin' || isCachedAdmin || (profile as any)?.metadata_role === 'admin';
 
   // For non-admins, scope the count to their assigned ward only
   const scopedList = isAdmin || !myWardName
