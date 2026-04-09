@@ -176,57 +176,34 @@ export function AddVisitModal({
           </div>
 
           {/* Clinical Status Flags Section */}
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-2">
+          <div className="bg-slate-50/50 dark:bg-slate-800/20 p-3 sm:p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 space-y-3">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
               <span className="h-1 w-1 rounded-full bg-blue-500" />
-              Clinical Status
+              Clinical Assessment
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4">
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={isConscious} 
-                  onChange={e => setIsConscious(e.target.checked)} 
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
-                />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Conscious</span>
-              </label>
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={isOriented} 
-                  onChange={e => setIsOriented(e.target.checked)} 
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
-                />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Oriented</span>
-              </label>
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={isAmbulatory} 
-                  onChange={e => setIsAmbulatory(e.target.checked)} 
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
-                />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Ambulatory</span>
-              </label>
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={isDyspnic} 
-                  onChange={e => setIsDyspnic(e.target.checked)} 
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
-                />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Dyspnic</span>
-              </label>
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  checked={isSoftAbdomen} 
-                  onChange={e => setIsSoftAbdomen(e.target.checked)} 
-                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
-                />
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors">Soft Abdomen</span>
-              </label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Conscious', value: isConscious, setter: setIsConscious, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                { label: 'Oriented', value: isOriented, setter: setIsOriented, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                { label: 'Ambulatory', value: isAmbulatory, setter: setIsAmbulatory, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                { label: 'Dyspnic', value: isDyspnic, setter: setIsDyspnic, activeClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800' },
+                { label: 'Soft Abdomen', value: isSoftAbdomen, setter: setIsSoftAbdomen, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => item.setter(!item.value)}
+                  className={`
+                    px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ring-offset-background
+                    ${item.value 
+                      ? `${item.activeClass} shadow-sm` 
+                      : 'bg-white dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }
+                  `}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
 
