@@ -22,6 +22,7 @@ const UrgentInsights = dynamic(() => import('@/components/dashboard/urgent-insig
   loading: () => <Skeleton className="h-48 w-full rounded-2xl" />
 })
 
+import { AlertCircle, LayoutDashboard, Settings } from 'lucide-react'
 import type { Patient } from '@/types/database.types'
 
 export function OfflineDashboard() {
