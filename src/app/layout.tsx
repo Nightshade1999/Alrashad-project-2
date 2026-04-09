@@ -7,9 +7,6 @@ import { DatabaseProvider } from "@/hooks/useDatabase";
 import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
-import { VConsoleProvider } from "@/components/pwa/VConsoleProvider";
-import { BlackBox, recordEvent } from "@/components/pwa/BlackBox";
-import { PWAExtras } from "@/components/pwa/PWAExtras";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -78,13 +75,9 @@ export default function RootLayout({
         </Suspense>
         <PowerSyncProvider>
           <DatabaseProvider>
-            <VConsoleProvider>
-              <BlackBox />
-              <PWAExtras />
-              {children}
-              <InstallPrompt />
-              <ServiceWorkerRegistry />
-            </VConsoleProvider>
+            {children}
+            <InstallPrompt />
+            <ServiceWorkerRegistry />
           </DatabaseProvider>
         </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />

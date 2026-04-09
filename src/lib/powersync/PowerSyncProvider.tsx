@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase';
 import { getPowerSync, initPowerSync } from './db';
 import { SCHEMA_VERSION } from './schema';
 import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
-import { recordEvent } from '@/components/pwa/BlackBox';
 
 const PowerSyncContext = createContext<PowerSyncDatabase | null>(null);
 

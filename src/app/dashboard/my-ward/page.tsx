@@ -9,7 +9,6 @@ import { ExportButton } from '@/components/dashboard/export-button'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
-import { recordEvent } from '@/components/pwa/BlackBox'
 
 const CATEGORIES = [
   {
@@ -143,7 +142,6 @@ export default function MyWardPage() {
         }
 
         if (!loading && !profile?.ward_name) {
-          recordEvent(`Redirect: No Ward Found (Navigating to /select-ward)`);
           router.replace('/dashboard/select-ward');
           return;
         }

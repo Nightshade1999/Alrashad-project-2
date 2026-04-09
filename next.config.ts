@@ -5,16 +5,8 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  fallbacks: {
-    document: "/offline.html",
-    image: "/icon.png",
-  },
-  reloadOnOnline: false, // Prevents reloads when network status changes
-  workboxOptions: {
-    disableDevLogs: true,
-    skipWaiting: false,    // Critical: prevents automatic reloads on new SW detection
-    clientsClaim: false,   // Critical: prevents new SW from taking control of open tabs immediately
-  },
+  skipWaiting: true,
+  clientsClaim: true,
 });
 
 const nextConfig: NextConfig = {

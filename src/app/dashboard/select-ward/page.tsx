@@ -9,7 +9,6 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
-import { recordEvent } from '@/components/pwa/BlackBox'
 
 export default function SelectWardPage() {
   const router = useRouter()
@@ -101,7 +100,6 @@ export default function SelectWardPage() {
               localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify({ ward_name: activeWard }))
             }
           }
-          recordEvent(`SelectWard: Auto-selecting ward ${activeWard}`);
           router.replace('/dashboard/my-ward');
           return;
         }
