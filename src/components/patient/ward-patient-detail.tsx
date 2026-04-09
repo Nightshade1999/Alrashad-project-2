@@ -22,7 +22,7 @@ import { ShareAIPromptModal } from "@/components/patient/share-ai-prompt-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
-import { isLabAbnormal } from "@/lib/utils"
+import { isLabAbnormal, safeJsonParse } from "@/lib/utils"
 import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string; dot: string }> = {
@@ -207,9 +207,9 @@ export function WardPatientDetail({
           </div>
           <div className="p-4 sm:p-5 overflow-auto max-h-[300px]">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Chronic Diseases</p>
-            {patient.chronic_diseases && patient.chronic_diseases.length > 0 ? (
+            {safeJsonParse(patient.chronic_diseases).length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {patient.chronic_diseases.map((d: any, i: number) => (
+                {safeJsonParse(patient.chronic_diseases).map((d: any, i: number) => (
                   <Badge key={i} variant="default">{d.name || d}</Badge>
                 ))}
               </div>
@@ -229,9 +229,9 @@ export function WardPatientDetail({
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Psychiatric Medications</h2>
           </div>
           <div className="p-0 flex-1 overflow-auto max-h-[300px]">
-             {patient.psych_drugs && patient.psych_drugs.length > 0 ? (
+             {safeJsonParse(patient.psych_drugs).length > 0 ? (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {patient.psych_drugs.map((drug: any, i: number) => (
+                  {safeJsonParse(patient.psych_drugs).map((drug: any, i: number) => (
                     <div key={i} className="px-4 py-2.5">
                       <div className="flex items-center justify-between">
                         <p className="font-bold text-xs text-slate-800 dark:text-slate-100">{drug.name}</p>
@@ -254,9 +254,9 @@ export function WardPatientDetail({
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Internal Medical Drugs</h2>
           </div>
           <div className="p-0 flex-1 overflow-auto max-h-[300px]">
-             {patient.medical_drugs && patient.medical_drugs.length > 0 ? (
+             {safeJsonParse(patient.medical_drugs).length > 0 ? (
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {patient.medical_drugs.map((drug: any, i: number) => (
+                  {safeJsonParse(patient.medical_drugs).map((drug: any, i: number) => (
                     <div key={i} className="px-4 py-2.5">
                       <div className="flex items-center justify-between">
                         <p className="font-bold text-xs text-slate-800 dark:text-slate-100">{drug.name}</p>

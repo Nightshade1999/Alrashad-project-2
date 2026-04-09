@@ -38,7 +38,8 @@ export function DoctorNameModal() {
 
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) return
 
       // We still fetch the name from the DB as a default suggestion
@@ -78,7 +79,8 @@ export function DoctorNameModal() {
     setIsSaving(true)
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) throw new Error("Not authenticated")
 
       await (supabase as any)

@@ -12,7 +12,7 @@ import {
   Legend, ScatterChart, Scatter, ZAxis, AreaChart, Area
 } from 'recharts'
 import { useVariableDiscovery, type Variable } from '@/hooks/use-variable-discovery'
-import { exportAnalyticsToExcel } from '@/lib/export-utils'
+import { safeJsonParse } from '@/lib/utils'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 const RISK_COLORS = {
@@ -86,7 +86,7 @@ export function WardAnalytics({ patients }: { patients: any[] }) {
     if (varId === 'category') return p.category ?? null
     if (varId === 'is_deceased') return p.date_of_death ? 'Deceased' : 'Alive'
     if (varId === 'total_visits') return p.visits?.length || 0
-    if (varId === 'total_chronic') return p.chronic_diseases?.length || 0
+    if (varId === 'total_chronic') return safeJsonParse(p.chronic_diseases).length
     if (varId.startsWith('lab_')) {
       const field = varId.replace('lab_', '')
       const investigations = p.investigations || p.latest_investigations || []
@@ -153,7 +153,10 @@ export function WardAnalytics({ patients }: { patients: any[] }) {
           groups[catVal].push(contVal)
         }
       })
-      const bar = Object.entries(groups).map(([name, vals]) => ({ name, value: vals.reduce((a, b) => a + b, 0) / vals.length }))
+      const bar = Object.entries(groups).map(([name, vals]) => {
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+        return { name, value: Number.isFinite(avg) ? Number(avg.toFixed(2)) : 0 }
+      })
       return { explorerData: { scatter: [], bar, stacked: [], series: [] }, explorerType: 'bar' as const, axisLabels: labels }
     }
     const groups: Record<string, Record<string, number>> = {}
@@ -169,7 +172,7 @@ export function WardAnalytics({ patients }: { patients: any[] }) {
     return { explorerData: { scatter: [], bar: [], stacked, series: Array.from(seriesSet) }, explorerType: 'stacked' as const, axisLabels: labels }
   }, [patients, selectedVars1, selectedVars2, logicMode1, logicMode2, ALL_VARIABLES])
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const exportData = patients.map(p => ({
       name: p.name,
       ward: p.doctor_ward || "Unassigned",
@@ -178,7 +181,8 @@ export function WardAnalytics({ patients }: { patients: any[] }) {
       y_val: computeComposite(p, selectedVars2, logicMode2)
     })).filter(row => row.x_val !== null && row.y_val !== null)
 
-    exportAnalyticsToExcel({
+    const { exportAnalyticsToExcel } = await import('@/lib/export-analytics')
+    await exportAnalyticsToExcel({
       title: `${axisLabels.x} vs ${axisLabels.y}`,
       xLabel: axisLabels.x,
       yLabel: axisLabels.y,

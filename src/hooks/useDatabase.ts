@@ -15,7 +15,8 @@ export function useDatabase() {
   useEffect(() => {
     async function loadSettings() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
         if (!user) return;
 
         // 1. Try Global Setting from Supabase/PowerSync

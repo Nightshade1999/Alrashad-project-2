@@ -35,8 +35,10 @@ export function ModalPortal({ children }: { children: React.ReactNode }) {
       body.style.left = ''
       body.style.right = ''
       body.style.overflow = ''
-      // Restore scroll position
-      window.scrollTo(0, scrollY)
+      // Yield to browser paint before scrolling to prevent iOS flicker
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, behavior: 'instant' })
+      })
     }
   }, [])
 

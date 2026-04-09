@@ -35,3 +35,22 @@ export function isLabAbnormal(key: string, value: number | string | undefined | 
     default: return false;
   }
 }
+
+/**
+ * Safely parse a JSONB field that may arrive as a string from SQLite (PowerSync)
+ * or as a native array from Supabase. Prevents `.map()` / `.length` crashes.
+ */
+export function safeJsonParse<T = any>(data: any): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+

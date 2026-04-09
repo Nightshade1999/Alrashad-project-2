@@ -6,7 +6,7 @@ declare const self: ServiceWorkerGlobalScope & {
 
 import { clientsClaim } from "workbox-core";
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
-import { registerRoute, NavigationRoute } from "workbox-routing";
+import { Route, registerRoute, NavigationRoute } from "workbox-routing";
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
@@ -41,6 +41,20 @@ registerRoute(
     cacheName: "next-static-assets",
   })
 );
+
+// Match Next.js RSC data requests for seamless offline navigation
+const rscRequestRoute = new Route(
+  ({ request, url }) => {
+    return request.headers.get('RSC') === '1' || url.searchParams.has('_rsc');
+  },
+  new NetworkFirst({
+    cacheName: 'next-rsc-payloads',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }), // Keep for 24 hours
+    ],
+  })
+);
+registerRoute(rscRequestRoute);
 
 // 4. API (Supabase) - NetworkFirst (with short timeout)
 // Reduced to 2.5s because Safari is extremely impatient with hanging fetch events

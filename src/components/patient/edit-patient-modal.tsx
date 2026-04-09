@@ -27,7 +27,7 @@ import { useRouter } from "next/navigation"
 import type { PatientCategory, MedicalDrugParams, ChronicDiseaseParams } from "@/types/database.types"
 import { GENERAL_SURGERIES, FEMALE_SURGERIES, MALE_SURGERIES, COMMON_ALLERGIES } from "@/lib/medical-dictionary"
 import { DrugListInput, DiseaseListInput, StringListInput } from "../dashboard/medical-inputs"
-import { convertArabicNumbers } from "@/lib/utils"
+import { convertArabicNumbers, safeJsonParse } from "@/lib/utils"
 
 const IRAQ_PROVINCES = [
   "Baghdad", "Basra", "Nineveh", "Erbil", "Sulaymaniyah", "Dohuk",
@@ -81,11 +81,11 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
   const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>(patient.relative_status || 'Unknown')
   const [relativeVisits, setRelativeVisits] = useState(patient.relative_visits || "")
 
-  const [pastSurgeries, setPastSurgeries] = useState<string[]>(patient.past_surgeries || [])
-  const [chronicDiseases, setChronicDiseases] = useState<ChronicDiseaseParams[]>(patient.chronic_diseases || [])
-  const [medicalDrugs, setMedicalDrugs] = useState<MedicalDrugParams[]>(patient.medical_drugs || [])
-  const [psychDrugs, setPsychDrugs] = useState<MedicalDrugParams[]>(patient.psych_drugs || [])
-  const [allergies, setAllergies] = useState<string[]>(patient.allergies || [])
+  const [pastSurgeries, setPastSurgeries] = useState<string[]>(safeJsonParse(patient.past_surgeries))
+  const [chronicDiseases, setChronicDiseases] = useState<ChronicDiseaseParams[]>(safeJsonParse(patient.chronic_diseases))
+  const [medicalDrugs, setMedicalDrugs] = useState<MedicalDrugParams[]>(safeJsonParse(patient.medical_drugs))
+  const [psychDrugs, setPsychDrugs] = useState<MedicalDrugParams[]>(safeJsonParse(patient.psych_drugs))
+  const [allergies, setAllergies] = useState<string[]>(safeJsonParse(patient.allergies))
 
   const router = useRouter()
 
@@ -97,11 +97,11 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
       setEducationLevel(patient.education_level || "")
       setRelativeStatus(patient.relative_status || 'Unknown')
       setRelativeVisits(patient.relative_visits || "")
-      setPastSurgeries(patient.past_surgeries || [])
-      setChronicDiseases(patient.chronic_diseases || [])
-      setMedicalDrugs(patient.medical_drugs || [])
-      setPsychDrugs(patient.psych_drugs || [])
-      setAllergies(patient.allergies || [])
+      setPastSurgeries(safeJsonParse(patient.past_surgeries))
+      setChronicDiseases(safeJsonParse(patient.chronic_diseases))
+      setMedicalDrugs(safeJsonParse(patient.medical_drugs))
+      setPsychDrugs(safeJsonParse(patient.psych_drugs))
+      setAllergies(safeJsonParse(patient.allergies))
     }
   }, [open, patient])
 

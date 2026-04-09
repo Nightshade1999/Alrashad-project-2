@@ -27,9 +27,18 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    user = session?.user
+  } catch (error: any) {
+    // Network error — allow the request through to the Service Worker
+    // which will serve cached offline content. Don't boot the user to /login.
+    console.warn('Middleware auth check failed (likely offline):', error?.message);
+    return supabaseResponse;
+  }
 
   // Public paths that must be accessible without authentication
   const isPublicPath =

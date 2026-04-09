@@ -58,7 +58,8 @@ export function NavigationButtons() {
     // Only fetch if on my-ward to avoid unnecessary requests on every page
     if (pathname !== '/dashboard/my-ward') return
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
       if (!user) return
       ;(supabase.from('user_profiles') as any)
         .select('accessible_wards')

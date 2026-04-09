@@ -3,8 +3,7 @@
 import { useState } from "react"
 import { FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { exportToWord } from "@/lib/export-utils"
-import { createClient } from "@/lib/supabase"
+import { useDatabase } from "@/hooks/useDatabase"
 import { toast } from "sonner"
 
 interface ExportPatientButtonProps {
@@ -15,49 +14,33 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
   const [isExporting, setIsExporting] = useState<false | 'word' | 'pdf'>(false)
   const [showMenu, setShowMenu] = useState(false)
 
+  const { visits, investigations, profile } = useDatabase()
+
   const handleExport = async (format: 'word' | 'pdf') => {
     setIsExporting(format)
     setShowMenu(false)
-    const supabase = createClient()
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || "Ward Clinician"
+      const wardName = profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
 
-      let doctorName = ""
-      let wardName = ""
-      if (user) {
-        const { data: profile } = await (supabase as any)
-          .from('user_profiles')
-          .select('doctor_name, ward_name')
-          .eq('user_id', user.id)
-          .single()
-        doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || user.email?.split('@')[0] || "Ward Clinician"
-        wardName = profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
-      }
-
-      const { data: investigations } = await supabase
-        .from('investigations')
-        .select('*')
-        .eq('patient_id', patient.id)
-        .order('date', { ascending: false })
-
-      const { data: visits } = await supabase
-        .from('visits')
-        .select('*')
-        .eq('patient_id', patient.id)
-        .order('visit_date', { ascending: false })
+      const [v, i] = await Promise.all([
+        visits.list(patient.id),
+        investigations.list(patient.id)
+      ])
 
       const fullData = {
         ...patient,
-        investigations: investigations || [],
-        visits: visits || []
+        investigations: i || [],
+        visits: v || []
       }
 
       if (format === 'word') {
-        const { exportToWord } = await import("@/lib/export-utils")
+        const { exportToWord } = await import("@/lib/export-word")
         await exportToWord([fullData], doctorName, wardName)
         toast.success("Clinical summary exported to Word")
       } else {
-        const { exportToPdf } = await import("@/lib/export-utils")
+        const { exportToPdf } = await import("@/lib/export-pdf")
         await exportToPdf([fullData], doctorName, wardName)
         toast.success("Clinical summary exported to PDF")
       }

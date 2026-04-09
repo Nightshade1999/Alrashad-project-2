@@ -1,6 +1,7 @@
 "use client"
 
 import { useDatabase } from '@/hooks/useDatabase'
+import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, AlertCircle, Clock, Activity, CalendarClock, LayoutDashboard, Settings } from 'lucide-react'
@@ -12,10 +13,37 @@ import type { Patient } from '@/types/database.types'
 
 export function OfflineDashboard() {
   const { patients, isOfflineMode, profile } = useDatabase();
+  const ps = usePowerSync();
   const [patientList, setPatientList] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // When offline mode is active and PowerSync is available, use live queries
+    // so the UI updates automatically as data syncs in the background
+    if (isOfflineMode && ps) {
+      const abortController = new AbortController();
+
+      const watcher = ps.watch(
+        `SELECT * FROM patients WHERE category != 'Deceased/Archive' ORDER BY updated_at DESC`,
+        [],
+        { signal: abortController.signal }
+      );
+
+      (async () => {
+        try {
+          for await (const result of watcher) {
+            setPatientList((result.rows?._array || []) as any[]);
+            setLoading(false);
+          }
+        } catch (e: any) {
+          if (e.name !== 'AbortError') console.error("Watch error:", e);
+        }
+      })();
+
+      return () => abortController.abort();
+    }
+
+    // Fallback: online mode or PowerSync not ready — use the one-shot fetch
     async function loadData() {
       try {
         const data = await patients.list();
@@ -27,7 +55,7 @@ export function OfflineDashboard() {
       }
     }
     loadData();
-  }, [isOfflineMode]);
+  }, [isOfflineMode, ps]);
 
   const myWardName = profile?.ward_name ?? null;
   const isAdmin = profile?.role === 'admin';

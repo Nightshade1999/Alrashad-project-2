@@ -7,7 +7,6 @@ import {
   HeartPulse, Stethoscope, BarChart3, ArrowRight, CheckCircle2, Info,
   Table, X, ChevronRight, Zap, Eye, RefreshCw
 } from 'lucide-react'
-import { exportResearchToWord, exportResearchToExcel } from '@/lib/export-utils'
 import ReactMarkdown from 'react-markdown'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,

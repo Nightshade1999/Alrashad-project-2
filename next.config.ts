@@ -11,7 +11,7 @@ const withPWA = withPWAInit({
   },
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
-  reloadOnOnline: true,
+  reloadOnOnline: false,
   workboxOptions: {
     disableDevLogs: true,
     // skipWaiting intentionally removed — it caused random page reloads.
@@ -21,6 +21,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   /* config options here */
+  turbopack: {},
 };
 
 // Only wrap with PWA in production or when explicitly enabled for testing

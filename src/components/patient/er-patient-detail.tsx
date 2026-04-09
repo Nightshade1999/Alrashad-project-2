@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
 import { Pill } from "lucide-react"
-import { isLabAbnormal } from "@/lib/utils"
+import { isLabAbnormal, safeJsonParse } from "@/lib/utils"
 import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
 
 export function ErPatientDetail({ 
@@ -111,7 +111,7 @@ export function ErPatientDetail({
            {/* Add Treatment (Tx Icon) */}
            <ErTreatmentEditor 
              patientId={patient.id} 
-             initialTreatments={patient.er_treatment} 
+             initialTreatments={safeJsonParse(patient.er_treatment)} 
              disabled={patient.is_referred}
              trigger={
                <Button variant="outline" size="icon" className="h-10 w-10 border-indigo-200 dark:border-indigo-900 bg-white" title="Edit Treatment">
@@ -160,8 +160,8 @@ export function ErPatientDetail({
                <div className="col-span-2">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Chronic Diseases</p>
                   <div className="flex flex-wrap gap-1">
-                     {patient.chronic_diseases && patient.chronic_diseases.length > 0 ? (
-                       patient.chronic_diseases.map((d: any, i: number) => (
+                     {safeJsonParse(patient.chronic_diseases).length > 0 ? (
+                       safeJsonParse(patient.chronic_diseases).map((d: any, i: number) => (
                          <Badge key={i} variant="outline" className="bg-white text-[10px] px-1.5 h-5">{d.name || d}</Badge>
                        ))
                      ) : <span className="text-xs italic text-slate-400">None</span>}
@@ -181,8 +181,8 @@ export function ErPatientDetail({
                <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Internal Meds</p>
                   <ul className="space-y-1">
-                    {patient.medical_drugs && patient.medical_drugs.length > 0 ? (
-                      patient.medical_drugs.map((m: any, i: number) => (
+                    {safeJsonParse(patient.medical_drugs).length > 0 ? (
+                      safeJsonParse(patient.medical_drugs).map((m: any, i: number) => (
                         <li key={i} className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                           <Droplets className="h-2.5 w-2.5 text-teal-500" /> {m.name}
                         </li>
@@ -193,8 +193,8 @@ export function ErPatientDetail({
                <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Psychiatric Meds</p>
                   <ul className="space-y-1">
-                    {patient.psych_drugs && patient.psych_drugs.length > 0 ? (
-                      patient.psych_drugs.map((p: any, i: number) => (
+                    {safeJsonParse(patient.psych_drugs).length > 0 ? (
+                      safeJsonParse(patient.psych_drugs).map((p: any, i: number) => (
                         <li key={i} className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                           <BrainCircuit className="h-2.5 w-2.5 text-violet-500" /> {p.name}
                         </li>
@@ -328,7 +328,7 @@ export function ErPatientDetail({
             ) : <p className="text-xs italic text-slate-400 py-2">No lab results in ER yet.</p>}
          </div>
 
-         <ErTreatmentEditor patientId={patient.id} initialTreatments={patient.er_treatment} />
+         <ErTreatmentEditor patientId={patient.id} initialTreatments={safeJsonParse(patient.er_treatment)} />
       </div>
 
       {/* ── History Cards & Navigation ── */}

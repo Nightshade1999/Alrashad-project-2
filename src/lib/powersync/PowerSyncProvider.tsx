@@ -37,8 +37,11 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           console.log(`Schema mismatch (Local: ${storedVersion}, Code: ${SCHEMA_VERSION}). Clearing database...`);
           await powerSync.disconnectAndClear();
           localStorage.setItem('powersync_schema_version', SCHEMA_VERSION);
-          // Small delay to ensure clear is committed
-          await new Promise(r => setTimeout(r, 500));
+          // Force a hard reload so the app restarts with a clean database slate.
+          // Without this, React components would try to read from the freshly-wiped
+          // SQLite DB and crash or show empty data.
+          window.location.reload();
+          return;
         }
 
         // Initializing via singleton helper (prevents duplicate init)

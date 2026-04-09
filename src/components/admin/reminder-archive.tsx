@@ -34,7 +34,8 @@ export function ReminderArchive() {
       // Get auth and role for personalized UI using proper browser client
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (user) {
          setUserId(user.id)
          const { data: profile } = await (supabase.from('user_profiles') as any).select('role, specialty, gender').eq('user_id', user.id).single()

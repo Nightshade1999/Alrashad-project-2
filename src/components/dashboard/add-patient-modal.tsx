@@ -87,7 +87,8 @@ export function AddPatientModal() {
     const supabase = createClient()
     const formData = new FormData(e.currentTarget)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) {
       toast.error("You must be logged in to add a patient.")
       setIsSubmitting(false)
@@ -130,15 +131,21 @@ export function AddPatientModal() {
     }
 
     try {
-      // Only use local PowerSync path when truly offline.
-      // When online, always insert directly into Supabase so the data is
-      // immediately visible on page reload (PowerSync syncs bidirectionally anyway).
-      if (isOfflineMode && !navigator.onLine) {
+      // Only use local PowerSync path when offline mode is active.
+      // PowerSync will sync data to Supabase automatically in the background.
+      if (isOfflineMode) {
+        if (!profile) {
+          toast.error("User identity not loaded. Please wait a moment.")
+          setIsSubmitting(false)
+          return
+        }
         await dbPatients.insert({
           ...payload,
-          ward_number: payload.ward_name
+          user_id: profile.user_id,
+          ward_name: profile.ward_name || 'Unknown',
+          ward_number: profile.ward_name || 'Unknown'
         })
-        toast.success("Patient saved to local device!")
+        toast.success("Patient saved locally — syncing...")
       } else {
         const { data: inserted, error } = await (supabase.from('patients') as any).insert([payload]).select()
         if (error) throw error
@@ -149,7 +156,7 @@ export function AddPatientModal() {
       }
       setOpen(false)
       resetForm()
-      window.location.reload()
+      router.refresh()
     } catch (error: any) {
       console.error("Add patient failed:", error)
       toast.error(error?.message || "Failed to add patient")

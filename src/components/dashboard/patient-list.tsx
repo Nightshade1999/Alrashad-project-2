@@ -11,7 +11,6 @@ import { DeletePatientButton } from '@/components/patient/delete-button'
 import { AddVisitModal } from '@/components/patient/add-visit-modal'
 import { AddInvestigationModal } from '@/components/patient/add-investigation-modal'
 import { format, parseISO } from 'date-fns'
-import { exportPatientsToExcel, exportToWord } from '@/lib/export-utils'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useEffect, memo, useCallback } from 'react'
@@ -135,6 +134,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
 
   const handleBulkExportExcel = async () => {
     const selectedPatients = patients.filter(p => selectedIds.has(p.id))
+    const { exportPatientsToExcel } = await import('@/lib/export-excel')
     await exportPatientsToExcel(selectedPatients)
     toast.success(`Exported ${selectedIds.size} patients to Excel`)
   }
@@ -143,7 +143,8 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
     setIsExporting(true)
     const supabase = createClient()
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       const doctorEmail = user?.email || ""
 
       // Fetch full patient data
@@ -183,6 +184,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         }
       })
 
+      const { exportToWord } = await import('@/lib/export-word')
       await exportToWord(merged, doctorEmail)
       toast.success(`Exported ${selectedIds.size} patients to Word`)
     } catch (err) {

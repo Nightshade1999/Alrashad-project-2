@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PowerSyncProvider } from "@/lib/powersync/PowerSyncProvider";
 import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -74,6 +75,7 @@ export default function RootLayout({
         <PowerSyncProvider>
           {children}
           <InstallPrompt />
+          <ServiceWorkerRegistry />
         </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />
         <SpeedInsights />

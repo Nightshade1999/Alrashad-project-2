@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
-import { exportPatientsToCSV } from '@/lib/export-utils'
 import { toast } from 'sonner'
 
 export function ExportButton() {
@@ -26,6 +25,7 @@ export function ExportButton() {
         return
       }
 
+      const { exportPatientsToCSV } = await import('@/lib/export-excel')
       await exportPatientsToCSV(data)
       toast.success("Export successful!")
     } catch (error) {

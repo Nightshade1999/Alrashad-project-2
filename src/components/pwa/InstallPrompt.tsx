@@ -34,7 +34,15 @@ export function InstallPrompt() {
 
   const maybeShowPrompt = useCallback(() => {
     if (isDismissedForNow()) return
-    if (window.matchMedia('(display-mode: standalone)').matches) return
+
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches || 
+      (window.navigator as any).standalone === true;
+
+    if (isStandalone) {
+      setIsInstalled(true);
+      return;
+    }
 
     // Increment visit count — show only after 2+ visits
     try {
@@ -48,7 +56,11 @@ export function InstallPrompt() {
 
   useEffect(() => {
     // Detect installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches || 
+      (window.navigator as any).standalone === true;
+
+    if (isStandalone) {
       setIsInstalled(true)
       return
     }

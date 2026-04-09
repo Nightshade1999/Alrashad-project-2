@@ -3,52 +3,50 @@
 import { getGenerativeModel, MODEL_PRIORITY } from "@/lib/gemini"
 
 export async function runMedicalCorrelationAction(
-  var1Name: string, 
-  var2Name: string, 
+  var1Def: any, 
+  var2Def: any, 
   dataset: any[], 
-  statsContext?: string,
   userInstruction?: string
 ) {
-  if (!dataset || dataset.length === 0) {
-    return { error: 'No data provided to analyze.' }
-  }
+  if (!dataset || dataset.length === 0) return { error: 'No data provided.' }
 
-  // Convert the dataset into a strict Markdown Tabular format
-  let markdownTable = `| Record (Anon) | ${var1Name} | ${var2Name} |\n|---|---|---|\n`
-  dataset.forEach((row, i) => {
-    markdownTable += `| #${i + 1} | ${row.val1 ?? 'N/A'} | ${row.val2 ?? 'N/A'} |\n`
+  // 1. Send data to your Python Engine for pure math
+  const pythonResponse = await fetch('http://127.0.0.1:8000/api/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      independent_vars: [var1Def],
+      dependent_var: var2Def,
+      data: dataset
+    })
   })
 
-  // THE ADVANCED AI RESEARCH PROMPT
-  const prompt = `You are an elite Clinical Data Scientist and Medical Research AI.
+  if (!pythonResponse.ok) throw new Error("Python engine failed to calculate statistics.")
+  const statsResult = await pythonResponse.json()
 
-${userInstruction ? `YOUR SPECIFIC CLINICAL OBJECTIVE: "${userInstruction}"` : `YOUR TASK: Analyze the correlation between "${var1Name}" and "${var2Name}".`}
-
-${statsContext ? `MATH ENGINE CALCULATIONS: \n${statsContext}\n\n` : ''}
-
-Below is the clinical dataset extracted from the Hospital Ward Management System.
-The dataset is anonymized for patient privacy.
-
-DATASET:
-${markdownTable}
-
-STRICT REPORTING GUIDELINES:
-1. Provide a professional "Clinical Abstract" of your findings.
-2. Analyze the "Study Group" versus the "Control" baseline patterns.
-3. Elaborate on Statistical Trends (Breakdowns, percentages, or frequencies).
-4. Address Clinical Significance: Is there a medical reason for this correlation?
-5. Formulate a final "Investigative Conclusion" with actionable hospital ward recommendations.
-
-Use formal medical terminology and format your output entirely in rich Markdown (Bold text, Bullet points, Blockquotes, Tables).
-`
+  // 2. Send the MATHEMATICAL TRUTH to Gemini for clinical interpretation
+  const prompt = `
+    You are an elite Clinical Data Scientist.
+    OBJECTIVE: ${userInstruction || `Analyze the correlation between ${var1Def.label} and ${var2Def.label}.`}
+    
+    STATISTICAL ENGINE RESULTS (ABSOLUTE FACT):
+    Test Used: ${statsResult.test_used}
+    Statistic: ${statsResult.statistic}
+    P-Value: ${statsResult.p_value}
+    
+    INSTRUCTIONS: Write a professional Clinical Abstract. If P-value > 0.05, explicitly state there is NO statistically significant correlation. Do not invent trends.
+  `
 
   let lastError: any = null
   for (const modelName of MODEL_PRIORITY) {
     try {
-      console.log(`[Research-Action] Attempting with model: ${modelName}`)
       const model = getGenerativeModel(modelName)
-      const result = await model.generateContent(prompt)
-      return { result: result.response.text() }
+      const aiResult = await model.generateContent(prompt)
+      
+      return { 
+        result: aiResult.response.text(), 
+        chartData: statsResult.chart_data // Pass the chart data straight to Recharts!
+      }
     } catch (err: any) {
       console.warn(`[Research-Action] Model ${modelName} failed:`, err.message)
       lastError = err
