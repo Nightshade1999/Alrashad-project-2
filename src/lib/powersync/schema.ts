@@ -62,6 +62,30 @@ const investigations = new Table({
   is_er: column.integer,
   doctor_id: column.text,
   doctor_name: column.text,
+  other_labs: column.text,
+});
+
+const ward_settings = new Table({
+  ward_name: column.text,
+  gender: column.text,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
+const reminders = new Table({
+  patient_id: column.text,
+  notes: column.text,
+  reminder_date: column.text,
+  target_specialty: column.text,
+  target_gender: column.text,
+  created_by: column.text,
+  created_by_name: column.text,
+  status: column.text,
+  resolve_notes: column.text,
+  resolved_by: column.text,
+  resolved_by_name: column.text,
+  resolved_at: column.text,
+  updated_at: column.text,
 });
 
 const user_profiles = new Table({
@@ -88,7 +112,9 @@ export const AppSchema = new Schema({
   visits,
   investigations,
   user_profiles,
-  system_settings
+  system_settings,
+  ward_settings,
+  reminders
 });
 
 /**
@@ -97,4 +123,4 @@ export const AppSchema = new Schema({
  * Changing this will trigger a full disconnectAndClear() for all clients on their next launch,
  * ensuring they redownload the entire database matching the new structure.
  */
-export const SCHEMA_VERSION = 'v17.0.0'; 
+export const SCHEMA_VERSION = 'v18.0.0'; 
