@@ -177,17 +177,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadSettings() {
-      // Step 1: Instant cache load — profile shows immediately, no network wait
-      const anyCacheKey = Object.keys(localStorage).find(k => k.startsWith('profile_cache_'));
-      if (anyCacheKey) {
-        try {
-          const cached = JSON.parse(localStorage.getItem(anyCacheKey)!);
-          setProfile(cached);
-          setOfflineEnabled(cached?.offline_mode_enabled ?? false);
-        } catch {}
-      }
-
-      // Step 2: Auth session — isolated try/catch so offline errors don't cascade
+      // Step 1: Auth session — isolate so offline errors don't cascade
       let session: any = null;
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -197,6 +187,18 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       }
 
       const userId = session?.user?.id;
+
+      // Step 2: Safe Instant Cache Load for the correct user ONLY
+      if (userId) {
+        try {
+          const cached = localStorage.getItem(`profile_cache_${userId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setProfile(parsed);
+            setOfflineEnabled(parsed?.offline_mode_enabled ?? false);
+          }
+        } catch {}
+      }
 
       // Step 3: Global system settings
       try {
@@ -228,13 +230,10 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
               console.warn('SQLite profile fetch failed, using localStorage cache.');
             }
           }
-          // Offline final fallback: scan all cache keys
-          if (!userProfile?.ward_name) {
-            const cacheKey = userId ? `profile_cache_${userId}` : anyCacheKey || null;
-            if (cacheKey) {
-              const cached = localStorage.getItem(cacheKey);
-              if (cached) { try { userProfile = JSON.parse(cached); } catch {} }
-            }
+          // Offline final fallback
+          if (!userProfile?.ward_name && userId) {
+            const cached = localStorage.getItem(`profile_cache_${userId}`);
+            if (cached) { try { userProfile = JSON.parse(cached); } catch {} }
           }
         }
         if (userProfile) {
