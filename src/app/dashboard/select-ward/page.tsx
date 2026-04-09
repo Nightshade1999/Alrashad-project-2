@@ -80,6 +80,24 @@ export default function SelectWardPage() {
             // Ward mismatch — sync silently then navigate
             if (navigator.onLine) {
               await syncProfileWardAction(activeWard)
+            } else if (ps) {
+              // OFFLINE: Update local DB so my-ward will recognize it
+              await ps.execute(
+                'UPDATE user_profiles SET ward_name = ? WHERE user_id = ?',
+                [activeWard, user.id]
+              ).catch(e => console.warn("Failed to update SQLite offline", e))
+            }
+            
+            // Always update localStorage cache to break redirect loop with my-ward
+            const cached = localStorage.getItem(`profile_cache_${user.id}`)
+            if (cached) {
+              try { 
+                const p = JSON.parse(cached)
+                p.ward_name = activeWard
+                localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(p))
+              } catch {}
+            } else {
+              localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify({ ward_name: activeWard }))
             }
           }
           router.push('/dashboard/my-ward')
@@ -98,6 +116,13 @@ export default function SelectWardPage() {
   async function handleSelectWard(wardName: string) {
     setIsSyncing(wardName)
     try {
+      let currentUserId = profile?.user_id
+      if (!currentUserId) {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        currentUserId = user?.id
+      }
+
       if (navigator.onLine) {
         await syncProfileWardAction(wardName)
       } else if (ps) {
@@ -107,6 +132,20 @@ export default function SelectWardPage() {
           [wardName]
         )
       }
+
+      if (currentUserId) {
+        const cached = localStorage.getItem(`profile_cache_${currentUserId}`)
+        if (cached) {
+          try { 
+            const p = JSON.parse(cached)
+            p.ward_name = wardName
+            localStorage.setItem(`profile_cache_${currentUserId}`, JSON.stringify(p))
+          } catch {}
+        } else {
+          localStorage.setItem(`profile_cache_${currentUserId}`, JSON.stringify({ ward_name: wardName }))
+        }
+      }
+
       router.push('/dashboard/my-ward')
     } catch (err) {
       console.error("Ward sync error:", err)
