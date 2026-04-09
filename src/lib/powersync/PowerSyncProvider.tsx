@@ -50,9 +50,7 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (session && !powerSync.currentStatus?.connected && !connectingRef.current) {
           try {
             connectingRef.current = true;
-            recordEvent('PowerSync: Connecting...');
             await powerSync.connect(connector);
-            recordEvent('PowerSync: Connected Successfully');
             console.log('PowerSync initial connection established');
           } catch (e) {
             console.warn('PowerSync initial connection failed (expected if offline):', e);
@@ -67,9 +65,7 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             try {
               if (!powerSync.currentStatus?.connected && !connectingRef.current) {
                 connectingRef.current = true;
-                recordEvent('PowerSync: Auth Reconnect...');
                 await powerSync.connect(connector);
-                recordEvent('PowerSync: Reconnected');
                 console.log('PowerSync: Connected');
               }
             } catch (e) {
