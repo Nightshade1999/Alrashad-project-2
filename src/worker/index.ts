@@ -10,7 +10,8 @@ import { Route, registerRoute, NavigationRoute } from "workbox-routing";
 import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
-clientsClaim();
+// clientsClaim() intentionally removed; handled by next-config/workbox to prevent reloads
+// clientsClaim();
 cleanupOutdatedCaches();
 
 // Precaching Next.js build assets

@@ -204,13 +204,15 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       // Step 2: Instant Metadata & Cache Load
       if (userId) {
         // A. Primary Fallback: Supabase User Metadata (Instant from Session)
-        const metadataRole = session?.user?.user_metadata?.role;
-        if (metadataRole) {
+        const metadataRoleRaw = session?.user?.user_metadata?.role;
+        const isMetadataAdmin = typeof metadataRoleRaw === 'string' && metadataRoleRaw.toLowerCase() === 'admin';
+        
+        if (metadataRoleRaw) {
           setProfile(prev => ({ 
             ...(prev || {}), 
-            role: metadataRole,
+            role: isMetadataAdmin ? 'admin' : metadataRoleRaw,
             user_id: userId,
-            metadata_role: metadataRole // Persistent flag
+            metadata_role: isMetadataAdmin ? 'admin' : metadataRoleRaw
           } as UserProfile));
         }
 
@@ -262,11 +264,17 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (userProfile) {
-          setProfile(prev => ({
-            ...(userProfile as any),
-            // CRITICAL: Never let a DB fetch downgrade an Admin if they have the metadata flag
-            role: (prev as any)?.metadata_role === 'admin' ? 'admin' : (userProfile as any).role
-          }));
+          setProfile(prev => {
+            const dbRole = (userProfile as any).role;
+            const isDbAdmin = typeof dbRole === 'string' && dbRole.toLowerCase() === 'admin';
+            const isPrevMetadataAdmin = (prev as any)?.metadata_role === 'admin';
+
+            return {
+              ...(userProfile as any),
+              // CRITICAL: Never let a DB fetch downgrade an Admin if they have the metadata flag
+              role: isPrevMetadataAdmin ? 'admin' : (isDbAdmin ? 'admin' : dbRole)
+            }
+          });
           setOfflineEnabled((userProfile as any).offline_mode_enabled ?? false);
         }
       } catch (err) {
