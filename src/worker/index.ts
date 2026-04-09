@@ -111,7 +111,8 @@ self.addEventListener("install", (event) => {
       ]);
     })
   );
-  self.skipWaiting();
+  // self.skipWaiting() intentionally removed to prevent random page reloads.
+  // The new service worker will wait until all tabs are closed before activating.
 });
 
 // ACTIVATE EVENT: Disable Navigation Preload (Fix for Safari bug)

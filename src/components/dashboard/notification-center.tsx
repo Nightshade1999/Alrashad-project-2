@@ -1,53 +1,41 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase"
 import Link from "next/link"
+import { usePowerSync } from "@/lib/powersync/PowerSyncProvider"
 
 export function NotificationCenter() {
+  const ps = usePowerSync()
   const [pendingCount, setPendingCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-
-  const fetchRemindersCount = useCallback(async () => {
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: profile } = await (supabase.from('user_profiles') as any).select('specialty, gender').eq('user_id', user.id).single()
-      if (!profile) return
-
-      const today = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0] // Baghdad time
-      
-      let query = (supabase.from('reminders') as any)
-        .select('*', { count: 'exact', head: true })
-        .eq('reminder_date', today)
-        .eq('status', 'pending')
-        .eq('target_specialty', profile.specialty)
-
-      if (profile.specialty === 'internal_medicine' && profile.gender) {
-        query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
-      }
-
-      const { count, error } = await query
-      if (!error && count !== null) {
-        setPendingCount(count)
-      }
-    } catch (e) {
-      console.error("Failed to fetch notification count", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   useEffect(() => {
-    fetchRemindersCount()
-    // Optional: Set up a periodic poll or use a database listener
-    const interval = setInterval(fetchRemindersCount, 30000)
-    return () => clearInterval(interval)
-  }, [fetchRemindersCount])
+    if (!ps) return;
+
+    const abortController = new AbortController();
+    
+    // PowerSync silently watches for new reminders in the background
+    // No setIntervals, no Server Actions, no UI resets!
+    const watcher = ps.watch(
+      "SELECT count(*) as count FROM reminders WHERE status = 'pending'",
+      [],
+      { signal: abortController.signal }
+    );
+
+    (async () => {
+      try {
+        for await (const result of watcher) {
+          const count = result.rows?.item(0)?.count || 0;
+          setPendingCount(count);
+        }
+      } catch (e: any) {
+        if (e.name !== 'AbortError') console.error("Notification watch error:", e);
+      }
+    })();
+
+    return () => abortController.abort();
+  }, [ps]);
 
   return (
     <Link href="/reminders" className="relative group" prefetch={true}>
