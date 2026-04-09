@@ -285,9 +285,49 @@ export function ErPatientDetail({
                <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Visit (ER)</h3>
             </div>
             {lastErVisit ? (
-              <div className="space-y-2">
-                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-3 italic">"{lastErVisit.exam_notes}"</p>
-                <p className="text-[10px] font-bold text-emerald-600">{format(parseISO(lastErVisit.visit_date), 'dd MMM, HH:mm')}</p>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 italic">"{lastErVisit.exam_notes}"</p>
+                
+                {/* Vitals Summary */}
+                <div className="flex flex-wrap gap-x-3 gap-y-1 py-2 border-y border-slate-50 dark:border-slate-800/50">
+                  <div className="flex items-center gap-1.5">
+                    <Stethoscope className="h-3 w-3 text-rose-500" />
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      {lastErVisit.bp_sys || '?'}/{lastErVisit.bp_dia || '?'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="h-3 w-3 text-emerald-500" />
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      {lastErVisit.pr ? `${lastErVisit.pr} bpm` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Droplets className="h-3 w-3 text-blue-500" />
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      {lastErVisit.spo2 ? `${lastErVisit.spo2}%` : '--'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Flags Summary */}
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    lastErVisit.is_conscious ? 'Conscious' : 'Unconscious',
+                    lastErVisit.is_oriented ? 'Oriented' : 'Disoriented',
+                    lastErVisit.is_ambulatory ? 'Ambulatory' : 'Bed-bound',
+                    lastErVisit.is_dyspnic ? 'Dyspnic' : null,
+                    lastErVisit.is_soft_abdomen ? 'Soft Abdomen' : 'Abdomen Not Soft'
+                  ].filter(Boolean).map((flag) => (
+                    <span key={flag} className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      {flag}
+                    </span>
+                  ))}
+                </div>
+
+                <p className="text-[10px] font-bold text-emerald-600 pt-1">
+                  {format(parseISO(lastErVisit.visit_date), 'dd MMM, HH:mm')}
+                </p>
               </div>
             ) : <p className="text-xs italic text-slate-400 py-2">No follow-up visits in ER yet.</p>}
          </div>
