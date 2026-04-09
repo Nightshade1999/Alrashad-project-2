@@ -2,8 +2,15 @@ import { createClient } from "@/lib/supabase-server"
 import { PatientDetail } from "@/components/patient/PatientDetail"
 import { notFound } from "next/navigation"
 
-export default async function PatientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PatientPage({ 
+  params, 
+  searchParams 
+}: { 
+  params: Promise<{ id: string }>,
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const { id } = await params
+  const sParams = await searchParams
   const supabase = await createClient()
 
   // Parallel fetch for optimal performance
@@ -37,6 +44,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
       initialVisits={(visits as any[]) || []}
       initialInvestigations={(investigations as any[]) || []}
       initialProfile={profile as any}
+      view={sParams.view as string}
     />
   )
 }

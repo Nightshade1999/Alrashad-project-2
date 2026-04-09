@@ -114,9 +114,18 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
               children: [
                 new Paragraph({ children: [new TextRun({ text: "I. PATIENT DEMOGRAPHICS", bold: true, size: sz(20), color: secondaryColor })], spacing: { after: 120 } }),
                 new Paragraph({ children: [new TextRun({ text: "Name: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.name, bold: true, size: sz(18) })], spacing: { after: 80 } }),
+                !isER ? new Paragraph({ children: [new TextRun({ text: "Medical Record No: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.medical_record_number || "N/A", size: sz(18) })], spacing: { after: 80 } }) : null,
+                !isER ? new Paragraph({ children: [new TextRun({ text: "Mother Name: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.mother_name || "N/A", size: sz(18) })], spacing: { after: 80 } }) : null,
                 !isER ? new Paragraph({ children: [new TextRun({ text: "Province / Edu: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: `${p.province || "N/A"} / ${p.education_level || "N/A"}`, size: sz(18) })], spacing: { after: 80 } }) : null,
                 new Paragraph({ children: [new TextRun({ text: "Age / Gender: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: `${p.age}y / ${p.gender}`, size: sz(18) })], spacing: { after: 80 } }),
                 new Paragraph({ children: [new TextRun({ text: "Primary Ward: ", bold: true, size: sz(18), color: "64748B" }), new TextRun({ text: p.ward_name || wardName || "General Ward", size: sz(18) })], spacing: { after: 80 } }),
+                new Paragraph({ 
+                  children: [
+                    new TextRun({ text: "Psychological Diagnosis: ", bold: true, size: sz(18), color: "64748B" }), 
+                    new TextRun({ text: p.psychological_diagnosis || "None recorded", size: sz(18), bold: true, color: "0D9488" })
+                  ], 
+                  spacing: { before: 100, after: 120 } 
+                }),
                 new Paragraph({ children: [new TextRun({ text: "Chronic Diseases:", bold: true, size: sz(18), color: "64748B" })], spacing: { after: 40 } }),
                 new Paragraph({ children: [new TextRun({ text: formatDiseases(p.chronic_diseases), size: sz(18), italics: true })], spacing: { after: isER ? 40 : 120 } }),
                 isER ? new Paragraph({ children: [new TextRun({ text: "Chronic Medications:", bold: true, size: sz(18), color: "64748B" })], spacing: { after: 40 } }) : null,

@@ -157,6 +157,10 @@ export function ErPatientDetail({
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Age / Gender</p>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{patient.age}y / {patient.gender}</p>
                </div>
+               <div className="col-span-2 border-t border-rose-100 dark:border-rose-900/30 pt-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Psychological Diagnosis</p>
+                  <p className="text-sm font-bold text-rose-800 dark:text-rose-200">{patient.psychological_diagnosis || 'None recorded'}</p>
+               </div>
                <div className="col-span-2">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Chronic Diseases</p>
                   <div className="flex flex-wrap gap-1">

@@ -66,6 +66,9 @@ interface EditPatientModalProps {
     allergies: string[]
     high_risk_date?: string | null
     is_referred?: boolean
+    mother_name?: string | null
+    medical_record_number?: string | null
+    psychological_diagnosis?: string | null
   }
   disabled?: boolean
 }
@@ -137,6 +140,9 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
       medical_drugs: medicalDrugs,
       psych_drugs: psychDrugs,
       allergies: allergies,
+      mother_name: formData.get('motherName') as string || null,
+      medical_record_number: formData.get('medicalRecordNumber') as string || null,
+      psychological_diagnosis: formData.get('diagnosis') as string || null,
     }
 
     if (category === 'High Risk') {
@@ -233,6 +239,21 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="motherName">Mother Name</Label>
+                <Input id="motherName" name="motherName" defaultValue={patient.mother_name || ""} placeholder="Full name of mother" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="medicalRecordNumber">Medical Record No.</Label>
+                <Input id="medicalRecordNumber" name="medicalRecordNumber" defaultValue={patient.medical_record_number || ""} placeholder="e.g. MRN12345" />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="diagnosis">Psychological Diagnosis</Label>
+                <Input id="diagnosis" name="diagnosis" defaultValue={patient.psychological_diagnosis || ""} placeholder="Primary psychological diagnosis" />
               </div>
 
               {/* Relatives Info */}

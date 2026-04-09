@@ -123,6 +123,9 @@ export function AddPatientModal() {
       medical_drugs: medicalDrugs,
       psych_drugs: psychDrugs,
       allergies: allergies,
+      mother_name: formData.get('motherName') as string || null,
+      medical_record_number: formData.get('medicalRecordNumber') as string || null,
+      psychological_diagnosis: formData.get('diagnosis') as string || null,
     }
 
     if (category === 'High Risk') {
@@ -229,6 +232,21 @@ export function AddPatientModal() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="motherName">Mother Name</Label>
+                <Input id="motherName" name="motherName" placeholder="Full name of mother" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="medicalRecordNumber">Medical Record No.</Label>
+                <Input id="medicalRecordNumber" name="medicalRecordNumber" placeholder="e.g. MRN12345" />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="diagnosis">Psychological Diagnosis</Label>
+                <Input id="diagnosis" name="diagnosis" placeholder="Primary psychological diagnosis" />
               </div>
               
               {/* Relatives Info */}

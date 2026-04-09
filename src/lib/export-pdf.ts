@@ -133,8 +133,16 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
           <h4 style="color:${tealHex};">I. PATIENT DEMOGRAPHICS</h4>
           <p><strong>Name:</strong> ${field(pName)}</p>
           <p><strong>Age / Gender:</strong> ${p.age || "?"}y / ${p.gender || "N/A"}</p>
-          ${!isER ? `<p><strong>Province / Edu:</strong> ${field(p.province)} / ${field(p.education_level)}</p>` : ""}
+          ${!isER ? `
+            <p><strong>Medical Record No.:</strong> ${field(p.medical_record_number)}</p>
+            <p><strong>Mother Name:</strong> ${field(p.mother_name)}</p>
+            <p><strong>Province / Edu:</strong> ${field(p.province)} / ${field(p.education_level)}</p>
+          ` : ""}
           <p><strong>Ward:</strong> ${field(p.ward_name || wardName)}</p>
+          <div style="margin-top:8px; padding-top:4px; border-top:1px solid #e2e8f0;">
+             <p><strong>Psychological Diagnosis:</strong></p>
+             <p dir="auto" style="font-weight:bold; color:#0D9488;">${field(p.psychological_diagnosis)}</p>
+          </div>
           ${isER ? `
             <h4 style="color:#64748B; margin-top:8px; margin-bottom:4px; font-size:0.7rem;">CHRONIC MEDICATIONS:</h4>
             <p dir="auto" style="font-style:italic;">${field([...parseArr(p.medical_drugs), ...parseArr(p.psych_drugs)].map(d => d.name || d).join(", ") || "None recorded")}</p>

@@ -190,11 +190,16 @@ export function WardPatientDetail({
           </div>
           <div className="p-4 sm:p-5 grid grid-cols-2 gap-x-4 gap-y-3">
             <InfoRow label="Ward / Room" value={`${wardName || patient.ward_name || 'General Ward'} / Room ${patient.room_number}`} />
+            <InfoRow label="MRN" value={patient.medical_record_number} />
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={`${patient.age} years`} />
+            <InfoRow label="Mother Name" value={patient.mother_name} />
             <InfoRow label="Category" value={`${catStyle.dot} ${patient.category}`} />
             <InfoRow label="Province" value={patient.province} />
             <InfoRow label="Education" value={patient.education_level} />
+            <div className="col-span-2 border-t pt-2 mt-1">
+              <InfoRow label="Psychological Diagnosis" value={patient.psychological_diagnosis} />
+            </div>
           </div>
         </div>
 
