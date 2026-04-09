@@ -27,8 +27,12 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
     const isER = p.is_in_er === true || p.is_in_er === 1 || p.is_in_er === "1" || p.is_in_er === "true";
 
     const visitsForDoc = (p.visits || []).filter((v: any) => isER ? v.is_er : !v.is_er);
-    visitsForDoc.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime());
-    const targetVisit = visitsForDoc.length > 0 ? visitsForDoc[0] : (p.visits?.[0] || null);
+    const targetVisit = visitsForDoc.reduce((latest: any, curr: any) => {
+      if (!latest) return curr;
+      const t1 = Date.parse(curr.visit_date || 0);
+      const t2 = Date.parse(latest.visit_date || 0);
+      return t1 > t2 ? curr : latest;
+    }, null) || (p.visits?.[0] || null);
 
     let docLabs = (p.investigations || []).filter((inv: any) => isER ? inv.is_er : !inv.is_er);
     if (docLabs.length === 0 && p.investigations?.length > 0) docLabs = [p.investigations[0]];
@@ -307,7 +311,11 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
       spacing: { after: 200 },
     }));
 
-    docLabs.sort((a: any, b: any) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+    docLabs.sort((a: any, b: any) => {
+      const t1 = Date.parse(b.date || b.created_at || 0);
+      const t2 = Date.parse(a.date || a.created_at || 0);
+      return t1 - t2;
+    });
     const labsToPrint = limitLabs ? docLabs.slice(0, 1) : docLabs.slice(0, 5);
 
     labsToPrint.forEach((inv: any) => {
