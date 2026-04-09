@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
+import { recordEvent } from '@/components/pwa/BlackBox'
 
 export default function SelectWardPage() {
   const router = useRouter()

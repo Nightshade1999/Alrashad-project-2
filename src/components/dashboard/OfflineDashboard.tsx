@@ -66,7 +66,7 @@ export function OfflineDashboard() {
     }
   }, []);
 
-  const isAdmin = profile?.role === 'admin' || isCachedAdmin;
+  const isAdmin = profile?.role === 'admin' || isCachedAdmin || (profile as any)?.metadataRole === 'admin';
 
   // For non-admins, scope the count to their assigned ward only
   const scopedList = isAdmin || !myWardName

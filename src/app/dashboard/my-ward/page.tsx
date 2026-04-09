@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, Clock, Activity, CalendarClock, Loader2, RefreshCw } from 'lucide-react'
 import { ExportButton } from '@/components/dashboard/export-button'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
+import { recordEvent } from '@/components/pwa/BlackBox'
 
 const CATEGORIES = [
   {
@@ -95,6 +97,7 @@ async function fetchPatientsOffline(ps: any, wardName: string): Promise<{ pts: P
 }
 
 export default function MyWardPage() {
+  const router = useRouter()
   const ps = usePowerSync()
   const [wardName, setWardName] = useState<string | null>(null)
   const [patients, setPatients] = useState<PatientSummary[]>([])

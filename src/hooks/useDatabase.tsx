@@ -201,13 +201,24 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
       const userId = session?.user?.id;
 
-      // Step 2: Safe Instant Cache Load for the correct user ONLY
+      // Step 2: Instant Metadata & Cache Load
       if (userId) {
+        // A. Primary Fallback: Supabase User Metadata (Instant from Session)
+        const metadataRole = session?.user?.user_metadata?.role;
+        if (metadataRole) {
+          setProfile(prev => ({ 
+            ...(prev || {}), 
+            role: metadataRole,
+            user_id: userId 
+          } as UserProfile));
+        }
+
+        // B. Secondary Fallback: localStorage Cache
         try {
           const cached = localStorage.getItem(`profile_cache_${userId}`);
           if (cached) {
             const parsed = JSON.parse(cached);
-            setProfile(parsed);
+            setProfile(prev => ({ ...parsed, ...prev })); // Merge so metadataRole has priority if cache is stale
             setOfflineEnabled(parsed?.offline_mode_enabled ?? false);
           }
         } catch {}
