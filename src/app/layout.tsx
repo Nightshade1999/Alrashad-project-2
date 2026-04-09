@@ -57,7 +57,8 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col selection:bg-teal-100 dark:selection:bg-teal-900/30">
+      <body className="min-h-full flex flex-col selection:bg-teal-100 dark:selection:bg-teal-900/30 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+        <div className="fixed inset-0 bg-linear-to-br from-teal-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
         <PwaRegistry />
         <script dangerouslySetInnerHTML={{ __html: `
           // Tunnel Heartbeat: Keep connection alive to stop refresh loops
@@ -66,7 +67,9 @@ export default function RootLayout({
           }, 15000);
         `}} />
         <DatabaseProvider>
-          {children}
+          <main className="relative flex-1 flex flex-col max-w-[1600px] mx-auto w-full overflow-x-hidden">
+            {children}
+          </main>
         </DatabaseProvider>
         <InstallPrompt />
         <Toaster richColors position="bottom-right" />

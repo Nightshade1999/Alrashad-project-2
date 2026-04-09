@@ -306,7 +306,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 flex flex-col stagger-fade-in">
             {sorted.map((p, i) => (
               <PatientCard 
                 key={p.id} 

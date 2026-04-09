@@ -3,11 +3,25 @@
 import { useDatabase } from '@/hooks/useDatabase'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, AlertCircle, Clock, Activity, CalendarClock, LayoutDashboard, Settings } from 'lucide-react'
-import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
-import { ExportButton } from '@/components/dashboard/export-button'
-import { GlobalSearch } from '@/components/dashboard/global-search'
-import { UrgentInsights } from '@/components/dashboard/urgent-insights'
+import dynamic from 'next/dynamic'
+import { Skeleton } from '@/components/ui/skeleton'
+
+const AddPatientModal = dynamic(() => import('@/components/dashboard/add-patient-modal').then(mod => mod.AddPatientModal), {
+  loading: () => <Skeleton className="h-14 w-32 rounded-xl" />
+})
+
+const ExportButton = dynamic(() => import('@/components/dashboard/export-button').then(mod => mod.ExportButton), {
+  loading: () => <Skeleton className="h-14 w-32 rounded-xl" />
+})
+
+const GlobalSearch = dynamic(() => import('@/components/dashboard/global-search').then(mod => mod.GlobalSearch), {
+  loading: () => <Skeleton className="h-12 w-full max-w-2xl rounded-xl" />
+})
+
+const UrgentInsights = dynamic(() => import('@/components/dashboard/urgent-insights').then(mod => mod.UrgentInsights), {
+  loading: () => <Skeleton className="h-48 w-full rounded-2xl" />
+})
+
 import type { Patient } from '@/types/database.types'
 
 export function OfflineDashboard() {
@@ -75,14 +89,27 @@ export function OfflineDashboard() {
 
 
   if (loading) {
-     return <div className="space-y-4">
-       <div className="h-12 bg-slate-100 dark:bg-slate-800 rounded-xl w-48" />
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-3xl" />
-         <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-3xl" />
-         <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-3xl" />
+     return (
+       <div className="space-y-10 animate-pulse">
+         <div className="flex justify-between items-end">
+           <div className="space-y-4">
+             <Skeleton className="h-10 w-64" />
+             <Skeleton className="h-4 w-40" />
+           </div>
+           <div className="flex gap-2">
+             <Skeleton className="h-14 w-28 rounded-xl" />
+             <Skeleton className="h-14 w-28 rounded-xl" />
+           </div>
+         </div>
+         <Skeleton className="h-12 w-full max-w-2xl mx-auto rounded-2xl" />
+         <Skeleton className="h-48 w-full rounded-3xl" />
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+           <Skeleton className="h-80 rounded-[2.5rem]" />
+           <Skeleton className="h-80 rounded-[2.5rem]" />
+           <Skeleton className="h-80 rounded-[2.5rem]" />
+         </div>
        </div>
-     </div>
+     )
   }
 
   return (
@@ -115,11 +142,11 @@ export function OfflineDashboard() {
       <UrgentInsights aiEnabled={profile?.ai_enabled ?? true} />
 
       {/* Role-based Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto stagger-fade-in">
         {/* ER Ward Card */}
-        <Link href="/dashboard/er" prefetch={true}>
-          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+        <Link href="/dashboard/er" prefetch={true} className="block">
+          <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full glass-card">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
               <AlertCircle className="h-32 w-32 text-rose-500" />
             </div>
             <div className="relative z-10 flex flex-col h-full">
@@ -140,9 +167,9 @@ export function OfflineDashboard() {
         </Link>
 
         {/* Normal Ward Card */}
-        <Link href={(!isAdmin && (profile?.accessible_wards?.length ?? 0) <= 1) ? '/dashboard/my-ward' : '/dashboard/select-ward'} prefetch={true}>
-          <div className="group relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+        <Link href={(!isAdmin && (profile?.accessible_wards?.length ?? 0) <= 1) ? '/dashboard/my-ward' : '/dashboard/select-ward'} prefetch={true} className="block">
+          <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full glass-card">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
               <LayoutDashboard className="h-32 w-32 text-emerald-500" />
             </div>
             <div className="relative z-10 flex flex-col h-full">
@@ -166,9 +193,9 @@ export function OfflineDashboard() {
 
         {/* Admin Manage Card - ONLY FOR ADMINS */}
         {isAdmin && (
-          <Link href="/admin/manage" prefetch={true}>
-            <div className="group relative overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
+          <Link href="/admin/manage" prefetch={true} className="block">
+            <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full glass-card">
+              <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
                 <Settings className="h-32 w-32 text-indigo-500" />
               </div>
               <div className="relative z-10 flex flex-col h-full">

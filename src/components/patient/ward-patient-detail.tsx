@@ -180,8 +180,8 @@ export function WardPatientDetail({
       </div>
 
       {/* ── Demographics + Medical Info ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-fade-in">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
             <div className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-900/40">
               <User className="h-4 w-4 text-teal-600 dark:text-teal-400" />
@@ -203,7 +203,7 @@ export function WardPatientDetail({
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col glass-card">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
             <div className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40">
               <Heart className="h-4 w-4 text-rose-500 dark:text-rose-400" />
@@ -224,9 +224,9 @@ export function WardPatientDetail({
       </div>
 
        {/* ── Medications ── */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-fade-in" style={{ animationDelay: '0.4s' }}>
         {/* Psych Drugs */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col glass-card">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-violet-50/60 dark:bg-violet-900/10 shrink-0">
             <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
               <Database className="h-4 w-4 text-violet-600 dark:text-violet-400" />
@@ -251,7 +251,7 @@ export function WardPatientDetail({
         </div>
 
         {/* Medical Drugs */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col glass-card">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-teal-50/60 dark:bg-teal-900/10 shrink-0">
             <div className="p-1.5 rounded-lg bg-teal-100 dark:bg-teal-900/40">
               <Layers className="h-4 w-4 text-teal-600 dark:text-teal-400" />

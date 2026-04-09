@@ -140,8 +140,8 @@ export function ErPatientDetail({
       </div>
 
       {/* ── Patient Demographics & Chronic History ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-         <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-fade-in">
+         <div className="bg-slate-50/50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm glass-card">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-1.5 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
                 <User className="h-4 w-4 text-rose-600" />
@@ -174,7 +174,7 @@ export function ErPatientDetail({
             </div>
          </div>
 
-         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+         <div className="bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm glass-card">
             <div className="flex items-center gap-2 mb-4">
               <div className="p-1.5 bg-teal-100 dark:bg-teal-900/30 rounded-lg">
                 <Heart className="h-4 w-4 text-teal-600" />
