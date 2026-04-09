@@ -9,6 +9,7 @@ import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
 import { VConsoleProvider } from "@/components/pwa/VConsoleProvider";
 import { BlackBox, recordEvent } from "@/components/pwa/BlackBox";
+import { PWAExtras } from "@/components/pwa/PWAExtras";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -66,31 +67,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  useEffect(() => {
-    // --- 1. THE RELOAD TRAP (EMERGENCY OVERRIDE) ---
-    if (typeof window !== 'undefined') {
-      const originalReload = window.location.reload;
-      
-      // Monkey patch the browser's reload to block loops and log callers
-      (window.location as any).reload = function() {
-        // Record the stack trace to the Black Box so we can find the file
-        const stack = new Error().stack;
-        const caller = stack ? stack.split('\n')[2]?.trim() : 'Unknown Caller';
-        
-        recordEvent(`🚫 BLOCKED RELOAD: Triggered by ${caller}`);
-        console.error(`🚨 RELOAD TRAPPED! Source:`, stack);
-        
-        // Block the reload to keep the app alive and logs viewable
-        alert(`CRITICAL: A background process tried to refresh the page.\n\nSource: ${caller}\n\nRefresh has been blocked to protect your data.`);
-        
-        // DO NOT call originalReload()
-      };
-    }
-
-    // Capture initial load in the Black Box
-    recordEvent('Layout: Root Mounted');
-  }, []);
-
   return (
     <html
       lang="en"
@@ -104,6 +80,7 @@ export default function RootLayout({
           <DatabaseProvider>
             <VConsoleProvider>
               <BlackBox />
+              <PWAExtras />
               {children}
               <InstallPrompt />
               <ServiceWorkerRegistry />
