@@ -57,13 +57,24 @@ export function OfflineDashboard() {
         const cachedRaw = localStorage.getItem(`profile_cache_${profile.user_id}`);
         if (cachedRaw) {
           const cached = JSON.parse(cachedRaw);
-          if (cached.role === 'admin') setIsCachedAdmin(true);
+          if (cached.role?.toLowerCase() === 'admin') setIsCachedAdmin(true);
         }
       } catch (e) {
         console.debug('Dashboard: Cache check failed', e);
       }
     }
   }, [profile?.user_id]);
+
+  useEffect(() => {
+    if (profile?.user_id) {
+      console.log('[Clinical Admin Diagnostic]', {
+        userId: profile.user_id,
+        currentRole: profile.role,
+        metadataRole: (profile as any).metadata_role,
+        isSystemAdmin: profile?.role?.toLowerCase() === 'admin' || (profile as any)?.metadata_role?.toLowerCase() === 'admin'
+      });
+    }
+  }, [profile]);
 
   const isAdmin = profile?.role?.toLowerCase() === 'admin' || isCachedAdmin || (profile as any)?.metadata_role?.toLowerCase() === 'admin';
 

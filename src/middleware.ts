@@ -70,7 +70,7 @@ export async function middleware(request: NextRequest) {
   // 5. Hardened Role Check
   if (user && isAdmin) {
     // A. Priority Fallback: Check Supabase Auth Metadata (Instant)
-    const metadataRole = user.user_metadata?.role;
+    const metadataRole = user.app_metadata?.role || user.user_metadata?.role;
     if (typeof metadataRole === 'string' && metadataRole.toLowerCase() === 'admin') {
       return supabaseResponse;
     }

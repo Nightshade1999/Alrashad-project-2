@@ -31,13 +31,20 @@ async function verifyAdmin() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized: Login required")
 
+  // 1. Check Auth Metadata first (Instant & Decisive)
+  const metadataRole = user.app_metadata?.role || user.user_metadata?.role;
+  if (typeof metadataRole === 'string' && metadataRole.toLowerCase() === 'admin') {
+    return; // Authorized
+  }
+
+  // 2. Check Database Profile (Fallback)
   const { data: profile } = await (supabase
     .from('user_profiles') as any)
     .select('role')
     .eq('user_id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role?.toLowerCase() !== 'admin') {
     throw new Error("Access Denied: Administrative privileges required")
   }
 }

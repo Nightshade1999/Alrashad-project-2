@@ -204,7 +204,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       // Step 2: Instant Metadata & Cache Load
       if (userId) {
         // A. Primary Fallback: Supabase User Metadata (Instant from Session)
-        const metadataRoleRaw = session?.user?.user_metadata?.role;
+        const metadataRoleRaw = session?.user?.app_metadata?.role || session?.user?.user_metadata?.role;
         const isMetadataAdmin = typeof metadataRoleRaw === 'string' && metadataRoleRaw.toLowerCase() === 'admin';
         
         if (metadataRoleRaw) {
