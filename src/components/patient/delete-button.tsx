@@ -19,12 +19,6 @@ export function DeletePatientButton({ patientId, variant = "outline", redirectOn
 
     setIsDeleting(true)
     try {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        toast.error("Cannot delete patient while offline.")
-        setIsDeleting(false)
-        return
-      }
-
       const supabase = createClient()
       
       // Delete child records first to avoid foreign key constraint violations

@@ -3,7 +3,6 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { Stethoscope } from 'lucide-react'
-import { OfflineIndicator } from '@/components/pwa/offline-indicator'
 import { WardHeader } from '@/components/dashboard/ward-header'
 import { DoctorNameModal } from '@/components/dashboard/doctor-name-modal'
 import { NavigationButtons } from '@/components/layout/navigation-buttons'
@@ -64,7 +63,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-safe mb-32">
         {children}
       </main>
-      <OfflineIndicator />
       <Toaster richColors position="bottom-right" />
     </div>
   )

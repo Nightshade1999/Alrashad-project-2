@@ -8,11 +8,9 @@ import { LayoutDashboard, CheckCircle2, ChevronRight, Stethoscope, Loader2 } fro
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { syncProfileWardAction } from '@/app/actions/admin-actions'
-import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 
 export default function SelectWardPage() {
   const router = useRouter()
-  const ps = usePowerSync()
   
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
@@ -27,47 +25,18 @@ export default function SelectWardPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.push('/login'); return }
 
-        let activeProfile: any = null
-        let wards: string[] = []
-
-        if (navigator.onLine) {
-          const { data: p } = await supabase
-            .from('user_profiles')
-            .select('ward_name, accessible_wards, role')
-            .eq('user_id', user.id)
-            .single()
-          activeProfile = p
-          // Save to localStorage so offline fallback always has latest ward assignment
-          if (p) localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(p))
-        } else {
-          // 1. Try PowerSync SQLite first
-          if (ps) {
-            const psResult = (await ps.getAll('SELECT ward_name, accessible_wards, role FROM user_profiles WHERE user_id = ?', [user.id]))[0]
-            if (psResult) activeProfile = psResult
-          }
-          // 2. Fall back to localStorage cache (works even if SQLite is empty)
-          if (!activeProfile?.ward_name) {
-            const cached = localStorage.getItem(`profile_cache_${user.id}`)
-            if (cached) {
-              try { activeProfile = JSON.parse(cached) } catch {}
-            }
-          }
-          if (activeProfile && typeof activeProfile.accessible_wards === 'string') {
-            try { activeProfile.accessible_wards = JSON.parse(activeProfile.accessible_wards) } catch {}
-          }
-        }
+        const { data: activeProfile } = await supabase
+          .from('user_profiles')
+          .select('ward_name, accessible_wards, role')
+          .eq('user_id', user.id)
+          .single() as any
 
         const isAdmin = activeProfile?.role === 'admin'
-        wards = activeProfile?.accessible_wards || (activeProfile?.ward_name ? [activeProfile.ward_name] : [])
+        let wards = activeProfile?.accessible_wards || (activeProfile?.ward_name ? [activeProfile.ward_name] : [])
 
         if (isAdmin) {
-          if (navigator.onLine) {
-            const { data: allWards } = await supabase.from('ward_settings').select('ward_name')
-            if (allWards) wards = (allWards as any[]).map(w => w.ward_name)
-          } else if (ps) {
-            const allWards = await ps.getAll('SELECT ward_name FROM ward_settings')
-            wards = allWards.map((w: any) => w.ward_name)
-          }
+          const { data: allWards } = await supabase.from('ward_settings').select('ward_name')
+          if (allWards) wards = (allWards as any[]).map(w => w.ward_name)
         }
 
         setProfile(activeProfile)
@@ -77,28 +46,7 @@ export default function SelectWardPage() {
         if (wards.length === 1) {
           const activeWard = wards[0]
           if (activeProfile?.ward_name !== activeWard) {
-            // Ward mismatch — sync silently then navigate
-            if (navigator.onLine) {
-              await syncProfileWardAction(activeWard)
-            } else if (ps) {
-              // OFFLINE: Update local DB so my-ward will recognize it
-              await ps.execute(
-                'UPDATE user_profiles SET ward_name = ? WHERE user_id = ?',
-                [activeWard, user.id]
-              ).catch(e => console.warn("Failed to update SQLite offline", e))
-            }
-            
-            // Always update localStorage cache to break redirect loop with my-ward
-            const cached = localStorage.getItem(`profile_cache_${user.id}`)
-            if (cached) {
-              try { 
-                const p = JSON.parse(cached)
-                p.ward_name = activeWard
-                localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(p))
-              } catch {}
-            } else {
-              localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify({ ward_name: activeWard }))
-            }
+            await syncProfileWardAction(activeWard)
           }
           router.replace('/dashboard/my-ward');
           return;
@@ -111,41 +59,12 @@ export default function SelectWardPage() {
       }
     }
     load()
-  }, [ps, router])
+  }, [router])
 
   async function handleSelectWard(wardName: string) {
     setIsSyncing(wardName)
     try {
-      let currentUserId = profile?.user_id
-      if (!currentUserId) {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        currentUserId = user?.id
-      }
-
-      if (navigator.onLine) {
-        await syncProfileWardAction(wardName)
-      } else if (ps) {
-        // Offline transition: Update local profile immediately
-        await ps.execute(
-          'UPDATE user_profiles SET ward_name = ? WHERE user_id = (SELECT user_id FROM user_profiles LIMIT 1)',
-          [wardName]
-        )
-      }
-
-      if (currentUserId) {
-        const cached = localStorage.getItem(`profile_cache_${currentUserId}`)
-        if (cached) {
-          try { 
-            const p = JSON.parse(cached)
-            p.ward_name = wardName
-            localStorage.setItem(`profile_cache_${currentUserId}`, JSON.stringify(p))
-          } catch {}
-        } else {
-          localStorage.setItem(`profile_cache_${currentUserId}`, JSON.stringify({ ward_name: wardName }))
-        }
-      }
-
+      await syncProfileWardAction(wardName)
       router.push('/dashboard/my-ward')
     } catch (err) {
       console.error("Ward sync error:", err)
@@ -248,10 +167,9 @@ export default function SelectWardPage() {
       {/* Footer Meta */}
       <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-          Alrashad Medical & Research Hub | Healthcare Local-First Platform
+          Alrashad Medical & Research Hub | Global Healthcare Platform
         </p>
       </div>
     </div>
   )
 }
-

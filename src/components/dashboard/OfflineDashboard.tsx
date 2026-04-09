@@ -1,7 +1,6 @@
 "use client"
 
 import { useDatabase } from '@/hooks/useDatabase'
-import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, AlertCircle, Clock, Activity, CalendarClock, LayoutDashboard, Settings } from 'lucide-react'
@@ -10,57 +9,25 @@ import { ExportButton } from '@/components/dashboard/export-button'
 import { GlobalSearch } from '@/components/dashboard/global-search'
 import { UrgentInsights } from '@/components/dashboard/urgent-insights'
 import type { Patient } from '@/types/database.types'
-import { logEvent } from '@/lib/pwa/black-box'
 
 export function OfflineDashboard() {
-  const { patients, isOfflineMode, profile } = useDatabase();
-  const ps = usePowerSync();
+  const { patients, profile } = useDatabase();
   const [patientList, setPatientList] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!ps) return;
-
-    const abortController = new AbortController();
-
-    // OPTIMIZATION: Narrow the query instead of SELECT *
-    // This reduces the memory footprint and prevents triggers from unrelated column updates.
-    const query = `
-      SELECT id, name, age, room_number, category, chronic_diseases, 
-             updated_at, ward_name, is_in_er 
-      FROM patients 
-      WHERE category != 'Deceased/Archive' 
-      ORDER BY updated_at DESC
-    `;
-
-    const watcher = ps.watch(query, [], { signal: abortController.signal });
-
     (async () => {
       try {
         setLoading(true);
-        let renderCount = 0;
-        for await (const result of watcher) {
-          renderCount++;
-          const rows = (result.rows?._array || []) as any[];
-          
-          // Log to Black Box to detect rapid-fire sync loops
-          if (renderCount % 5 === 0) {
-            logEvent('Dashboard: Patient List Refreshed', { count: rows.length, iteration: renderCount });
-          }
-          
-          setPatientList(rows);
-          setLoading(false);
-        }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') {
-          console.error("PowerSync watch error:", e);
-          logEvent('Dashboard: Sync Error', { error: e.message });
-        }
+        const list = await patients.list();
+        setPatientList(list);
+      } catch (err: any) {
+        console.error("Dashboard: fetch error:", err);
+      } finally {
+        setLoading(false);
       }
     })();
-
-    return () => abortController.abort();
-  }, [ps]);
+  }, [patients]);
 
   const myWardName = profile?.ward_name ?? null;
   const [isCachedAdmin, setIsCachedAdmin] = useState(false);
@@ -108,7 +75,7 @@ export function OfflineDashboard() {
 
 
   if (loading) {
-     return <div className="animate-pulse space-y-4">
+     return <div className="space-y-4">
        <div className="h-12 bg-slate-100 dark:bg-slate-800 rounded-xl w-48" />
        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="h-64 bg-slate-100 dark:bg-slate-800 rounded-3xl" />
@@ -124,7 +91,7 @@ export function OfflineDashboard() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-            Patient Overview {isOfflineMode && <span className="text-emerald-500 text-xs font-black uppercase tracking-widest ml-2 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-full border border-emerald-100 dark:border-emerald-900/40">Local-First™</span>}
+            Patient Overview
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted

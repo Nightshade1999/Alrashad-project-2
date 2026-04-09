@@ -4,38 +4,29 @@ import { useState, useEffect } from "react"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { usePowerSync } from "@/lib/powersync/PowerSyncProvider"
+import { createClient } from "@/lib/supabase"
 
 export function NotificationCenter() {
-  const ps = usePowerSync()
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    if (!ps) return;
-
-    const abortController = new AbortController();
-    
-    // PowerSync silently watches for new reminders in the background
-    // No setIntervals, no Server Actions, no UI resets!
-    const watcher = ps.watch(
-      "SELECT count(*) as count FROM reminders WHERE status = 'pending'",
-      [],
-      { signal: abortController.signal }
-    );
-
-    (async () => {
+    async function fetchCount() {
       try {
-        for await (const result of watcher) {
-          const count = result.rows?.item(0)?.count || 0;
-          setPendingCount(count);
-        }
-      } catch (e: any) {
-        if (e.name !== 'AbortError') console.error("Notification watch error:", e);
+        const supabase = createClient()
+        const { count } = await supabase
+          .from('reminders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending')
+        
+        setPendingCount(count || 0)
+      } catch (e) {
+        console.error("Notification fetch error:", e)
       }
-    })();
+    }
 
-    return () => abortController.abort();
-  }, [ps]);
+    fetchCount()
+    // Optional: Add a standard real-time subscription here later if needed.
+  }, [])
 
   return (
     <Link href="/reminders" className="relative group" prefetch={true}>

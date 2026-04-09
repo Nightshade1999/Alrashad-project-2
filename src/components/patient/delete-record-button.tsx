@@ -26,7 +26,7 @@ export function DeleteRecordButton({
 }: DeleteRecordButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
-  const { isOfflineMode, delete: dbDelete } = useDatabase()
+  const { delete: dbDelete } = useDatabase()
 
   const hoursSinceCreation = differenceInHours(new Date(), parseISO(createdAt));
   const canDelete = creatorId === currentUserId && hoursSinceCreation < 24;
@@ -41,15 +41,10 @@ export function DeleteRecordButton({
 
     setIsDeleting(true)
     try {
-      if (isOfflineMode) {
-        await dbDelete(table, recordId)
-        toast.success("Record deleted locally — syncing...")
-      } else {
-        const supabase = createClient()
-        const { error } = await supabase.from(table).delete().eq('id', recordId)
-        if (error) throw error
-        toast.success("Record deleted successfully")
-      }
+      const supabase = createClient()
+      const { error } = await supabase.from(table).delete().eq('id', recordId)
+      if (error) throw error
+      toast.success("Record deleted successfully")
       
       router.refresh()
     } catch (error: any) {

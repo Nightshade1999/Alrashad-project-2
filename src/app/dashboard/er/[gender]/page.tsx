@@ -5,12 +5,9 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { ArrowLeft, AlertCircle, Activity, HeartPulse, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 
 export default function GenderErPage({ params }: { params: Promise<{ gender: string }> }) {
   const { gender: rawGender } = use(params)
-  const ps = usePowerSync()
-  
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -18,52 +15,28 @@ export default function GenderErPage({ params }: { params: Promise<{ gender: str
   const gender = rawGender.toLowerCase() === 'male' ? 'Male' : 
                  rawGender.toLowerCase() === 'female' ? 'Female' : 
                  null
-
   useEffect(() => {
-    if (!gender) return;
-
     async function load() {
       setLoading(true)
       try {
         const supabase = createClient()
         
         // 1. Fetch wards configured for this gender
-        let validWards: string[] = []
-        if (navigator.onLine) {
-          const { data: wards } = await supabase
-            .from('ward_settings')
-            .select('ward_name')
-            .eq('gender', gender as string)
-          validWards = (wards as any[])?.map(w => w.ward_name) || []
-        } else if (ps) {
-          const wards = await ps.getAll('SELECT ward_name FROM ward_settings WHERE gender = ?', [gender as string])
-          validWards = (wards as any[]).map((w: any) => w.ward_name)
-        }
+        const { data: wards } = await supabase
+          .from('ward_settings')
+          .select('ward_name')
+          .eq('gender', gender as string) as any
+        const validWards = (wards as any[])?.map(w => w.ward_name) || []
 
         // 2. Fetch patients
         if (validWards.length > 0) {
-          if (navigator.onLine) {
-            const { data } = await supabase
-              .from('patients')
-              .select('id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint')
-              .eq('is_in_er', true)
-              .in('ward_name', validWards)
-              .order('created_at', { ascending: false })
-            setPatients(data || [])
-          } else if (ps) {
-            const placeholders = validWards.map(() => '?').join(',')
-            const p = await ps.getAll(
-              `SELECT id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint 
-               FROM patients 
-               WHERE is_in_er = 1 AND ward_name IN (${placeholders})
-               ORDER BY created_at DESC`,
-              validWards
-            ) as any[]
-            setPatients(p.map(item => ({
-              ...(item as object),
-              chronic_diseases: typeof (item as any).chronic_diseases === 'string' ? JSON.parse((item as any).chronic_diseases) : (item as any).chronic_diseases
-            })))
-          }
+          const { data } = await supabase
+            .from('patients')
+            .select('id, name, age, category, ward_name, room_number, chronic_diseases, er_admission_date, er_admission_doctor, er_chief_complaint')
+            .eq('is_in_er', true)
+            .in('ward_name', validWards)
+            .order('created_at', { ascending: false })
+          setPatients(data || [])
         } else {
           setPatients([])
         }
@@ -75,7 +48,7 @@ export default function GenderErPage({ params }: { params: Promise<{ gender: str
       }
     }
     load()
-  }, [ps, gender])
+  }, [gender])
 
   if (!gender) {
     return <div className="p-8 text-center text-red-500 font-bold">Invalid ER specified: {rawGender}</div>

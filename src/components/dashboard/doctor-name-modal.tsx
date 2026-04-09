@@ -99,8 +99,6 @@ export function DoctorNameModal() {
       
       toast.success(`Session started as Dr. ${trimmed}!`)
       setOpen(false)
-      // Force a refresh to update layout header
-      window.location.reload()
     } catch (err) {
       console.error(err)
       toast.error("Failed to save name. Please try again.")

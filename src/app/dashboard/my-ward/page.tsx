@@ -8,7 +8,7 @@ import { AlertCircle, Clock, Activity, CalendarClock, Loader2, RefreshCw } from 
 import { ExportButton } from '@/components/dashboard/export-button'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
-import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
+import { useDatabase } from '@/hooks/useDatabase'
 
 const CATEGORIES = [
   {
@@ -83,26 +83,13 @@ async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> 
   return (data as PatientSummary[]) || []
 }
 
-async function fetchPatientsOffline(ps: any, wardName: string): Promise<{ pts: PatientSummary[], err: string | null }> {
-  try {
-    const data = await ps.getAll(
-      `SELECT id, name, room_number, category, is_in_er FROM patients WHERE ward_name = ?`,
-      [wardName]
-    )
-    return { pts: data as PatientSummary[], err: null }
-  } catch (e: any) {
-    return { pts: [], err: e.message || 'Unknown SQLite error' }
-  }
-}
-
 export default function MyWardPage() {
   const router = useRouter()
-  const ps = usePowerSync()
+  const { profile } = useDatabase()
   const [wardName, setWardName] = useState<string | null>(null)
   const [patients, setPatients] = useState<PatientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [offlineFetchError, setOfflineFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -113,58 +100,19 @@ export default function MyWardPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { setError('Not authenticated'); setLoading(false); return }
 
-        let profile: any = null
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('ward_name')
+          .eq('user_id', user.id)
+          .maybeSingle() as any
 
-        if (navigator.onLine) {
-          const { data } = await supabase
-            .from('user_profiles')
-            .select('ward_name')
-            .eq('user_id', user.id)
-            .maybeSingle()
-          profile = data as any
-          // Cache so offline mode always knows the current ward
-          if ((data as any)?.ward_name) localStorage.setItem(`profile_cache_${user.id}`, JSON.stringify(data))
-        } else {
-          // 1. Try PowerSync SQLite
-          if (ps) {
-            try {
-              const psResult = (await ps.getAll('SELECT ward_name FROM user_profiles WHERE user_id = ?', [user.id]))[0] as any
-              if (psResult?.ward_name) profile = psResult
-            } catch (err) {
-              console.warn('PowerSync SQLite empty, trying cache...')
-            }
-          }
-          // 2. Fall back to localStorage cache
-          if (!(profile as any)?.ward_name) {
-            const cached = localStorage.getItem(`profile_cache_${user.id}`)
-            if (cached) { try { profile = JSON.parse(cached) } catch {} }
-          }
-        }
-
-        if (!loading && !profile?.ward_name) {
+        if (!profileData?.ward_name) {
           router.replace('/dashboard/select-ward');
           return;
         }
 
-        setWardName(profile.ward_name)
-
-        let pts: PatientSummary[] = []
-        if (navigator.onLine) {
-          pts = await fetchPatientsOnline(profile.ward_name)
-          setOfflineFetchError(null)
-        } else if (ps) {
-          const res = await fetchPatientsOffline(ps, profile.ward_name)
-          pts = res.pts
-          setOfflineFetchError(res.err)
-          
-          if (pts.length === 0 && !res.err) {
-            // Check if ANY patients exist in DB
-            try {
-              const all = await ps.getAll('SELECT count(*) as c FROM patients')
-              setOfflineFetchError(`DB total patients: ${(all as any)[0]?.c}`)
-            } catch {}
-          }
-        }
+        setWardName(profileData.ward_name)
+        const pts = await fetchPatientsOnline(profileData.ward_name)
         setPatients(pts)
       } catch (e: any) {
         setError(e?.message || 'Failed to load ward data')
@@ -173,7 +121,7 @@ export default function MyWardPage() {
       }
     }
     load()
-  }, [ps])
+  }, [router])
 
   const counts = {
     'High Risk': patients.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
@@ -230,11 +178,6 @@ export default function MyWardPage() {
             <ExportButton />
             <AddPatientModal />
           </div>
-          {offlineFetchError && (
-            <div className="text-sm font-bold text-red-500 bg-red-100 dark:bg-red-900/20 px-3 py-1 rounded">
-              Debug offline: {offlineFetchError}
-            </div>
-          )}
         </div>
       </div>
 

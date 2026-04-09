@@ -14,10 +14,7 @@ import { format, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useEffect, memo, useCallback } from 'react'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { OfflinePatientDetail } from '@/components/patient/OfflinePatientDetail'
 import { useRouter } from 'next/navigation'
-import { logEvent } from '@/lib/pwa/black-box'
 
 export interface PatientRow {
   id: string
@@ -93,7 +90,6 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
   )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isExporting, setIsExporting] = useState(false)
-  const [offlineViewId, setOfflineViewId] = useState<string | null>(null)
   
   const router = useRouter();
 
@@ -229,9 +225,6 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
       if (va > vb) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-    if (arr.length > 50) {
-      logEvent('PatientList: Large dataset detected', { count: arr.length });
-    }
     return arr
   }, [filtered, sortCol, sortDir])
 
@@ -252,7 +245,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         </div>
 
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/60 p-1.5 rounded-lg animate-in fade-in zoom-in duration-200 shadow-sm">
+          <div className="flex items-center gap-2 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/60 p-1.5 rounded-lg shadow-sm">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-400 px-2 min-w-[70px]">
               {selectedIds.size} selected
             </span>
@@ -321,7 +314,6 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                 index={i}
                 isSelected={selectedIds.has(p.id)} 
                 onToggleSelect={toggleSelect} 
-                onViewOffline={setOfflineViewId}
               />
             ))}
           </div>
@@ -334,22 +326,6 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
         {sortCol && <span> · Sorted by <strong>{sortCol === 'lastVisit' ? 'last visit' : sortCol === 'lastHba1c' ? 'HbA1c' : sortCol === 'lastHb' ? 'Hb' : sortCol}</strong> ({sortDir})</span>}
       </p>
 
-      {/* Offline Dialog Intercept */}
-      <Dialog open={!!offlineViewId} onOpenChange={(open) => !open && setOfflineViewId(null)}>
-        <DialogContent className="max-w-[100vw] w-screen h-[100dvh] m-0 p-0 sm:p-0 rounded-none border-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 flex flex-col pb-16 outline-none">
-          <DialogTitle className="sr-only">Offline Patient Viewer</DialogTitle>
-          {offlineViewId && (
-            <div className="flex-1 w-full relative pt-10 sm:pt-4">
-              <OfflinePatientDetail 
-                initialPatient={{ id: offlineViewId } as any}
-                initialVisits={[]}
-                initialInvestigations={[]}
-                view="ward"
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -358,13 +334,10 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
  * MEMOIZED PATIENT CARD
  * extracted for high-performance rendering (prevents full list flicker on sync)
  */
-const PatientCard = memo(({ p, index, isSelected, onToggleSelect, onViewOffline }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void; onViewOffline: (id: string) => void }) => {
+const PatientCard = memo(({ p, index, isSelected, onToggleSelect }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void }) => {
+  const router = useRouter()
   const handleRowClick = () => {
-    if (!navigator.onLine) {
-      onViewOffline(p.id)
-    } else {
-      window.location.href = `/patient/${p.id}`
-    }
+    router.push(`/patient/${p.id}`)
   }
 
   const OverdueTag = () => {
@@ -381,7 +354,7 @@ const PatientCard = memo(({ p, index, isSelected, onToggleSelect, onViewOffline 
 
   return (
     <div
-      className={`group relative transition-all cursor-pointer border-l-2 animate-fade-in-up ${isSelected ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
+      className={`group relative transition-all cursor-pointer border-l-2 ${isSelected ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
       onClick={handleRowClick}
     >
 

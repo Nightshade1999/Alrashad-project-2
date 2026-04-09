@@ -56,7 +56,6 @@ export function AddPatientModal() {
   const [province, setProvince] = useState("")
   const [educationLevel, setEducationLevel] = useState("")
   const router = useRouter()
-  const { isOfflineMode, patients: dbPatients } = useDatabase()
   
   // Relatives State
   const [relativeStatus, setRelativeStatus] = useState<'Known' | 'Unknown'>('Unknown')
@@ -131,29 +130,13 @@ export function AddPatientModal() {
     }
 
     try {
-      // Only use local PowerSync path when offline mode is active.
-      // PowerSync will sync data to Supabase automatically in the background.
-      if (isOfflineMode) {
-        if (!profile) {
-          toast.error("User identity not loaded. Please wait a moment.")
-          setIsSubmitting(false)
-          return
-        }
-        await dbPatients.insert({
-          ...payload,
-          user_id: profile.user_id,
-          ward_name: profile.ward_name || 'Unknown',
-          ward_number: profile.ward_name || 'Unknown'
-        })
-        toast.success("Patient saved locally — syncing...")
-      } else {
-        const { data: inserted, error } = await (supabase.from('patients') as any).insert([payload]).select()
-        if (error) throw error
-        if (!inserted || inserted.length === 0) {
-          throw new Error("Insert was blocked — check Supabase RLS policies for this user's ward.")
-        }
-        toast.success("Patient added successfully!")
+      const { data: inserted, error } = await (supabase.from('patients') as any).insert([payload]).select()
+      if (error) throw error
+      if (!inserted || inserted.length === 0) {
+        throw new Error("Insert was blocked — check Supabase RLS policies for this user's ward.")
       }
+      toast.success("Patient added successfully!")
+      
       setOpen(false)
       resetForm()
       router.refresh()

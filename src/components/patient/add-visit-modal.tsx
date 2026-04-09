@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ClipboardList, Plus, X, WifiOff } from 'lucide-react'
+import { ClipboardList, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,8 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from "sonner"
 import { convertArabicNumbers } from '@/lib/utils'
 import { addVisitAction } from '@/app/actions/patient-actions'
-import { useDatabase } from '@/hooks/useDatabase'
-import { createClient } from '@/lib/supabase'
 import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function AddVisitModal({ 
@@ -36,7 +34,6 @@ export function AddVisitModal({
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
   const router = useRouter()
-  const { isOfflineMode, profile, visits: dbVisits } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,22 +53,10 @@ export function AddVisitModal({
       is_er: isEr
     }
 
-    // ── Database Path ─────────────────────────────────────────
     try {
-      if (isOfflineMode) {
-        if (!profile) throw new Error("User identity not loaded. Please wait a moment.")
-        
-        await dbVisits.insert({
-          ...payload,
-          doctor_id: profile.user_id,
-          visit_date: `${payload.visit_date}T${payload.visit_time}:00`
-        })
-        toast.success('Saved to local database — syncing...')
-      } else {
-        const response = await addVisitAction(payload)
-        if (response.error) throw new Error(response.error)
-        toast.success('Visit note saved')
-      }
+      const response = await addVisitAction(payload)
+      if (response.error) throw new Error(response.error)
+      toast.success('Visit note saved')
       
       setOpen(false)
       setNotes('')

@@ -48,6 +48,7 @@ export async function middleware(request: NextRequest) {
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/remote-log') ||
     request.nextUrl.pathname === '/manifest.webmanifest' ||
     request.nextUrl.pathname === '/manifest.json' ||
     request.nextUrl.pathname === '/sw.js' ||
@@ -67,39 +68,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // 5. Hardened Role Check
-  if (user && isAdmin) {
-    // A. Priority Fallback: Check Supabase Auth Metadata (Instant)
-    const metadataRole = user.app_metadata?.role || user.user_metadata?.role;
-    if (typeof metadataRole === 'string' && metadataRole.toLowerCase() === 'admin') {
-      return supabaseResponse;
-    }
-
-    // B. Database Profile Check
-    try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single()
-
-      if (profile?.role?.toLowerCase() !== 'admin') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url)
-      }
-    } catch {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
-    }
-  }
+  // 5. Hardened Role Check - DEFERRED TO UI
+  // We no longer perform DB-level role checks in Middleware to prevent 35s tunnel heartbeats from timing out.
+  // The UI (Dashboard/Admin) handles its own role-based gate.
 
   return supabaseResponse
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|manifest\\.json|sw\\.js|workbox-.*\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/remote-log|manifest\\.webmanifest|manifest\\.json|sw\\.js|workbox-.*\\.js|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

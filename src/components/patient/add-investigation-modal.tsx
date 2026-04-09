@@ -2,15 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FlaskConical, Plus, X, WifiOff } from 'lucide-react'
+import { FlaskConical, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { convertArabicNumbers } from '@/lib/utils'
 import { addInvestigationAction } from '@/app/actions/patient-actions'
-import { useDatabase } from '@/hooks/useDatabase'
-import { createClient } from '@/lib/supabase'
 import { ModalPortal } from '@/components/ui/modal-portal'
 
 const LAB_FIELDS = [
@@ -48,7 +46,6 @@ export function AddInvestigationModal({
   const [values, setValues] = useState<Record<string, string>>({})
   const [otherLabs, setOtherLabs] = useState<{name: string, value: string}[]>([])
   const router = useRouter()
-  const { isOfflineMode, profile, investigations: dbLabs } = useDatabase()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,23 +69,10 @@ export function AddInvestigationModal({
       payload.other_labs = otherLabs.filter(l => l.name && l.value)
     }
 
-    // ── Database Path ─────────────────────────────────────────
     try {
-      if (isOfflineMode) {
-        if (!profile) throw new Error("User identity not loaded. Please wait a moment.")
-        
-        await dbLabs.insert({
-          ...payload,
-          doctor_id: profile.user_id,
-          doctor_name: profile.doctor_name || profile.user_id,
-          date: `${payload.date}T${payload.time}:00`
-        })
-        toast.success('Saved to local database — syncing...')
-      } else {
-        const response = await addInvestigationAction(payload)
-        if (response.error) throw new Error(response.error)
-        toast.success('Lab results saved')
-      }
+      const response = await addInvestigationAction(payload)
+      if (response.error) throw new Error(response.error)
+      toast.success('Lab results saved')
       
       setOpen(false)
       setValues({})
@@ -125,10 +109,8 @@ export function AddInvestigationModal({
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop — touch-action:none prevents scroll bleed-through on iOS */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" style={{touchAction:'none'}} onClick={() => setOpen(false)} />
 
-      {/* Modal */}
       <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl flex flex-col max-h-[95dvh] animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-950/20">
