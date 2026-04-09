@@ -4,7 +4,7 @@ import { useDatabase } from '@/hooks/useDatabase'
 import { useState, useEffect } from 'react'
 import { WardPatientDetail } from '@/components/patient/ward-patient-detail'
 import { ErPatientDetail } from '@/components/patient/er-patient-detail'
-import type { Patient, Visit, Investigation } from '@/types/database.types'
+import type { Patient, Visit, Investigation, UserProfile } from '@/types/database.types'
 
 interface PatientDetailProps {
   initialPatient: Patient;
