@@ -2,7 +2,7 @@
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { createClient } from '@/lib/supabase'
-import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react'
 import type { Patient, Visit, Investigation, UserProfile } from '@/types/database.types'
 
 // ─── Shared Context ──────────────────────────────────────────────────────────
@@ -171,6 +171,7 @@ function buildInvestigationApi(isOfflineMode: boolean, ps: any, supabase: any) {
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const ps = usePowerSync();
   const supabase = useMemo(() => createClient(), []);
+  const initRef = useRef(false);
   const [offlineEnabled, setOfflineEnabled] = useState(false);
   const [globalEnabled, setGlobalEnabled] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -189,6 +190,9 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (initRef.current) return; // Skip if already initialized
+    initRef.current = true;
+
     async function loadSettings() {
       // Step 1: Auth session — isolate so offline errors don't cascade
       let session: any = null;
@@ -283,7 +287,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadSettings();
-  }, [ps, supabase]);
+  }, []); // Empty dependency array
 
   const isOfflineMode = (globalEnabled && offlineEnabled) || !isOnline;
 

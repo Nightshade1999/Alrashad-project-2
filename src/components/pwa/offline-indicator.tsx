@@ -85,7 +85,7 @@ export function OfflineIndicator() {
 
     updateStatus();
     const unsubscribe = ps.registerListener?.({ statusChanged: updateStatus });
-    const interval = setInterval(updateStatus, 1000);
+    const interval = setInterval(updateStatus, 5000); // Poll every 5 seconds instead
 
     return () => {
       if (unsubscribe) unsubscribe();
