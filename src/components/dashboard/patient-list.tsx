@@ -82,7 +82,7 @@ function SortableHeader({
   )
 }
 
-export function PatientList({ patients, defaultSort = 'name' }: { patients: PatientRow[]; defaultSort?: SortKey }) {
+export function PatientList({ patients, defaultSort = 'name', categorySlug }: { patients: PatientRow[]; defaultSort?: SortKey; categorySlug?: string }) {
   const [search, setSearch] = useState('')
   const [sortCol, setSortCol] = useState<SortKey>(defaultSort)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
@@ -314,6 +314,7 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
                 index={i}
                 isSelected={selectedIds.has(p.id)} 
                 onToggleSelect={toggleSelect} 
+                categorySlug={categorySlug}
               />
             ))}
           </div>
@@ -334,10 +335,11 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
  * MEMOIZED PATIENT CARD
  * extracted for high-performance rendering (prevents full list flicker on sync)
  */
-const PatientCard = memo(({ p, index, isSelected, onToggleSelect }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void }) => {
+const PatientCard = memo(({ p, index, isSelected, onToggleSelect, categorySlug }: { p: PatientRow; index: number; isSelected: boolean; onToggleSelect: (id: string) => void; categorySlug?: string }) => {
   const router = useRouter()
   const handleRowClick = () => {
-    router.push(`/patient/${p.id}`)
+    const url = categorySlug ? `/patient/${p.id}?from=${categorySlug}` : `/patient/${p.id}`
+    router.push(url)
   }
 
   const OverdueTag = () => {

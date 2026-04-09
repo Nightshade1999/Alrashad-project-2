@@ -28,7 +28,7 @@ export function PatientCard({ patient }: { patient: PatientSummary }) {
               {patient.roomNumber}
             </div>
             <span className="text-xs font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-              {patient.age}y · {patient.gender === 'Male' ? 'M' : 'F'}
+              {patient.age === -1 ? 'N/A' : `${patient.age}y`} · {patient.gender === 'Male' ? 'M' : 'F'}
             </span>
           </div>
 

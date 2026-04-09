@@ -18,11 +18,10 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          ward_number: string;
           ward_name: string;
           room_number: string;
           name: string;
-          age: number;
+          age: number | null;
           gender: string;
           category: PatientCategory;
           province: string | null;
@@ -53,11 +52,10 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
-          ward_number: string;
           ward_name: string;
           room_number: string;
           name: string;
-          age: number;
+          age: number | null;
           gender: string;
           category: PatientCategory;
           province?: string | null;
@@ -88,11 +86,10 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
-          ward_number?: string;
           ward_name?: string;
           room_number?: string;
           name?: string;
-          age?: number;
+          age?: number | null;
           gender?: string;
           category?: PatientCategory;
           province?: string | null;

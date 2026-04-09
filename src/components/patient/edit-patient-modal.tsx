@@ -131,10 +131,11 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
     setIsSubmitting(true)
     const formData = new FormData(e.currentTarget)
 
+    const ageStr = convertArabicNumbers(formData.get('age') as string);
     const payload: any = {
       name: formData.get('name') as string,
       room_number: convertArabicNumbers(formData.get('roomNumber') as string),
-      age: parseInt(convertArabicNumbers(formData.get('age') as string)),
+      age: ageStr ? parseInt(ageStr) : null,
       gender: gender,
       category: category,
       province: province === 'Other' ? (customProvince || 'Other') : (province || null),
@@ -206,8 +207,8 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
                 <Input id="roomNumber" name="roomNumber" defaultValue={patient.room_number} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input id="age" name="age" type="number" defaultValue={patient.age} required min="0" max="150" />
+                <Label htmlFor="age">Age (Optional)</Label>
+                <Input id="age" name="age" type="number" defaultValue={patient.age ?? ""} min="0" max="150" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>

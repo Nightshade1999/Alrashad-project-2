@@ -109,12 +109,13 @@ export function AddPatientModal() {
       return
     }
 
+    const ageStr = convertArabicNumbers(formData.get('age') as string);
     const payload: any = {
       user_id: user.id,
       ward_name: (profile as any).ward_name,
       name: formData.get('name') as string,
       room_number: convertArabicNumbers(formData.get('roomNumber') as string),
-      age: parseInt(convertArabicNumbers(formData.get('age') as string)),
+      age: ageStr ? parseInt(ageStr) : null,
       gender,
       category,
       province: province === 'Other' ? (customProvince || 'Other') : (province || null),
@@ -198,8 +199,8 @@ export function AddPatientModal() {
                 <Input id="roomNumber" name="roomNumber" placeholder="e.g. B12" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="age">Age</Label>
-                <Input id="age" name="age" type="number" placeholder="Years" required min="0" max="150" />
+                <Label htmlFor="age">Age (Optional)</Label>
+                <Input id="age" name="age" type="number" placeholder="Years" min="0" max="150" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>

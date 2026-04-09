@@ -1,14 +1,19 @@
 "use client"
 
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
 import { ArrowLeft, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
 // Maps route patterns to their logical parent (not history-based)
-function getParentRoute(pathname: string, isMultiWard: boolean): string | null {
+function getParentRoute(pathname: string, isMultiWard: boolean, fromParam?: string | null): string | null {
+  // If we came from a specific category, return there
+  if (fromParam && pathname.startsWith('/patient/')) {
+    return `/dashboard/category/${fromParam}`
+  }
+
   // Patient sub-pages → patient detail
   if (/^\/patient\/[^/]+\/(visits|investigations|er)$/.test(pathname)) {
     const patientId = pathname.split('/')[2]
@@ -50,8 +55,18 @@ function getParentRoute(pathname: string, isMultiWard: boolean): string | null {
 }
 
 export function NavigationButtons() {
+  return (
+    <Suspense fallback={<div className="h-9 w-9" />}>
+      <NavigationButtonsInner />
+    </Suspense>
+  )
+}
+
+function NavigationButtonsInner() {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const fromParam = searchParams.get('from')
   const [isMultiWard, setIsMultiWard] = useState(false)
 
   useEffect(() => {
@@ -73,7 +88,7 @@ export function NavigationButtons() {
   }, [pathname])
 
   const isDashboard = pathname === '/dashboard'
-  const parentRoute = getParentRoute(pathname, isMultiWard)
+  const parentRoute = getParentRoute(pathname, isMultiWard, fromParam)
 
   if (isDashboard) return null
 

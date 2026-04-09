@@ -79,7 +79,7 @@ export function CategoryView({ slug, rows, isPending }: CategoryViewProps) {
       </div>
 
       {/* Patient List */}
-      <PatientList patients={rows} defaultSort={isPending ? 'overdue' : 'name'} />
+      <PatientList patients={rows} defaultSort={isPending ? 'overdue' : 'name'} categorySlug={slug} />
     </div>
   )
 }
