@@ -103,7 +103,7 @@ function buildVisitApi(isOfflineMode: boolean, ps: any, supabase: any) {
             crypto.randomUUID(),
             data.patient_id,
             data.doctor_id,
-            new Date().toISOString(),
+            data.visit_date || new Date().toISOString(),
             data.exam_notes,
             data.bp_sys,
             data.bp_dia,
@@ -174,6 +174,19 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [offlineEnabled, setOfflineEnabled] = useState(false);
   const [globalEnabled, setGlobalEnabled] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -248,7 +261,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     loadSettings();
   }, [ps, supabase]);
 
-  const isOfflineMode = globalEnabled && offlineEnabled;
+  const isOfflineMode = (globalEnabled && offlineEnabled) || !isOnline;
 
   const value = useMemo<DatabaseContextValue>(() => ({
     isOfflineMode,

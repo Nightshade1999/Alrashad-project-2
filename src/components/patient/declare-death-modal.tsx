@@ -17,12 +17,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { createClient } from "@/lib/supabase"
+import { useDatabase } from "@/hooks/useDatabase"
 
 export function DeclareDeathModal({ patientId, currentCategory, disabled = false }: { patientId: string, currentCategory: string, disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
+  const { patients } = useDatabase()
 
   // Get current time in 12h format for defaults
   const now = new Date()
@@ -63,25 +64,7 @@ export function DeclareDeathModal({ patientId, currentCategory, disabled = false
     console.log("SENDING UPDATE PAYLOAD:", { patientId, updatePayload })
 
     try {
-      const supabase = createClient()
-      const { data, error, status, statusText } = await (supabase as any)
-        .from('patients')
-        .update(updatePayload)
-        .eq('id', patientId)
-        .select()
-
-      if (error) {
-        console.error("FULL SUPABASE ERROR:", error)
-        // Extracting properties manually because JSON.stringify(PostgrestError) can be "{}"
-        const msg = error.message || "Unknown DB Error"
-        const code = error.code || "No Code"
-        const details = error.details || ""
-        throw new Error(`[${code}] ${msg} ${details}`)
-      }
-
-      if (!data || data.length === 0) {
-        throw new Error(`NOT_FOUND: No patient matches ID ${patientId}`)
-      }
+      await patients.update(patientId, updatePayload)
 
       toast.success("Clinical status updated: Patient archived.")
       setOpen(false)

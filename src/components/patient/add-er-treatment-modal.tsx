@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Pill, Plus, X, ListPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase"
+import { useDatabase } from "@/hooks/useDatabase"
 import { toast } from "sonner"
 import { DrugListInput } from "@/components/dashboard/medical-inputs"
 import { MedicalDrugParams } from "@/types/database.types"
@@ -25,15 +25,12 @@ export function AddErTreatmentModal({
   const [treatment, setTreatment] = useState<MedicalDrugParams[]>(currentTreatment)
   const router = useRouter()
 
+  const { patients } = useDatabase()
+
   const handleSave = async () => {
     setIsSubmitting(true)
     try {
-      const supabase = createClient()
-      const { error } = await (supabase.from('patients') as any)
-        .update({ er_treatment: treatment })
-        .eq('id', patientId)
-
-      if (error) throw error
+      await patients.update(patientId, { er_treatment: treatment })
       toast.success("ER Treatment updated successfully")
       setOpen(false)
       router.refresh()

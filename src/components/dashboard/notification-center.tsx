@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getTodayRemindersAction } from "@/app/actions/reminder-actions"
+import { createClient } from "@/lib/supabase"
 import Link from "next/link"
 
 export function NotificationCenter() {
@@ -12,9 +12,28 @@ export function NotificationCenter() {
 
   const fetchRemindersCount = useCallback(async () => {
     try {
-      const result = await getTodayRemindersAction()
-      if (result.data) {
-        setPendingCount(result.data.length)
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await (supabase.from('user_profiles') as any).select('specialty, gender').eq('user_id', user.id).single()
+      if (!profile) return
+
+      const today = new Date(new Date().getTime() + 3 * 60 * 60 * 1000).toISOString().split('T')[0] // Baghdad time
+      
+      let query = (supabase.from('reminders') as any)
+        .select('*', { count: 'exact', head: true })
+        .eq('reminder_date', today)
+        .eq('status', 'pending')
+        .eq('target_specialty', profile.specialty)
+
+      if (profile.specialty === 'internal_medicine' && profile.gender) {
+        query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+      }
+
+      const { count, error } = await query
+      if (!error && count !== null) {
+        setPendingCount(count)
       }
     } catch (e) {
       console.error("Failed to fetch notification count", e)
