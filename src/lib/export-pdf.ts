@@ -21,13 +21,24 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     const themeHex = isER ? "#BE123C" : "#1E293B";
     const tealHex = "#0D9488";
 
-    const visitsForDoc = (p.visits || []).filter((v: any) => isER ? v.is_er : !v.is_er);
-    const targetVisit = visitsForDoc.reduce((latest: any, curr: any) => {
-      if (!latest) return curr;
-      const t1 = Date.parse(curr.visit_date || 0);
-      const t2 = Date.parse(latest.visit_date || 0);
-      return t1 > t2 ? curr : latest;
-    }, null) || (p.visits?.[0] || null);
+    // --- OPTIMIZED FAST FIND ---
+    let targetVisit = null;
+    let maxTime = 0;
+    if (p.visits && p.visits.length > 0) {
+      for (let i = 0; i < p.visits.length; i++) {
+        const v = p.visits[i];
+        const matchesEr = isER ? v.is_er : !v.is_er;
+        if (matchesEr) {
+          const time = Date.parse(v.visit_date || 0);
+          if (time > maxTime) {
+            maxTime = time;
+            targetVisit = v;
+          }
+        }
+      }
+      if (!targetVisit) targetVisit = p.visits[0]; // fallback
+    }
+    // ---------------------------
 
     // --- ONE PAGE RULE: LINE PROJECTION ENGINE ---
     const noteLines = targetVisit ? (targetVisit.exam_notes || "").split("\n").length : 1;
