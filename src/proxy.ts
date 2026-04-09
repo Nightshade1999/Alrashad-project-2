@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession();
     user = session?.user;
   } catch (error: any) {
-    console.warn('Middleware: Auth check suppressed crash:', error?.message);
+    console.warn('Proxy: Auth check suppressed crash:', error?.message);
     return supabaseResponse;
   }
 
@@ -69,7 +69,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. Hardened Role Check - DEFERRED TO UI
-  // We no longer perform DB-level role checks in Middleware to prevent 35s tunnel heartbeats from timing out.
+  // We no longer perform DB-level role checks in Middleware (now Proxy) to prevent 35s tunnel heartbeats from timing out.
   // The UI (Dashboard/Admin) handles its own role-based gate.
 
   return supabaseResponse
