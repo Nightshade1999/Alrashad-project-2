@@ -19,7 +19,9 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
   const handleExport = async (format: 'word' | 'pdf') => {
     setIsExporting(format)
     setShowMenu(false)
-    
+    // Show immediate feedback — the dynamic import + Packer.toBlob can take 1-2s
+    toast.loading(format === 'word' ? "Generating Word document…" : "Generating PDF…", { id: 'export-toast' })
+
     try {
       const doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || "Ward Clinician"
       const wardName = profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
@@ -37,16 +39,19 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
 
       if (format === 'word') {
         const { exportToWord } = await import("@/lib/export-word")
+        // Yield to the event loop so the loading spinner renders before
+        // Packer.toBlob() blocks the main thread
+        await new Promise(resolve => setTimeout(resolve, 0))
         await exportToWord([fullData], doctorName, wardName)
-        toast.success("Clinical summary exported to Word")
+        toast.success("Word document ready", { id: 'export-toast' })
       } else {
         const { exportToPdf } = await import("@/lib/export-pdf")
         await exportToPdf([fullData], doctorName, wardName)
-        toast.success("Clinical summary exported to PDF")
+        toast.success("PDF preview opened", { id: 'export-toast' })
       }
     } catch (err: any) {
       console.error("PDF/Word export error:", err)
-      toast.error(`Failed to export: ${err?.message || "Unknown error"}`)
+      toast.error(`Export failed: ${err?.message || "Unknown error"}`, { id: 'export-toast' })
     } finally {
       setIsExporting(false)
     }

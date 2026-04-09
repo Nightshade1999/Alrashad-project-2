@@ -18,44 +18,34 @@ export function OfflineDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // When offline mode is active and PowerSync is available, use live queries
-    // so the UI updates automatically as data syncs in the background
-    if (isOfflineMode && ps) {
-      const abortController = new AbortController();
+    // PowerSync.watch() reads directly from local SQLite — it works whether
+    // online or offline. We no longer gate on isOfflineMode; ps being ready
+    // is the only prerequisite. This prevents the "0 patients" race condition
+    // where isOfflineMode hadn't resolved yet when the component mounted.
+    if (!ps) return;
 
-      const watcher = ps.watch(
-        `SELECT * FROM patients WHERE category != 'Deceased/Archive' ORDER BY updated_at DESC`,
-        [],
-        { signal: abortController.signal }
-      );
+    const abortController = new AbortController();
 
-      (async () => {
-        try {
-          for await (const result of watcher) {
-            setPatientList((result.rows?._array || []) as any[]);
-            setLoading(false);
-          }
-        } catch (e: any) {
-          if (e.name !== 'AbortError') console.error("Watch error:", e);
-        }
-      })();
+    const watcher = ps.watch(
+      `SELECT * FROM patients WHERE category != 'Deceased/Archive' ORDER BY updated_at DESC`,
+      [],
+      { signal: abortController.signal }
+    );
 
-      return () => abortController.abort();
-    }
-
-    // Fallback: online mode or PowerSync not ready — use the one-shot fetch
-    async function loadData() {
+    (async () => {
       try {
-        const data = await patients.list();
-        setPatientList(data as any[]);
-      } catch (e) {
-        console.error("Dashboard Load Failed:", e);
-      } finally {
-        setLoading(false);
+        setLoading(true);
+        for await (const result of watcher) {
+          setPatientList((result.rows?._array || []) as any[]);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (e.name !== 'AbortError') console.error("PowerSync watch error:", e);
       }
-    }
-    loadData();
-  }, [isOfflineMode, ps]);
+    })();
+
+    return () => abortController.abort();
+  }, [ps]);
 
   const myWardName = profile?.ward_name ?? null;
   const isAdmin = profile?.role === 'admin';

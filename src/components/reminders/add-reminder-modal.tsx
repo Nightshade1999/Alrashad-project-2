@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { createReminderAction } from "@/app/actions/reminder-actions"
-import { getUserProfileAction } from "@/app/actions/user-actions"
+import { useDatabase } from "@/hooks/useDatabase"
 import { toast } from "sonner"
 
 export function AddReminderModal({ 
@@ -56,27 +56,19 @@ export function AddReminderModal({
   const [assignedUserGender, setAssignedUserGender] = useState<string | null>(null)
   const [assignedUserSpecialty, setAssignedUserSpecialty] = useState<string | null>(null)
 
+  // Pull profile from shared context — no extra server round-trip
+  const { profile } = useDatabase()
   useEffect(() => {
-    async function loadProfile() {
-      const result = await getUserProfileAction()
-      if (result.data) {
-        const profile = result.data
-        
-        // Default gender by the doctor's own profile gender (chosen during session start)
-        if (profile.gender && (profile.gender === 'Male' || profile.gender === 'Female')) {
-          setAssignedUserGender(profile.gender)
-          setGender(profile.gender as any)
-        }
-        
-        // Lock and sync specialty from the doctor's profile
-        if (profile.specialty) {
-          setAssignedUserSpecialty(profile.specialty)
-          setSpecialty(profile.specialty as any)
-        }
-      }
+    if (!profile) return
+    if (profile.gender === 'Male' || profile.gender === 'Female') {
+      setAssignedUserGender(profile.gender)
+      setGender(profile.gender as any)
     }
-    loadProfile()
-  }, [])
+    if ((profile as any).specialty) {
+      setAssignedUserSpecialty((profile as any).specialty)
+      setSpecialty((profile as any).specialty as any)
+    }
+  }, [profile])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

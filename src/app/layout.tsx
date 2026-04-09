@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PowerSyncProvider } from "@/lib/powersync/PowerSyncProvider";
+import { DatabaseProvider } from "@/hooks/useDatabase";
 import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
@@ -73,9 +74,11 @@ export default function RootLayout({
           <ProgressBar />
         </Suspense>
         <PowerSyncProvider>
-          {children}
-          <InstallPrompt />
-          <ServiceWorkerRegistry />
+          <DatabaseProvider>
+            {children}
+            <InstallPrompt />
+            <ServiceWorkerRegistry />
+          </DatabaseProvider>
         </PowerSyncProvider>
         <Toaster richColors position="bottom-right" />
         <SpeedInsights />

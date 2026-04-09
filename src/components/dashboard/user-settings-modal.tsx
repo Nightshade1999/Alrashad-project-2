@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { getUserProfileAction, updateUserProfileAction } from "@/app/actions/user-actions"
+import { updateUserProfileAction } from "@/app/actions/user-actions"
+import { useDatabase } from "@/hooks/useDatabase"
 import { toast } from "sonner"
 
 export function UserSettingsModal() {
@@ -25,21 +26,15 @@ export function UserSettingsModal() {
   const [userRole, setUserRole] = useState('')
   const [userSpecialty, setUserSpecialty] = useState('')
 
-  const fetchProfile = async () => {
-    setLoading(true)
-    const result = await getUserProfileAction()
-    if (result.data) {
-      setName(result.data.doctor_name || "")
-      setGender(result.data.gender || "Both")
-      setUserRole(result.data.role || "user")
-      setUserSpecialty(result.data.specialty || "")
-    }
-    setLoading(false)
-  }
-
+  // Pull profile from shared context — no extra server round-trip on modal open
+  const { profile } = useDatabase()
   useEffect(() => {
-    if (open) fetchProfile()
-  }, [open])
+    if (!profile) return
+    setName((profile as any).doctor_name || "")
+    setGender((profile as any).gender || "Both")
+    setUserRole((profile as any).role || "user")
+    setUserSpecialty((profile as any).specialty || "")
+  }, [profile])
 
   // handleSave is now removed as Name and Gender are managed via the session-based initialization modal.
 
