@@ -123,4 +123,4 @@ export const AppSchema = new Schema({
  * Changing this will trigger a full disconnectAndClear() for all clients on their next launch,
  * ensuring they redownload the entire database matching the new structure.
  */
-export const SCHEMA_VERSION = 'v18.0.0'; 
+export const SCHEMA_VERSION = 'v18.1.0'; 

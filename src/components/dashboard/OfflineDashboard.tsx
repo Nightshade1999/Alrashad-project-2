@@ -48,7 +48,25 @@ export function OfflineDashboard() {
   }, [ps]);
 
   const myWardName = profile?.ward_name ?? null;
-  const isAdmin = profile?.role === 'admin';
+  const [isCachedAdmin, setIsCachedAdmin] = useState(false);
+
+  useEffect(() => {
+    // Check localStorage directly for an emergency fallback if the reactive profile hasn't synced yet.
+    if (typeof window !== 'undefined') {
+      try {
+        const keys = Object.keys(localStorage);
+        const profileKey = keys.find(k => k.startsWith('profile_cache_'));
+        if (profileKey) {
+          const cached = JSON.parse(localStorage.getItem(profileKey) || '{}');
+          if (cached.role === 'admin') setIsCachedAdmin(true);
+        }
+      } catch (e) {
+        console.debug('Dashboard: Cache check failed', e);
+      }
+    }
+  }, []);
+
+  const isAdmin = profile?.role === 'admin' || isCachedAdmin;
 
   // For non-admins, scope the count to their assigned ward only
   const scopedList = isAdmin || !myWardName

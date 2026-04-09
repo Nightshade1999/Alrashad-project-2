@@ -1,6 +1,7 @@
 "use client"
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
+import { useDatabase } from '@/hooks/useDatabase'
 import { useState, useEffect, useRef } from 'react'
 import { CloudOff, RefreshCw, Loader2, Database, CheckCircle2 } from 'lucide-react'
 
@@ -19,6 +20,8 @@ function deriveStatus(ps: any) {
 
 export function OfflineIndicator() {
   const ps = usePowerSync();
+  const { profile } = useDatabase();
+  const role = profile?.role || 'Guest';
 
   // ── PowerSync not yet initialised ──────────────────────────
   // Show an initialising overlay rather than returning null.
@@ -201,6 +204,14 @@ export function OfflineIndicator() {
             </div>
           </>
         )}
+
+        {/* Diagnostic Metadata */}
+        <div className="ml-4 pl-4 border-l border-white/10 flex flex-col items-end">
+          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-teal-500/80">v18.1.0</span>
+          <span className={`text-[8px] font-bold uppercase tracking-widest ${role === 'admin' ? 'text-amber-400' : 'text-slate-500'}`}>
+            {role}
+          </span>
+        </div>
 
       </div>
     </div>
