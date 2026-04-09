@@ -209,7 +209,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           setProfile(prev => ({ 
             ...(prev || {}), 
             role: metadataRole,
-            user_id: userId 
+            user_id: userId,
+            metadata_role: metadataRole // Persistent flag
           } as UserProfile));
         }
 
@@ -261,7 +262,11 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (userProfile) {
-          setProfile(userProfile as any);
+          setProfile(prev => ({
+            ...(userProfile as any),
+            // CRITICAL: Never let a DB fetch downgrade an Admin if they have the metadata flag
+            role: (prev as any)?.metadata_role === 'admin' ? 'admin' : (userProfile as any).role
+          }));
           setOfflineEnabled((userProfile as any).offline_mode_enabled ?? false);
         }
       } catch (err) {
