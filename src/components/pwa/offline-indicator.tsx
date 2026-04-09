@@ -2,8 +2,9 @@
 
 import { usePowerSync } from '@/lib/powersync/PowerSyncProvider'
 import { useDatabase } from '@/hooks/useDatabase'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { CloudOff, RefreshCw, Loader2, Database, CheckCircle2 } from 'lucide-react'
+import { logEvent } from '@/lib/pwa/black-box'
 
 function deriveStatus(ps: any) {
   const currentStatus = ps?.currentStatus;
@@ -47,52 +48,64 @@ export function OfflineIndicator() {
   // initialization gate from flashing during navigations or background reconnects.
   const hasEverSyncedRef = useRef(false);
 
+  const updateStatus = useCallback(() => {
+    if (!ps) return;
+    const currentStatus = ps.currentStatus;
+    if (!currentStatus) return;
+
+    const isSyncing = !!(currentStatus.dataFlowStatus?.downloading || currentStatus.dataFlowStatus?.uploading);
+    const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
+    const lastSyncedTime = lastSyncedAt?.getTime() || 0;
+
+    // THROTLE: Only update state if meaningful status fields change
+    const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${lastSyncedTime}`;
+    if (statusKey === lastStatusRef.current) return;
+    lastStatusRef.current = statusKey;
+
+    logEvent('PWA: Status Update', { connected: currentStatus.connected, hasSynced: currentStatus.hasSynced, isSyncing });
+
+    setStatus({
+      connected: !!currentStatus.connected,
+      hasSynced: !!currentStatus.hasSynced,
+      lastSyncedAt,
+      isSyncing,
+    });
+
+    if (currentStatus.hasSynced) {
+      hasEverSyncedRef.current = true;
+    }
+
+    if (isSyncing) {
+      setShowSyncBanner(true);
+      if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
+      syncBannerTimerRef.current = setTimeout(() => {
+        setShowSyncBanner(false);
+      }, 3000);
+    }
+  }, [ps]);
+
   useEffect(() => {
     if (!ps) return;
 
-    const updateStatus = () => {
-      const currentStatus = ps.currentStatus;
-      if (!currentStatus) return;
-
-      const isSyncing = !!(currentStatus.dataFlowStatus?.downloading || currentStatus.dataFlowStatus?.uploading);
-      const lastSyncedAt = currentStatus.lastSyncedAt ? new Date(currentStatus.lastSyncedAt) : null;
-      const lastSyncedTime = lastSyncedAt?.getTime() || 0;
-
-      const statusKey = `${currentStatus.connected}-${currentStatus.hasSynced}-${isSyncing}-${lastSyncedTime}`;
-
-      if (statusKey === lastStatusRef.current) return;
-      lastStatusRef.current = statusKey;
-
-      setStatus({
-        connected: !!currentStatus.connected,
-        hasSynced: !!currentStatus.hasSynced,
-        lastSyncedAt,
-        isSyncing,
-      });
-
-      if (currentStatus.hasSynced) {
-        hasEverSyncedRef.current = true;
-      }
-
-      if (isSyncing) {
-        setShowSyncBanner(true);
-        if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
-        syncBannerTimerRef.current = setTimeout(() => {
-          setShowSyncBanner(false);
-        }, 3000);
-      }
-    };
-
     updateStatus();
-    const unsubscribe = ps.registerListener?.({ statusChanged: updateStatus });
-    const interval = setInterval(updateStatus, 5000); // Poll every 5 seconds instead
+    
+    // Register listener for reactive updates
+    const unsubscribe = ps.registerListener?.({ 
+      statusChanged: () => {
+        // Use requestAnimationFrame to ensure we don't hammer the main thread
+        // during high-frequency sync events.
+        requestAnimationFrame(updateStatus);
+      } 
+    });
+
+    // CRITICAL: Removed setInterval polling. We rely entirely on the reactive listener
+    // to prevent the "A problem repeatedly occurred" rendering crash.
 
     return () => {
       if (unsubscribe) unsubscribe();
-      clearInterval(interval);
       if (syncBannerTimerRef.current) clearTimeout(syncBannerTimerRef.current);
     };
-  }, [ps]);
+  }, [ps, updateStatus]);
 
   // --- 1. FULL-SCREEN GATE ---
   // Show while PowerSync is booting OR until the first sync completes.

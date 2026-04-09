@@ -17,6 +17,7 @@ import { useEffect, memo, useCallback } from 'react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { OfflinePatientDetail } from '@/components/patient/OfflinePatientDetail'
 import { useRouter } from 'next/navigation'
+import { logEvent } from '@/lib/pwa/black-box'
 
 export interface PatientRow {
   id: string
@@ -228,6 +229,9 @@ export function PatientList({ patients, defaultSort = 'name' }: { patients: Pati
       if (va > vb) return sortDir === 'asc' ? 1 : -1
       return 0
     })
+    if (arr.length > 50) {
+      logEvent('PatientList: Large dataset detected', { count: arr.length });
+    }
     return arr
   }, [filtered, sortCol, sortDir])
 
@@ -379,7 +383,6 @@ const PatientCard = memo(({ p, index, isSelected, onToggleSelect, onViewOffline 
     <div
       className={`group relative transition-all cursor-pointer border-l-2 animate-fade-in-up ${isSelected ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-900/10' : 'border-transparent hover:bg-teal-50/50 dark:hover:bg-teal-950/20'}`}
       onClick={handleRowClick}
-      style={{ animationDelay: delay, animationFillMode: 'both' }}
     >
 
       {/* --- Desktop Row --- */}

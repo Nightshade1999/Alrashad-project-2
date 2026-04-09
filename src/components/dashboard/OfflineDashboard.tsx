@@ -10,6 +10,7 @@ import { ExportButton } from '@/components/dashboard/export-button'
 import { GlobalSearch } from '@/components/dashboard/global-search'
 import { UrgentInsights } from '@/components/dashboard/urgent-insights'
 import type { Patient } from '@/types/database.types'
+import { logEvent } from '@/lib/pwa/black-box'
 
 export function OfflineDashboard() {
   const { patients, isOfflineMode, profile } = useDatabase();
@@ -18,29 +19,43 @@ export function OfflineDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // PowerSync.watch() reads directly from local SQLite — it works whether
-    // online or offline. We no longer gate on isOfflineMode; ps being ready
-    // is the only prerequisite. This prevents the "0 patients" race condition
-    // where isOfflineMode hadn't resolved yet when the component mounted.
     if (!ps) return;
 
     const abortController = new AbortController();
 
-    const watcher = ps.watch(
-      `SELECT * FROM patients WHERE category != 'Deceased/Archive' ORDER BY updated_at DESC`,
-      [],
-      { signal: abortController.signal }
-    );
+    // OPTIMIZATION: Narrow the query instead of SELECT *
+    // This reduces the memory footprint and prevents triggers from unrelated column updates.
+    const query = `
+      SELECT id, name, age, room_number, category, chronic_diseases, 
+             updated_at, ward_name, is_in_er 
+      FROM patients 
+      WHERE category != 'Deceased/Archive' 
+      ORDER BY updated_at DESC
+    `;
+
+    const watcher = ps.watch(query, [], { signal: abortController.signal });
 
     (async () => {
       try {
         setLoading(true);
+        let renderCount = 0;
         for await (const result of watcher) {
-          setPatientList((result.rows?._array || []) as any[]);
+          renderCount++;
+          const rows = (result.rows?._array || []) as any[];
+          
+          // Log to Black Box to detect rapid-fire sync loops
+          if (renderCount % 5 === 0) {
+            logEvent('Dashboard: Patient List Refreshed', { count: rows.length, iteration: renderCount });
+          }
+          
+          setPatientList(rows);
           setLoading(false);
         }
       } catch (e: any) {
-        if (e.name !== 'AbortError') console.error("PowerSync watch error:", e);
+        if (e.name !== 'AbortError') {
+          console.error("PowerSync watch error:", e);
+          logEvent('Dashboard: Sync Error', { error: e.message });
+        }
       }
     })();
 
