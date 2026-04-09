@@ -205,8 +205,23 @@ export function OfflineIndicator() {
           </>
         )}
 
+        {/* Black Box Access */}
+        <button 
+          onClick={() => {
+            const raw = localStorage.getItem('app_black_box') || '[]';
+            const logs = JSON.parse(raw);
+            const text = logs.map((l: any) => `[${l.t}] ${l.m}`).join('\n');
+            alert(text || 'Black Box is empty.');
+          }}
+          className="ml-2 p-1.5 hover:bg-white/10 rounded-lg transition-colors pointer-events-auto group"
+          title="Read Clinical Black Box"
+        >
+          <span className="sr-only">Audit Logs</span>
+          <Database className="h-3 w-3 text-teal-500/50 group-hover:text-teal-400" />
+        </button>
+
         {/* Diagnostic Metadata */}
-        <div className="ml-4 pl-4 border-l border-white/10 flex flex-col items-end">
+        <div className="ml-2 pl-4 border-l border-white/10 flex flex-col items-end">
           <span className="text-[8px] font-black uppercase tracking-[0.2em] text-teal-500/80">v18.1.0</span>
           <span className={`text-[8px] font-bold uppercase tracking-widest ${role === 'admin' ? 'text-amber-400' : 'text-slate-500'}`}>
             {role}

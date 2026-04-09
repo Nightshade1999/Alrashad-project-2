@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/layout/ProgressBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ServiceWorkerRegistry } from "@/components/pwa/service-worker-registry";
 import { VConsoleProvider } from "@/components/pwa/VConsoleProvider";
+import { BlackBox } from "@/components/pwa/BlackBox";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -77,6 +78,7 @@ export default function RootLayout({
         <PowerSyncProvider>
           <DatabaseProvider>
             <VConsoleProvider>
+              <BlackBox />
               {children}
               <InstallPrompt />
               <ServiceWorkerRegistry />

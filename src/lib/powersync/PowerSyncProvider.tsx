@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import { getPowerSync, initPowerSync } from './db';
 import { SCHEMA_VERSION } from './schema';
 import { UpdatePrompt } from '@/components/pwa/UpdatePrompt';
+import { recordEvent } from '@/components/pwa/BlackBox';
 
 const PowerSyncContext = createContext<PowerSyncDatabase | null>(null);
 
@@ -36,6 +37,7 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // 1. Check for Schema Version Mismatch (Force Refresh if update pushed)
         const storedVersion = localStorage.getItem('powersync_schema_version');
         if (storedVersion !== SCHEMA_VERSION) {
+          recordEvent(`Schema Mismatch: ${storedVersion} -> ${SCHEMA_VERSION}`);
           console.log(`Schema mismatch (Local: ${storedVersion}, Code: ${SCHEMA_VERSION}). Update required.`);
           // STOP! No more automated reloads.
           setNeedsUpdate(true);
@@ -50,7 +52,9 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (session && !powerSync.currentStatus?.connected && !connectingRef.current) {
           try {
             connectingRef.current = true;
+            recordEvent('PowerSync: Connecting...');
             await powerSync.connect(connector);
+            recordEvent('PowerSync: Connected Successfully');
             console.log('PowerSync initial connection established');
           } catch (e) {
             console.warn('PowerSync initial connection failed (expected if offline):', e);
@@ -65,7 +69,9 @@ export const PowerSyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             try {
               if (!powerSync.currentStatus?.connected && !connectingRef.current) {
                 connectingRef.current = true;
+                recordEvent('PowerSync: Auth Reconnect...');
                 await powerSync.connect(connector);
+                recordEvent('PowerSync: Reconnected');
                 console.log('PowerSync: Connected');
               }
             } catch (e) {
