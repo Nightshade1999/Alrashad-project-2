@@ -593,51 +593,62 @@ export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'ove
     const admin = getSupabaseAdmin()
     const results: any = {}
     
-    // Ordered to respect potential foreign key relationships where possible
+    // Ordered to respect foreign key relationships
     const tables = ['ward_settings', 'user_profiles', 'patients', 'visits', 'investigations', 'reminders']
     
     for (const table of tables) {
       const tableData = data[table]
-      if (!tableData || !Array.isArray(tableData)) {
+      if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
         results[table] = { success: 0, skipped: 0, failed: 0 }
         continue
       }
       
-      let success = 0, skipped = 0, failed = 0
+      const conflictCol = table === 'user_profiles' ? 'user_id' : (table === 'ward_settings' ? 'ward_name' : 'id')
+      let rowsToProcess = [...tableData]
+      let skippedCount = 0
       
-      for (const row of tableData) {
-        try {
-          // If skip strategy, check if it exists first. 
-          // Note: for user_profiles and ward_settings we use unique keys.
-          const conflictCol = table === 'user_profiles' ? 'user_id' : (table === 'ward_settings' ? 'ward_name' : 'id')
-          
-          if (strategy === 'skip') {
-            const { data: existing } = await admin.from(table).select(conflictCol).eq(conflictCol, row[conflictCol]).maybeSingle()
-            if (existing) {
-              skipped++
-              continue
-            }
-          }
+      if (strategy === 'skip') {
+        // Optimization: Fetch existing IDs in bulk
+        const { data: existingRows } = await admin.from(table).select(conflictCol)
+        const existingIds = new Set(existingRows?.map((r: any) => r[conflictCol]) || [])
+        
+        const initialCount = rowsToProcess.length
+        rowsToProcess = rowsToProcess.filter(row => !existingIds.has(row[conflictCol]))
+        skippedCount = initialCount - rowsToProcess.length
+      }
 
-          const { error } = await (admin.from(table) as any).upsert(row, { 
-            onConflict: conflictCol
-          })
+      if (rowsToProcess.length === 0) {
+        results[table] = { success: 0, skipped: skippedCount, failed: 0 }
+        continue
+      }
 
-          if (error) {
-            console.error(`Restore error on ${table}:`, error.message)
-            failed++
-          } else {
-            success++
-          }
-        } catch (err) {
-          failed++
+      // Perform Bulk Upsert or Insert
+      // Note: We use chunks of 500 to avoid request size limits if data is huge
+      const CHUNK_SIZE = 500
+      let successCount = 0
+      let failedCount = 0
+
+      for (let i = 0; i < rowsToProcess.length; i += CHUNK_SIZE) {
+        const chunk = rowsToProcess.slice(i, i + CHUNK_SIZE)
+        const { error } = await (admin.from(table) as any).upsert(chunk, { 
+          onConflict: conflictCol
+        })
+
+        if (error) {
+          console.error(`Bulk restore error on ${table} (chunk ${i}):`, error.message)
+          failedCount += chunk.length
+        } else {
+          successCount += chunk.length
         }
       }
-      results[table] = { success, skipped, failed }
+
+      results[table] = { success: successCount, skipped: skippedCount, failed: failedCount }
     }
     
+    revalidatePath('/admin/manage')
     return { results }
   } catch (e: any) {
+    console.error('System Restore Action Failure:', e)
     return { error: e.message }
   }
 }

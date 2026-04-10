@@ -159,14 +159,21 @@ export function WardSettings({ settings, users }: { settings: any[], users: any[
     if (!confirm(confirmMsg)) return
 
     setIsRestoring(true)
-    const res = await restoreSystemDataAction(restoreData, strategy === 'overwrite' ? 'overwrite' : 'skip')
-    setIsRestoring(false)
-
-    if (res.error) {
-      toast.error("Restoration failed: " + res.error)
-    } else {
-      setRestoreResults(res.results)
-      toast.success("System restoration complete.")
+    try {
+      const res = await restoreSystemDataAction(restoreData, strategy === 'overwrite' ? 'overwrite' : 'skip')
+      if (res?.error) {
+        toast.error("Restoration failed: " + res.error)
+      } else if (res?.results) {
+        setRestoreResults(res.results)
+        toast.success("System restoration complete.")
+      } else {
+        toast.error("Restoration completed with an unexpected response format.")
+      }
+    } catch (err: any) {
+      console.error("Restoration UI Error:", err)
+      toast.error("An unexpected error occurred during restoration: " + (err.message || "Unknown error"))
+    } finally {
+      setIsRestoring(false)
     }
   }
 
