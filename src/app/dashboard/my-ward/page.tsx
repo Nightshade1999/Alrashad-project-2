@@ -287,7 +287,7 @@ export default function MyWardPage() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
-                {counts['Deceased/Archive']}
+                {counts['archive']}
               </div>
               <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Records</div>
             </div>
