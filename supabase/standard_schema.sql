@@ -1,10 +1,47 @@
 -- ============================================================
--- AL RASHAD CLINICAL SYSTEM: CONSOLIDATED SCHEMA (UNIFIED)
--- This file represents the canonical state of the database.
+-- AL RASHAD CLINICAL SYSTEM: CONSOLIDATED SCHEMA (OPTIMIZED)
+-- Implementation: Helper Functions + Recursive-Safe RLS
 -- ============================================================
 
 -- 0. CORE EXTENSIONS
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 0.1 SCHEMA SYNCHRONIZATION (Ensures all columns exist in all tables)
+DO $$ 
+BEGIN
+    -- user_profiles fixes
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ward_name TEXT DEFAULT 'Unassigned';
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS accessible_wards JSONB DEFAULT '[]'::jsonb;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS offline_mode_enabled BOOLEAN DEFAULT false;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS can_see_ward_patients BOOLEAN DEFAULT false;
+    END IF;
+
+    -- patients fixes
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'patients') THEN
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS ward_name TEXT NOT NULL DEFAULT 'General Ward';
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS is_in_er BOOLEAN DEFAULT false;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS er_treatment JSONB DEFAULT '[]'::jsonb;
+    END IF;
+
+    -- visits fixes
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'visits') THEN
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_er BOOLEAN DEFAULT false;
+    END IF;
+
+    -- investigations fixes
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'investigations') THEN
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS is_er BOOLEAN DEFAULT false;
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS serology JSONB DEFAULT '{}'::jsonb;
+    END IF;
+
+    -- reminders fixes
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'reminders') THEN
+        ALTER TABLE public.reminders ADD COLUMN IF NOT EXISTS is_resolved BOOLEAN DEFAULT false;
+        ALTER TABLE public.reminders ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+    END IF;
+END $$;
 
 -- 1. TRIGGER FUNCTIONS
 
@@ -174,20 +211,121 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
 );
 
 -- 3. TRIGGERS
+DROP TRIGGER IF EXISTS tr_on_auth_user_created ON auth.users;
 CREATE TRIGGER tr_on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- Updated At triggers
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_patients_updated_at BEFORE UPDATE ON patients FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_visits_updated_at BEFORE UPDATE ON visits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_investigations_updated_at BEFORE UPDATE ON investigations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_reminders_updated_at BEFORE UPDATE ON reminders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE OR REPLACE FUNCTION create_update_trigger(tbl_name TEXT)
+RETURNS VOID AS $$
+BEGIN
+    EXECUTE format('DROP TRIGGER IF EXISTS update_%I_updated_at ON %I', tbl_name, tbl_name);
+    EXECUTE format('CREATE TRIGGER update_%I_updated_at BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()', tbl_name, tbl_name);
+END;
+$$ LANGUAGE plpgsql;
 
--- 4. RPC FUNCTIONS
+DO $$ 
+BEGIN
+    PERFORM create_update_trigger('user_profiles');
+    PERFORM create_update_trigger('patients');
+    PERFORM create_update_trigger('visits');
+    PERFORM create_update_trigger('investigations');
+    PERFORM create_update_trigger('reminders');
+END $$;
 
--- Move to ER (Clean slate readmission)
+-- 4. RLS HELPER FUNCTIONS (Critical for Performance & Stability)
+CREATE OR REPLACE FUNCTION public.fn_get_user_role()
+RETURNS TEXT AS $$
+  -- SECURITY DEFINER bypasses RLS to prevent infinite recursion
+  SELECT role FROM public.user_profiles WHERE user_id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.fn_get_user_ward()
+RETURNS TEXT AS $$
+  SELECT ward_name FROM public.user_profiles WHERE user_id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+-- 5. ROW LEVEL SECURITY (HARDENED)
+
+DO $$ 
+BEGIN
+    ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.ward_settings ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.investigations ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Drop all existing policies before recreating to ensure a clean slate
+DO $$ 
+DECLARE
+    pol RECORD;
+BEGIN
+    FOR pol IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    END LOOP;
+END $$;
+
+-- User Profiles: Self-read, Self-update, Admin All
+CREATE POLICY "Profiles_Self_Access" ON public.user_profiles 
+FOR ALL TO authenticated USING (auth.uid() = user_id OR public.fn_get_user_role() = 'admin');
+
+-- Ward Settings: Authenticated Read, Admin Write
+CREATE POLICY "Settings_Read" ON public.ward_settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Settings_Admin" ON public.ward_settings FOR ALL TO authenticated USING (public.fn_get_user_role() = 'admin');
+
+-- Patient READ: Global Access for Search (Everyone)
+CREATE POLICY "Patients_Read_Global" ON public.patients 
+FOR SELECT TO authenticated USING (true);
+
+-- Patient WRITE: Restricted to Admin, Master Ward, or Assigned Ward
+CREATE POLICY "Patients_Write_Restricted" ON public.patients 
+FOR ALL TO authenticated USING (
+    public.fn_get_user_role() = 'admin' OR 
+    public.fn_get_user_ward() = 'Master Ward' OR
+    public.fn_get_user_ward() = ward_name
+);
+
+-- Note: We don't need a separate INSERT policy if we use ALL above, 
+-- but we'll leave a standard one for compatibility if needed.
+-- CREATE POLICY "Patients_Insert" ON public.patients FOR INSERT TO authenticated WITH CHECK (true);
+
+-- Visits & Investigations: Access linked to Patient existence
+CREATE POLICY "Visits_Linked_Access" ON public.visits 
+FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
+);
+
+CREATE POLICY "Investigations_Linked_Access" ON public.investigations 
+FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
+);
+
+-- Reminders: Global visibility for coordination
+CREATE POLICY "Reminders_Global_Access" ON public.reminders 
+FOR ALL TO authenticated USING (
+    public.fn_get_user_role() IS NOT NULL
+);
+
+-- System Settings: Read all, Write admin
+CREATE POLICY "System_Settings_Read" ON public.system_settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "System_Settings_Admin" ON public.system_settings FOR ALL TO authenticated USING (public.fn_get_user_role() = 'admin');
+
+-- 6. INDICES (OPTIMIZATION)
+CREATE INDEX IF NOT EXISTS idx_patients_ward ON public.patients(ward_name);
+CREATE INDEX IF NOT EXISTS idx_patients_er ON public.patients(is_in_er);
+CREATE INDEX IF NOT EXISTS idx_visits_patient_date ON public.visits(patient_id, visit_date DESC);
+CREATE INDEX IF NOT EXISTS idx_investigations_patient_date ON public.investigations(patient_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_reminders_patient ON public.reminders(patient_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_status ON public.reminders(is_resolved);
+
+-- 7. RPC FUNCTIONS
+
+-- Move to ER
 CREATE OR REPLACE FUNCTION public.rpc_move_patient_to_er(
   p_patient_id UUID, 
   p_doctor_identifier TEXT,
@@ -196,7 +334,6 @@ CREATE OR REPLACE FUNCTION public.rpc_move_patient_to_er(
 )
 RETURNS VOID AS $$
 BEGIN
-  -- Archive previous ER records
   UPDATE public.visits SET is_er = false WHERE patient_id = p_patient_id AND is_er = true;
   UPDATE public.investigations SET is_er = false WHERE patient_id = p_patient_id AND is_er = true;
 
@@ -213,17 +350,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Return to Ward
-CREATE OR REPLACE FUNCTION public.rpc_return_patient_to_ward(p_patient_id UUID, p_ward_name TEXT)
-RETURNS VOID AS $$
-BEGIN
-  UPDATE public.patients
-  SET is_in_er = false, ward_name = p_ward_name, updated_at = NOW()
-  WHERE id = p_patient_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- Bulk Migration (Admin Tool)
+-- Bulk Migration
 CREATE OR REPLACE FUNCTION public.migrate_patients(from_user UUID, to_user UUID)
 RETURNS INTEGER AS $$
 DECLARE
@@ -234,59 +361,3 @@ BEGIN
   RETURN m_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
-
--- 5. ROW LEVEL SECURITY (UNIFIED)
-
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ward_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.investigations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
-
--- User Profiles: Self-read, Self-update, Admin All
-CREATE POLICY "Self Read" ON public.user_profiles FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Self Update" ON public.user_profiles FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Admin CRUD Profiles" ON public.user_profiles FOR ALL TO authenticated USING (
-    (SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin'
-);
-
--- Ward Settings: Authenticated Read, Admin Write
-CREATE POLICY "Auth Read Settings" ON public.ward_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Admin Write Settings" ON public.ward_settings FOR ALL TO authenticated USING (
-    (SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin'
-);
-
--- Patients: Clinician Global Access (For Search & Ward Coverage)
-CREATE POLICY "Verified Clinician Access" ON public.patients FOR SELECT TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.user_profiles WHERE user_id = auth.uid())
-);
-CREATE POLICY "Verified Clinician Update" ON public.patients FOR UPDATE TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.user_profiles WHERE user_id = auth.uid())
-);
-CREATE POLICY "Owner Admin Delete" ON public.patients FOR DELETE TO authenticated USING (
-    auth.uid() = user_id OR (SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin'
-);
-CREATE POLICY "Authenticated Insert" ON public.patients FOR INSERT TO authenticated WITH CHECK (true);
-
--- Visits & Investigations: Access linked to Patient visibility
-CREATE POLICY "Linked Patient Content Access" ON public.visits FOR ALL TO authenticated USING (
-    is_er = true OR EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
-);
-CREATE POLICY "Linked Patient Investigation Access" ON public.investigations FOR ALL TO authenticated USING (
-    is_er = true OR EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
-);
-
--- Reminders: Global visibility for clinicians (Coordination)
-CREATE POLICY "Clinician Reminder Access" ON public.reminders FOR ALL TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.user_profiles WHERE user_id = auth.uid())
-);
-
--- 6. INDICES (OPTMIZATION)
-CREATE INDEX IF NOT EXISTS idx_patients_ward ON public.patients(ward_name);
-CREATE INDEX IF NOT EXISTS idx_patients_er ON public.patients(is_in_er);
-CREATE INDEX IF NOT EXISTS idx_visits_patient_date ON public.visits(patient_id, visit_date DESC);
-CREATE INDEX IF NOT EXISTS idx_investigations_patient_date ON public.investigations(patient_id, date DESC);
-CREATE INDEX IF NOT EXISTS idx_reminders_patient ON public.reminders(patient_id);
-CREATE INDEX IF NOT EXISTS idx_reminders_status ON public.reminders(is_resolved);

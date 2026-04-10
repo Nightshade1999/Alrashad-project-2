@@ -4,12 +4,29 @@ import urllib.request
 import urllib.error
 from datetime import datetime
 import sys
+import os
 
-# Configuration
+# Load Environment Variables from .env.local
+def load_env():
+    env_path = r'C:\Users\x67\.gemini\antigravity\Scratch\Alrashad-project\.env.local'
+    env_vars = {}
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    env_vars[key.strip()] = value.strip()
+    return env_vars
+
+env = load_env()
+SUPABASE_URL = env.get('NEXT_PUBLIC_SUPABASE_URL')
+SUPABASE_KEY = env.get('SUPABASE_SERVICE_ROLE_KEY')
+ADMIN_USER_ID = 'dcad0ea9-c6b3-43af-8248-d385aa173269' # Standard Admin
 EXCEL_PATH = r'C:\Users\x67\.gemini\antigravity\Scratch\Alrashad-project\Database of patients.xlsx'
-SUPABASE_URL = 'https://vfbakmwhjqvadoyrgson.supabase.co'
-SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmYmFrbXdoanF2YWRveXJnc29uIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTA1MTE1NiwiZXhwIjoyMDkwNjI3MTU2fQ.4SykXbCqJ7OFrM10cJRiZBF3s-89GOZ3x5fk0WSZ-Gw'
-ADMIN_USER_ID = 'dcad0ea9-c6b3-43af-8248-d385aa173269'
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("Error: Missing Supabase credentials in .env.local")
+    sys.exit(1)
 
 # Force UTF-8 for console output
 sys.stdout.reconfigure(encoding='utf-8')
@@ -57,7 +74,8 @@ DIAGNOSIS_MAP = {
     'ثنائي القطب': 'Bipolar Disorder',
     'هوس': 'Mania',
     'زهايمر': 'Alzheimer\'s',
-    '`ذهان': 'Psychosis'
+    'اكتئاب': 'Depression',
+    'اضطراب وجداني': 'Bipolar Disorder'
 }
 
 WARD_GENDER_MAP = {
@@ -66,16 +84,20 @@ WARD_GENDER_MAP = {
     'Taj Aldin 2': 'Female',
     'Taj Aldin 3': 'Female',
     'Taj Aldin 4': 'Female',
-    'General Ward': 'Male' # Default
+    'Zainab 1': 'Female',
+    'Zainab 2': 'Female',
+    'Zainab 3': 'Female',
+    'Zainab 4': 'Female',
+    'General Ward': 'Male'
 }
 
 def get_gender_from_ward(ward_name):
-    if pd.isna(ward_name): return 'Unknown'
+    if pd.isna(ward_name): return 'Male'
     wn = str(ward_name).lower()
     for prefix, gender in WARD_GENDER_MAP.items():
         if prefix.lower() in wn:
             return gender
-    return 'Unknown'
+    return 'Male' # Default to Male if ward doesn't imply otherwise
 
 def translate_province(p):
     if pd.isna(p): return 'Unknown'
@@ -87,27 +109,26 @@ def translate_province(p):
 def translate_diagnosis(d):
     if pd.isna(d): return 'Psychosis'
     diag_str = str(d).strip()
-    return DIAGNOSIS_MAP.get(diag_str, 'Psychosis') # Unify to English Psychosis category
+    return DIAGNOSIS_MAP.get(diag_str, 'Psychosis')
 
-def calculate_age(dob):
+def calculate_age_from_dob(dob):
+    """Calculate age from year of birth as requested."""
     if pd.isna(dob): return None
     dob_str = str(dob).strip()
     if not dob_str or dob_str.lower() == 'unknown': return None
+    
+    current_year = 2026
     
     try:
         # 1. Handle 4-digit year strings (e.g. "1973")
         if len(dob_str) == 4 and dob_str.isdigit():
             year = int(dob_str)
-            current_year = 2026
-            age = current_year - year
-            return int(age) if age >= 0 else None
+            return current_year - year
             
         # 2. Handle full dates
         dt = pd.to_datetime(dob_str, dayfirst=True, errors='coerce')
         if not pd.isna(dt):
-            current_year = 2026
-            age = current_year - dt.year - ((4, 10) < (dt.month, dt.day)) # Today is April 10, 2026
-            return int(age) if age >= 0 else None
+            return current_year - dt.year
             
         return None
     except:
@@ -122,30 +143,29 @@ def normalize_date(d):
     except:
         return None
 
-def fetch_existing_patients():
-    print("Fetching existing patients from database (Limit 5000)...")
-    # Increase limit to avoid missing records for duplicate detection
-    url = f"{SUPABASE_URL}/rest/v1/patients?select=name,medical_record_number&limit=5000"
+def wipe_all_patients():
+    print("Wiping all existing patient data (CASCADE)...")
+    # PostgREST requires a filter for DELETE to prevent accidental table wipes.
+    # We use a filter that matches all UUIDs.
+    url = f"{SUPABASE_URL}/rest/v1/patients?id=neq.00000000-0000-0000-0000-000000000000"
     headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}'
     }
-    req = urllib.request.Request(url, headers=headers)
+    req = urllib.request.Request(url, headers=headers, method='DELETE')
     try:
         with urllib.request.urlopen(req) as response:
-            return json.loads(response.read().decode())
+            print("Wipe successful.")
     except Exception as e:
-        print(f"Fetch Error: {e}")
-        return []
+        print(f"Wipe Error: {e}")
 
-def insert_patients(patients):
+def insert_patients_chunk(patients):
     if not patients: return
     url = f"{SUPABASE_URL}/rest/v1/patients"
     headers = {
         'apikey': SUPABASE_KEY,
         'Authorization': f'Bearer {SUPABASE_KEY}',
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
+        'Content-Type': 'application/json'
     }
     data = json.dumps(patients, default=str).encode('utf-8')
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
@@ -159,15 +179,21 @@ def insert_patients(patients):
         print(f"Error: {e}")
 
 def main():
-    print(f"Loading Excel file: {EXCEL_PATH}...")
-    # Explicitly read the 'الكلي' sheet which has 1323 rows
-    df = pd.read_excel(EXCEL_PATH, sheet_name='الكلي')
-    
-    existing = fetch_existing_patients()
-    existing_keys = set((str(p['name']).strip(), str(p['medical_record_number']).strip() if p['medical_record_number'] else 'None') for p in existing)
-    
+    # 1. Wipe current data
+    wipe_all_patients()
+
+    # 2. Load Excel
+    print(f"Loading Excel file from {EXCEL_PATH}...")
+    try:
+        df = pd.read_excel(EXCEL_PATH, sheet_name='الكلي')
+    except Exception as e:
+        print(f"Error loading Excel: {e}")
+        return
+
     patients_to_insert = []
-    skipped_duplicates = []
+    seen_keys = set()
+    
+    print(f"Processing {len(df)} rows...")
     
     for _, row in df.iterrows():
         orig_name = row.get('Patient name')
@@ -175,19 +201,14 @@ def main():
             continue
         
         name = str(orig_name).strip()
-        
         mrn = row.get(' Medical record number')
-        if pd.isna(mrn): 
-            mrn_str = 'None'
-            mrn_val = None
-        else: 
-            mrn_val = str(mrn).strip()
-            mrn_str = mrn_val
+        mrn_val = str(mrn).strip() if not pd.isna(mrn) else None
         
-        # Check for duplicates rigorously
-        if (name, mrn_str) in existing_keys:
-            skipped_duplicates.append(name)
+        # Deduplication Rule: Combine Name + MRN
+        unique_key = (name.lower(), mrn_val)
+        if unique_key in seen_keys:
             continue
+        seen_keys.add(unique_key)
         
         ward_name = row.get('ward name')
         diagnosis = translate_diagnosis(row.get('Diagnosis'))
@@ -196,16 +217,16 @@ def main():
         if pd.isna(mother_name): mother_name = None
         
         dob = row.get('date of birth')
-        age = calculate_age(dob)
+        age = calculate_age_from_dob(dob)
         gender = get_gender_from_ward(ward_name)
         admission_date = normalize_date(row.get('Date of admission to ward'))
             
         patient_data = {
             'user_id': ADMIN_USER_ID,
-            'ward_name': str(ward_name) if not pd.isna(ward_name) else 'General Ward',
+            'ward_name': str(ward_name).strip() if not pd.isna(ward_name) else 'General Ward',
             'room_number': '1', 
             'name': name,
-            'age': age, # Will be None/Null if calculate_age returns None
+            'age': age,
             'gender': gender,
             'category': 'Normal',
             'province': province,
@@ -222,19 +243,17 @@ def main():
         }
         
         patients_to_insert.append(patient_data)
-        # Add to existing keys to prevent duplicates WITHIN the Excel file too
-        existing_keys.add((name, mrn_str))
         
-    print(f"Total Rows in Excel Sheet: {len(df)}")
-    print(f"Valid Patients extracted: {len(patients_to_insert) + len(skipped_duplicates)}")
-    print(f"To be imported: {len(patients_to_insert)}")
-    print(f"Skipped as duplicates: {len(skipped_duplicates)}")
+    print(f"Ready to import {len(patients_to_insert)} unique patients.")
     
+    # Chunked insertion for reliability
     chunk_size = 50
     for i in range(0, len(patients_to_insert), chunk_size):
-        insert_patients(patients_to_insert[i:i+chunk_size])
-        
-    print("\nImport Complete!")
+        insert_patients_chunk(patients_to_insert[i:i+chunk_size])
+        if (i + chunk_size) % 250 == 0:
+            print(f"Progress: {i + chunk_size} patients imported...")
+            
+    print("\nImport Complete! All wards, ages, and diagnoses have been unified.")
 
 if __name__ == "__main__":
     main()

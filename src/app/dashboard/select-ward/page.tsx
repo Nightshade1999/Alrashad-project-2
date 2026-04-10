@@ -116,24 +116,24 @@ export default function SelectWardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Master Ward for Admins */}
         {profile?.role === 'admin' && (
-          <div key="Master">
+          <div key="Master Ward">
             <button
               disabled={!!isSyncing}
-              onClick={() => handleSelectWard('Master')}
+              onClick={() => handleSelectWard('Master Ward')}
               className={`group relative w-full text-left p-8 rounded-[2.5rem] border-2 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 active:scale-95 flex flex-col items-start ${
-                profile?.ward_name === 'Master' 
+                profile?.ward_name === 'Master Ward' 
                   ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20' 
                   : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-700'
-              } ${isSyncing && isSyncing !== 'Master' ? 'opacity-50 grayscale' : ''}`}
+              } ${isSyncing && isSyncing !== 'Master Ward' ? 'opacity-50 grayscale' : ''}`}
             >
-              {profile?.ward_name === 'Master' && !isSyncing && (
+              {profile?.ward_name === 'Master Ward' && !isSyncing && (
                 <div className="absolute top-6 right-8 flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20">
                   <CheckCircle2 className="h-3 w-3" />
                   Currently Active
                 </div>
               )}
 
-              {isSyncing === 'Master' && (
+              {isSyncing === 'Master Ward' && (
                 <div className="absolute top-6 right-8">
                   <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
                 </div>
@@ -150,8 +150,8 @@ export default function SelectWardPage() {
                   Master Ward
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-                  {isSyncing === 'Master' ? 'Syncing...' : 'System-Wide Patients'}
-                  <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${isSyncing === 'Master' ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
+                  {isSyncing === 'Master Ward' ? 'Syncing...' : 'System-Wide Patients'}
+                  <ChevronRight className={`h-4 w-4 transition-transform duration-300 ${isSyncing === 'Master Ward' ? 'translate-x-1' : 'group-hover:translate-x-1'}`} />
                 </p>
               </div>
             </button>

@@ -23,7 +23,7 @@ function buildPatientApi(supabase: any) {
   return {
     list: async (wardName?: string) => {
       let query = supabase.from('patients').select('*').neq('category', 'Deceased/Archive').limit(5000);
-      if (wardName && wardName !== 'Master') {
+      if (wardName && wardName !== 'Master' && wardName !== 'Master Ward') {
         query = query.eq('ward_name', wardName);
       }
       const { data } = await query;

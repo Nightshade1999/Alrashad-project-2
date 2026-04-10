@@ -75,8 +75,8 @@ export function OfflineDashboard() {
 
   const isAdmin = profile?.role?.toLowerCase() === 'admin' || isCachedAdmin || (profile as any)?.metadata_role?.toLowerCase() === 'admin';
 
-  // Visibility Policy: 'Master', 'Unassigned', or missing ward assignment shows all for admins.
-  const isMaster = myWardName === 'Master' || (isAdmin && (!myWardName || myWardName === 'Unassigned'));
+  // Visibility Policy: 'Master Ward', 'Unassigned', or missing ward assignment shows all for admins.
+  const isMaster = myWardName === 'Master Ward' || (isAdmin && (!myWardName || myWardName === 'Unassigned'));
   
   // Case-Insensitive Filter
   const filteredList = (myWardName && !isMaster)

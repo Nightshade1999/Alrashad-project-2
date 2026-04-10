@@ -113,7 +113,7 @@ export default async function CategoryPage({
 
   const userWard = (profile as any)?.ward_name || null
   const isAdmin = (profile as any)?.role === 'admin'
-  const isMaster = userWard === 'Master' || (isAdmin && (!userWard || userWard === 'Unassigned'))
+  const isMaster = userWard === 'Master' || userWard === 'Master Ward' || (isAdmin && (!userWard || userWard === 'Unassigned'))
   
   // Visibility Policy: Use URL ward if present, else workstation ward (unless it is Master/Unassigned)
   const targetWard = wardFilter || (isMaster ? null : userWard)
