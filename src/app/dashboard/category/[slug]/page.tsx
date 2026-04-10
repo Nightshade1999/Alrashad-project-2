@@ -42,7 +42,14 @@ async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, ta
   }
 
   const { data: patients, error: pError } = await query
-  if (pError) console.error('Supabase query error (patients):', pError)
+  if (pError) {
+    console.error('Supabase query error (patients):', {
+      message: pError.message,
+      details: pError.details,
+      hint: pError.hint,
+      code: pError.code
+    })
+  }
   if (!patients || patients.length === 0) return []
 
   const ids = patients.map((p: any) => p.id)

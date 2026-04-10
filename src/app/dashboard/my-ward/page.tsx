@@ -89,7 +89,12 @@ async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> 
 
   const { data, error } = await query
   if (error) {
-    console.error('Supabase fetch error:', error)
+    console.error('Supabase fetch error:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
   }
   return (data as PatientSummary[]) || []
 }
