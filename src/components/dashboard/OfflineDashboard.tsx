@@ -75,11 +75,18 @@ export function OfflineDashboard() {
 
   const isAdmin = profile?.role?.toLowerCase() === 'admin' || isCachedAdmin || (profile as any)?.metadata_role?.toLowerCase() === 'admin';
 
-  const isMaster = myWardName === 'Master';
-  // Visibility is driven by the active workstation: 'Master' shows all, others are filtered.
-  const scopedList = (myWardName && !isMaster)
-    ? patientList.filter(p => p.ward_name === myWardName)
+  // Visibility Policy: 'Master', 'Unassigned', or missing ward assignment shows all for admins.
+  const isMaster = myWardName === 'Master' || (isAdmin && (!myWardName || myWardName === 'Unassigned'));
+  
+  // Case-Insensitive Filter
+  const filteredList = (myWardName && !isMaster)
+    ? patientList.filter(p => p.ward_name?.toLowerCase() === myWardName.toLowerCase())
     : patientList;
+
+  // Smart Fallback: If filtering returns nothing but there IS data available, show all (prevents blackout).
+  const scopedList = (filteredList.length === 0 && patientList.length > 0)
+    ? patientList
+    : filteredList;
 
   const counts = {
     'High Risk': scopedList.filter(p => p.category === 'High Risk' && !p.is_in_er).length,

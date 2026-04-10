@@ -112,9 +112,10 @@ export default async function CategoryPage({
     .maybeSingle() as any
 
   const userWard = (profile as any)?.ward_name || null
-  const isMaster = userWard === 'Master'
+  const isAdmin = (profile as any)?.role === 'admin'
+  const isMaster = userWard === 'Master' || (isAdmin && (!userWard || userWard === 'Unassigned'))
   
-  // Visibility Policy: Use URL ward if present, else workstation ward (unless it is Master)
+  // Visibility Policy: Use URL ward if present, else workstation ward (unless it is Master/Unassigned)
   const targetWard = wardFilter || (isMaster ? null : userWard)
   
   const dbValue = SERVER_CATEGORY_DB_MAP[slug]

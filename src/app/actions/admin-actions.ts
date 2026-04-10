@@ -307,7 +307,8 @@ export async function getAllPatientsForAdminAction() {
     const prof = profiles.find((f: any) => f.user_id === p.user_id)
     return {
       ...p,
-      doctor_ward: prof?.ward_name || 'Legacy / Unassigned'
+      // Priority: 1. Patient's admitted ward, 2. Doctor's assigned ward, 3. Unassigned
+      doctor_ward: p.ward_name || prof?.ward_name || 'Legacy / Unassigned'
     }
   })
 
