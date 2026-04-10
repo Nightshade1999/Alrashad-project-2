@@ -76,11 +76,17 @@ interface PatientSummary {
 
 async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
   const supabase = createClient()
-  const { data } = await supabase
+  let query = supabase
     .from('patients')
     .select('id, name, room_number, category, is_in_er, last_activity_at')
-    .eq('ward_name', wardName)
     .limit(5000)
+
+  // Master Ward Bypass: Admins or Master Ward users see everyone
+  if (wardName !== 'Master' && wardName !== 'Master Ward') {
+    query = query.eq('ward_name', wardName)
+  }
+
+  const { data } = await query
   return (data as PatientSummary[]) || []
 }
 
