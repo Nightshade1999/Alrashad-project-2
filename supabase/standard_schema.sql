@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 0.1 SCHEMA SYNCHRONIZATION (Ensures all columns exist in all tables)
 DO $$ 
 BEGIN
-    -- user_profiles fixes
+    -- user_profiles fixes (Nuclear Defaults to prevent trigger crashes)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ward_name TEXT DEFAULT 'Unassigned';
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS accessible_wards JSONB DEFAULT '[]'::jsonb;
@@ -18,9 +18,19 @@ BEGIN
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS can_see_ward_patients BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS doctor_name TEXT;
-        -- Ensure default exists for is_admin to prevent trigger failures
+        
+        -- Force re-applying defaults to existing columns
+        ALTER TABLE public.user_profiles ALTER COLUMN ward_name SET DEFAULT 'Unassigned';
+        ALTER TABLE public.user_profiles ALTER COLUMN accessible_wards SET DEFAULT '[]'::jsonb;
+        ALTER TABLE public.user_profiles ALTER COLUMN ai_enabled SET DEFAULT true;
+        ALTER TABLE public.user_profiles ALTER COLUMN offline_mode_enabled SET DEFAULT false;
+        ALTER TABLE public.user_profiles ALTER COLUMN can_see_ward_patients SET DEFAULT false;
         ALTER TABLE public.user_profiles ALTER COLUMN is_admin SET DEFAULT false;
+        ALTER TABLE public.user_profiles ALTER COLUMN role SET DEFAULT 'user';
+        ALTER TABLE public.user_profiles ALTER COLUMN specialty SET DEFAULT 'psychiatry';
     END IF;
+
+    -- ... [rest of sync block remains same]
 
     -- patients fixes
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'patients') THEN
@@ -62,8 +72,8 @@ $$ language 'plpgsql' SET search_path = public;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.user_profiles (user_id, role, specialty, gender, is_admin, doctor_name)
-  VALUES (new.id, 'user', 'psychiatry', null, false, null);
+  INSERT INTO public.user_profiles (user_id)
+  VALUES (new.id);
   RETURN new;
 END;
 $$ language 'plpgsql' SECURITY DEFINER SET search_path = public;
