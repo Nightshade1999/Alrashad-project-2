@@ -61,6 +61,7 @@ export default async function AdminWardsPage() {
   const { data: patients } = await supabase
     .from('patients')
     .select('id, name, room_number, ward_name, category, user_id')
+    .limit(5000)
     
   // Check if current user is indeed an admin (schema check)
   const { data: profile } = await supabase

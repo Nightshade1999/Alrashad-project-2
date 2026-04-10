@@ -167,6 +167,7 @@ export function PatientList({
         .from('patients')
         .select('*')
         .in('id', Array.from(selectedIds))
+        .limit(5000)
 
       if (pError) throw pError
 
@@ -176,6 +177,7 @@ export function PatientList({
         .select('*')
         .in('patient_id', Array.from(selectedIds))
         .order('date', { ascending: false })
+        .limit(5000)
 
       if (iError) throw iError
 
@@ -185,6 +187,7 @@ export function PatientList({
         .select('*')
         .in('patient_id', Array.from(selectedIds))
         .order('visit_date', { ascending: false })
+        .limit(5000)
 
       if (vError) throw vError
 

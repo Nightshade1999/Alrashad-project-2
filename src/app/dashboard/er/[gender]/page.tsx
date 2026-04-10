@@ -36,6 +36,7 @@ export default function GenderErPage({ params }: { params: Promise<{ gender: str
             .eq('is_in_er', true)
             .in('ward_name', validWards)
             .order('created_at', { ascending: false })
+            .limit(5000)
           setPatients(data || [])
         } else {
           setPatients([])

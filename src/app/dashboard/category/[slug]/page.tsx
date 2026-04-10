@@ -111,8 +111,11 @@ export default async function CategoryPage({
     .eq('user_id', userId)
     .maybeSingle() as any
 
-  const isAdmin = (profile as any)?.role === 'admin'
-  const targetWard = wardFilter || (isAdmin ? null : ((profile as any)?.ward_name || null))
+  const userWard = (profile as any)?.ward_name || null
+  const isMaster = userWard === 'Master'
+  
+  // Visibility Policy: Use URL ward if present, else workstation ward (unless it is Master)
+  const targetWard = wardFilter || (isMaster ? null : userWard)
   
   const dbValue = SERVER_CATEGORY_DB_MAP[slug]
   const rows = await fetchRowsOnline(supabase, dbValue, targetWard)

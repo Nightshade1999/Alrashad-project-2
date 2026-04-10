@@ -17,6 +17,7 @@ export function ExportButton() {
       const { data, error } = await supabase
         .from('patients')
         .select('*, investigations(*)')
+        .limit(5000)
       
       if (error) throw error
       

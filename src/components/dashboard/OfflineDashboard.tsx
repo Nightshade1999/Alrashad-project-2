@@ -75,10 +75,11 @@ export function OfflineDashboard() {
 
   const isAdmin = profile?.role?.toLowerCase() === 'admin' || isCachedAdmin || (profile as any)?.metadata_role?.toLowerCase() === 'admin';
 
-  // For non-admins, scope the count to their assigned ward only
-  const scopedList = isAdmin || !myWardName
-    ? patientList
-    : patientList.filter(p => p.ward_name === myWardName);
+  const isMaster = myWardName === 'Master';
+  // Visibility is driven by the active workstation: 'Master' shows all, others are filtered.
+  const scopedList = (myWardName && !isMaster)
+    ? patientList.filter(p => p.ward_name === myWardName)
+    : patientList;
 
   const counts = {
     'High Risk': scopedList.filter(p => p.category === 'High Risk' && !p.is_in_er).length,

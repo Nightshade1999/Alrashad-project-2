@@ -22,7 +22,7 @@ const DatabaseContext = createContext<DatabaseContextValue | null>(null);
 function buildPatientApi(supabase: any) {
   return {
     list: async (wardName?: string) => {
-      let query = supabase.from('patients').select('*').neq('category', 'Deceased/Archive');
+      let query = supabase.from('patients').select('*').neq('category', 'Deceased/Archive').limit(5000);
       if (wardName && wardName !== 'Master') {
         query = query.eq('ward_name', wardName);
       }

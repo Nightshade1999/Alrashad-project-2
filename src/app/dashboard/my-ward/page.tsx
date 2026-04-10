@@ -80,6 +80,7 @@ async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> 
     .from('patients')
     .select('id, name, room_number, category, is_in_er')
     .eq('ward_name', wardName)
+    .limit(5000)
   return (data as PatientSummary[]) || []
 }
 
