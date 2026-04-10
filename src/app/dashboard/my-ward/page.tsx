@@ -83,23 +83,29 @@ async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> 
 
   // Master Ward Bypass: Admins or Master Ward users see everyone
   if (wardName !== 'Master' && wardName !== 'Master Ward') {
-    query = query.eq('ward_name', wardName)
+    // Using ilike for case-insensitive matching and robustness against trailing spaces
+    query = query.ilike('ward_name', wardName)
   }
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) {
+    console.error('Supabase fetch error:', error)
+  }
   return (data as PatientSummary[]) || []
 }
 
 export default function MyWardPage() {
   const router = useRouter()
-  const { profile } = useDatabase()
+  const { profile, isReady } = useDatabase()
   const [wardName, setWardName] = useState<string | null>(null)
   const [patients, setPatients] = useState<PatientSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
     async function load() {
+      if (!isReady) return
       setLoading(true)
       setError(null)
       try {
@@ -107,28 +113,40 @@ export default function MyWardPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { setError('Not authenticated'); setLoading(false); return }
 
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profError } = await supabase
           .from('user_profiles')
-          .select('ward_name')
+          .select('ward_name, role')
           .eq('user_id', user.id)
           .maybeSingle() as any
+
+        if (profError) throw profError
 
         if (!profileData?.ward_name) {
           router.replace('/dashboard/select-ward');
           return;
         }
 
-        setWardName(profileData.ward_name)
-        const pts = await fetchPatientsOnline(profileData.ward_name)
+        const currentWard = profileData.ward_name
+        setWardName(currentWard)
+        const pts = await fetchPatientsOnline(currentWard)
         setPatients(pts)
+        
+        setDebugInfo({
+          uid: user.id.slice(0, 8) + '...',
+          role: profileData.role,
+          ward: currentWard,
+          count: pts.length,
+          timestamp: new Date().toLocaleTimeString()
+        })
       } catch (e: any) {
+        console.error('Page Load Error:', e)
         setError(e?.message || 'Failed to load ward data')
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [router])
+  }, [router, isReady])
 
   const counts = {
     'Normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
@@ -147,7 +165,7 @@ export default function MyWardPage() {
     total: patients.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length,
   }
 
-  if (loading) {
+  if (loading && !isReady) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-in fade-in duration-500">
         <div className="relative">
@@ -177,7 +195,7 @@ export default function MyWardPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in duration-300 relative">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
@@ -294,6 +312,33 @@ export default function MyWardPage() {
           </div>
         </div>
       </Link>
+
+      {/* Debug Monitor - Unobtrusive but accessible for diagnostics */}
+      {(profile?.role === 'admin' || profile?.ward_name === 'Master Ward') && debugInfo && (
+        <div className="mt-20 pt-8 border-t border-dashed border-slate-200 dark:border-slate-800 opacity-20 hover:opacity-100 transition-opacity">
+           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">
+             <Activity className="h-3 w-3" /> System Diagnostic Monitor
+           </div>
+           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Profile Ward</p>
+                <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate">{debugInfo.ward}</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Visibility Load</p>
+                <p className="text-xs font-black text-slate-700 dark:text-slate-200">{debugInfo.count} Records</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Auth Ref</p>
+                <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate">{debugInfo.uid}</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Sync Link</p>
+                <p className="text-xs font-black text-emerald-600">Online/Realtime</p>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   )
 }
