@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '50mb',
     },
   },
-};
+  // Allow mobile device to access dev resources without being blocked as cross-origin
+  allowedDevOrigins: ['192.168.0.120', '192.168.0.120:3000'],
+} as any;
 
 export default nextConfig;

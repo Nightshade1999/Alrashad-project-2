@@ -9,11 +9,26 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
   const performanceMetrics = useMemo(() => {
     if (!users || !patients) return []
 
-    return users.map(user => {
-      const userPatients = patients.filter(p => p.user_id === user.id)
+    // 1. Exclude ADMIN accounts from performance analysis
+    const clinicalDoctors = users.filter(u => u.role !== 'admin')
+
+    return clinicalDoctors.map(user => {
+      // 2. Caseload: Patients matching this user's assigned wards OR patients they personally added
+      const userPatients = patients.filter(p => {
+        const isInAssignedWard = p.ward_name && (
+          p.ward_name === user.ward_name || 
+          user.accessible_wards?.includes(p.ward_name)
+        )
+        const isOwner = p.user_id === user.id
+        return isInAssignedWard || isOwner
+      })
       const totalPatients = userPatients.length
       const highRiskCount = userPatients.filter(p => p.category === 'High Risk').length
       
+      // 3. Ward Analysis: Identify which clinical wards this doctor is active in
+      const activeWards = Array.from(new Set(userPatients.map(p => p.ward_name || 'Unassigned')))
+      const primaryActiveWard = activeWards.length > 0 ? activeWards[0] : (user.ward_name || 'Unassigned')
+
       let totalVisits = 0
       let overduePatients = 0
 
@@ -22,26 +37,13 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
         const iCount = p.investigations?.length || 0
         totalVisits += (vCount + iCount)
 
-        // Only calculate overdue strictly for Internal Medicine residents
-        if (user.specialty === 'internal_medicine') {
-          // Find the most recent date between all visits and investigations
-          let latestDate = new Date(p.created_at) // Default to creation date if no visits
-
-          if (p.visits && p.visits.length > 0) {
-            const lastVisit = [...p.visits].sort((a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
-            if (lastVisit && new Date(lastVisit.visit_date) > latestDate) {
-              latestDate = new Date(lastVisit.visit_date)
-            }
-          }
-
-          if (p.investigations && p.investigations.length > 0) {
-            const lastInv = [...p.investigations].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-            if (lastInv && new Date(lastInv.date) > latestDate) {
-              latestDate = new Date(lastInv.date)
-            }
-          }
-
-          const daysSinceLastAction = Math.floor((new Date().getTime() - latestDate.getTime()) / (1000 * 3600 * 24))
+        // Only calculate overdue strictly for Internal Medicine residents or high-risk psychiatry
+        if (user.specialty === 'internal_medicine' || p.category === 'High Risk') {
+          
+          // TRUE REALITY: Use the recently added high-precision last_activity_at
+          // Fallback to p.created_at if last_activity_at is null
+          const lastActivityDate = p.last_activity_at ? new Date(p.last_activity_at) : new Date(p.created_at)
+          const daysSinceLastAction = Math.floor((new Date().getTime() - lastActivityDate.getTime()) / (1000 * 3600 * 24))
           
           let isOverdue = false
           if (p.category === 'High Risk' && daysSinceLastAction > 7) isOverdue = true
@@ -57,6 +59,8 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
 
       return {
         ...user,
+        displayWard: primaryActiveWard,
+        otherWards: activeWards.filter(w => w !== primaryActiveWard),
         totalPatients,
         highRiskCount,
         totalVisits,
@@ -65,7 +69,7 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
         complianceRate
       }
     }).sort((a, b) => {
-      // Sort so Internal Medicine and Overdue naturally rise up, then by total patients
+      // Sort so Overdue naturally rise up, then by total patients
       if (a.overduePatients !== b.overduePatients) return b.overduePatients - a.overduePatients
       return b.totalPatients - a.totalPatients
     })
@@ -74,6 +78,7 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
   const filteredMetrics = useMemo(() => {
     return performanceMetrics.filter(m => 
       m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.displayWard?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.ward_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [performanceMetrics, searchTerm])
@@ -115,7 +120,14 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
                   {perf.email.split('@')[0]}
                 </h3>
                 <div className="flex flex-col gap-0.5 mt-0.5">
-                  <span className="text-xs font-medium text-slate-500">{perf.ward_name}</span>
+                  <span className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5 break-all">
+                    {perf.displayWard}
+                    {perf.otherWards.length > 0 && (
+                      <span className="text-[9px] px-1 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded ring-1 ring-slate-200 dark:ring-slate-700 whitespace-nowrap">
+                        +{perf.otherWards.length} more
+                      </span>
+                    )}
+                  </span>
                   <span className={`text-[10px] font-bold uppercase tracking-wider w-fit px-1.5 py-0.5 rounded ${perf.specialty === 'internal_medicine' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'}`}>
                     {perf.specialty === 'internal_medicine' ? 'IM Resident' : 'Psych Resident'}
                   </span>

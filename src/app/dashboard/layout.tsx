@@ -36,13 +36,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <div className="flex h-14 sm:h-18 items-center justify-between px-3 sm:px-8 max-w-screen-2xl mx-auto w-full gap-2">
           
           {/* Left: Nav Controls + Logo + Ward Name */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
             <NavigationButtons />
-            <Link href="/dashboard" className="flex items-center gap-3 transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer">
-              <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md shadow-teal-500/20 shrink-0">
-                <Stethoscope className="h-5 w-5 text-white" />
+            <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3 transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer min-w-0">
+              <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md shadow-teal-500/20 shrink-0">
+                <Stethoscope className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-white" />
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0">
                 <WardHeader />
               </div>
             </Link>

@@ -31,9 +31,13 @@ export async function addVisitAction(payload: any) {
     const isEnforcedEr = patient?.is_in_er || payload.is_er || false
 
     // 2. Combine Date and Time into a single timestamp
+    const now = new Date()
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+    const ms = String(now.getMilliseconds()).padStart(3, '0')
+
     const combinedDateTime = payload.visit_date && payload.visit_time 
-      ? `${payload.visit_date}T${payload.visit_time}:00` 
-      : new Date().toISOString()
+      ? `${payload.visit_date}T${payload.visit_time}:${seconds}.${ms}` 
+      : now.toISOString()
 
     // 3. Sanitize numeric fields to prevent NaN errors
     const sanitizedPayload = {
@@ -69,9 +73,16 @@ export async function addVisitAction(payload: any) {
       }
     }
 
+    // 4. Update the patient's master activity date
+    await supabase
+      .from('patients')
+      .update({ last_activity_at: combinedDateTime })
+      .eq('id', payload.patient_id)
+
     // Revalidate paths
     revalidatePath(`/patient/${payload.patient_id}/visits`)
     revalidatePath(`/patient/${payload.patient_id}`)
+    revalidatePath('/dashboard/my-ward')
     return { success: true }
   } catch (err: any) {
     console.error("Critical Add Visit Action Failure:", err)
@@ -113,9 +124,13 @@ export async function addInvestigationAction(payload: any) {
       .single()
 
     // 2. Combine Date and Time
+    const now = new Date()
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+    const ms = String(now.getMilliseconds()).padStart(3, '0')
+
     const combinedDateTime = payload.date && payload.time
-      ? `${payload.date}T${payload.time}:00`
-      : new Date().toISOString()
+      ? `${payload.date}T${payload.time}:${seconds}.${ms}`
+      : now.toISOString()
 
     // 3. Sanitize lab values to prevent NaN errors
     const sanitizedLabs: Record<string, any> = {}
@@ -157,8 +172,15 @@ export async function addInvestigationAction(payload: any) {
       }
     }
 
+    // 5. Update the patient's master activity date
+    await supabase
+      .from('patients')
+      .update({ last_activity_at: combinedDateTime })
+      .eq('id', payload.patient_id)
+
     revalidatePath(`/patient/${payload.patient_id}/investigations`)
     revalidatePath(`/patient/${payload.patient_id}`)
+    revalidatePath('/dashboard/my-ward')
     return { success: true }
   } catch (err: any) {
     console.error("Critical Add Investigation Action Failure:", err)

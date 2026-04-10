@@ -107,30 +107,35 @@ export default function WardTasksPage() {
   return (
     <div className="space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-200 dark:border-slate-800 pb-8">
-        <div className="flex items-center gap-4">
-          <NavigationButtons />
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-slate-200 dark:border-slate-800 pb-8">
+        <div className="flex items-start sm:items-center gap-4 w-full">
+          <div className="shrink-0 mt-1 sm:mt-0">
+            <NavigationButtons />
+          </div>
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2.5 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-2xl shadow-sm shadow-amber-500/10">
-                <LayoutList className="h-6 w-6" />
+              <div className="p-2 sm:p-2.5 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-xl sm:rounded-2xl shadow-sm shadow-amber-500/10">
+                <LayoutList className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 italic">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 italic">
                 Ward Tasks
               </h1>
             </div>
-            <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-sm sm:text-lg text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-sm sm:max-w-none">
               Manage clinical reminders and pending patient tasks for today.
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <AddReminderModal isGlobal={true} />
-          <Link href={userRole === 'admin' ? "/admin/manage?tab=reminders" : "/dashboard/archive"}>
-            <Button variant="outline" className="h-10 rounded-xl border-slate-200 dark:border-slate-800 gap-2 font-bold text-xs uppercase tracking-widest">
+        <div className="flex items-center gap-2 sm:gap-3 w-full lg:w-auto">
+          <div className="flex-1 lg:flex-none">
+            <AddReminderModal isGlobal={true} />
+          </div>
+          <Link href={userRole === 'admin' ? "/admin/manage?tab=reminders" : "/dashboard/archive"} className="flex-1 lg:flex-none">
+            <Button variant="outline" className="w-full lg:w-auto h-10 rounded-xl border-slate-200 dark:border-slate-800 gap-2 font-bold text-[10px] sm:text-xs uppercase tracking-widest">
               <History className="h-4 w-4" />
-              Archive
+              <span className="hidden sm:inline">Archive</span>
+              <span className="sm:hidden">History</span>
             </Button>
           </Link>
         </div>
@@ -158,25 +163,23 @@ export default function WardTasksPage() {
                 className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm transition-all hover:shadow-xl hover:border-amber-200 dark:hover:border-amber-900/50 animate-in fade-in zoom-in-95 duration-300"
               >
                 {/* Task Context */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   {r.patient_id ? (
                     <Link 
                       href={`/patient/${r.patient_id}`}
-                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-600 hover:text-amber-700 transition-colors bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-full"
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-600 hover:text-amber-700 transition-colors bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 rounded-full truncate max-w-full"
                     >
-                      <UserPlus className="h-3 w-3" />
-                      {r.patients?.name || "Patient Information"}
-                      <ChevronRight className="h-2.5 w-2.5" />
+                      <UserPlus className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{r.patients?.name || "Patient Information"}</span>
+                      <ChevronRight className="h-2.5 w-2.5 shrink-0" />
                     </Link>
                   ) : (
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1.5 rounded-full leading-none">
-                        <CheckCircle2 className="h-3 w-3" />
-                        General Ward Task
-                      </div>
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1.5 rounded-full leading-none truncate max-w-full">
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                      <span className="truncate">General Ward Task</span>
                     </div>
                   )}
-                  <div className="text-[10px] font-bold text-slate-400 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                  <div className="text-[10px] font-bold text-slate-400 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-full ml-auto">
                     <Calendar className="h-3 w-3" />
                     {r.reminder_date}
                   </div>
@@ -203,43 +206,42 @@ export default function WardTasksPage() {
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between gap-6 border-t border-slate-100 dark:border-slate-800 pt-5">
+                 <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-800 pt-5">
                   <div className="flex items-center gap-2 opacity-60">
-                    <span className="text-[10px] font-serif italic uppercase tracking-widest text-slate-500">Signed:</span>
-                    <span className="text-[10px] font-black uppercase text-slate-700 dark:text-slate-100">
-                      Dr. {r.created_by_name}
+                    <span className="text-[9px] sm:text-[10px] font-serif italic uppercase tracking-widest text-slate-500">Signed:</span>
+                    <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-700 dark:text-slate-100">
+                      Dr. {r.created_by_name?.split(' ')[0]}
                     </span>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
+ 
+                   {/* Actions - Scrollable or Flexible Bar */}
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
                     <Button 
                       variant="ghost" 
-                      size="sm" 
                       onClick={() => { setActiveResolve(r.id); setActiveReschedule(null); setActiveEdit(null); setResolveNotes(''); }}
-                      className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl"
+                      className="flex-1 sm:flex-none h-9 px-3 sm:px-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl"
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
-                      Resolve
+                      <CheckCircle2 className="h-3.5 w-3.5 sm:mr-2 shrink-0" />
+                      <span className="hidden sm:inline">Resolve</span>
+                      <span className="sm:hidden">Confirm</span>
                     </Button>
                     <Button 
                       variant="ghost" 
-                      size="sm" 
                       onClick={() => { setActiveReschedule(r.id); setActiveResolve(null); setActiveEdit(null); setUpdatedNotes(r.notes); }}
-                      className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-xl"
+                      className="flex-1 sm:flex-none h-9 px-3 sm:px-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-xl"
                     >
-                      <RotateCcw className="h-3.5 w-3.5 mr-2" />
-                      Reschedule
+                      <RotateCcw className="h-3.5 w-3.5 sm:mr-2 shrink-0" />
+                      <span className="hidden sm:inline">Reschedule</span>
+                      <span className="sm:hidden">Delay</span>
                     </Button>
                     
                     {(r.created_by === userId || userRole === 'admin') && (
                       <Button 
                         variant="ghost" 
-                        size="sm" 
                         onClick={() => { setActiveEdit(r.id); setActiveResolve(null); setActiveReschedule(null); setEditNotes(r.notes); setEditDate(r.reminder_date); }}
-                        className="h-9 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl"
+                        className="flex-1 sm:flex-none h-9 px-3 sm:px-4 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl"
                       >
-                        <MessageSquareCode className="h-3.5 w-3.5 mr-2" />
+                        <MessageSquareCode className="h-3.5 w-3.5 sm:mr-2 shrink-0" />
                         Edit
                       </Button>
                     )}

@@ -128,9 +128,9 @@ export function AddPatientModal() {
       medical_drugs: medicalDrugs,
       psych_drugs: psychDrugs,
       allergies: allergies,
-      mother_name: formData.get('motherName') as string || null,
       medical_record_number: formData.get('medicalRecordNumber') as string || null,
       psychological_diagnosis: formData.get('diagnosis') as string || null,
+      last_activity_at: new Date().toISOString(),
     }
 
     if (category === 'High Risk') {

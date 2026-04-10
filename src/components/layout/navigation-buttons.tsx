@@ -99,10 +99,10 @@ function NavigationButtonsInner() {
           variant="ghost"
           size="icon"
           onClick={() => router.push(parentRoute)}
-          className="h-9 w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-95"
+          className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-90"
           title="Go Back"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5.5 w-5.5 sm:h-5 sm:w-5" />
         </Button>
       )}
 
@@ -112,10 +112,10 @@ function NavigationButtonsInner() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-95"
+              className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-all active:scale-90"
               title="Home Dashboard"
             >
-              <Home className="h-5 w-5" />
+              <Home className="h-5.5 w-5.5 sm:h-5 sm:w-5" />
             </Button>
           </Link>
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-1" />

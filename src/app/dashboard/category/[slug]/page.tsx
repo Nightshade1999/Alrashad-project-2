@@ -73,16 +73,27 @@ async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, ta
     }
   }
 
-  return patients.map((p: any) => ({
-    id: p.id, name: p.name, age: getDynamicAge(p.age, p.created_at), room_number: p.room_number,
-    chronic_diseases: p.chronic_diseases, category: p.category,
-    lastHba1c: latestInv[p.id]?.hba1c ?? null, lastHb: latestInv[p.id]?.hb ?? null,
-    lastVisit: p.last_activity_at || latestVisit[p.id]?.date || null,
-    lastBpSys: latestVisit[p.id]?.bp_sys ?? null, lastBpDia: latestVisit[p.id]?.bp_dia ?? null,
-    lastPr: latestVisit[p.id]?.pr ?? null, lastSpo2: latestVisit[p.id]?.spo2 ?? null,
-    lastTemp: latestVisit[p.id]?.temp ?? null,
-    date_of_death: p.date_of_death, cause_of_death: p.cause_of_death, previous_category: p.previous_category,
-  }))
+  return patients.map((p: any) => {
+    const lVisit = latestVisit[p.id]?.date || null
+    const lInv = investigations?.find((inv: any) => inv.patient_id === p.id)?.date || null
+    
+    // True Reality: Max of master activity, latest visit log, latest inv log, or creation date
+    const dates = [p.last_activity_at, lVisit, lInv, p.created_at].filter(Boolean) as string[]
+    const trueLastActivity = dates.length > 0 
+      ? dates.reduce((a, b) => new Date(a) > new Date(b) ? a : b)
+      : null
+
+    return {
+      id: p.id, name: p.name, age: getDynamicAge(p.age, p.created_at), room_number: p.room_number,
+      chronic_diseases: p.chronic_diseases, category: p.category,
+      lastHba1c: latestInv[p.id]?.hba1c ?? null, lastHb: latestInv[p.id]?.hb ?? null,
+      lastVisit: trueLastActivity,
+      lastBpSys: latestVisit[p.id]?.bp_sys ?? null, lastBpDia: latestVisit[p.id]?.bp_dia ?? null,
+      lastPr: latestVisit[p.id]?.pr ?? null, lastSpo2: latestVisit[p.id]?.spo2 ?? null,
+      lastTemp: latestVisit[p.id]?.temp ?? null,
+      date_of_death: p.date_of_death, cause_of_death: p.cause_of_death, previous_category: p.previous_category,
+    }
+  })
 }
 
 export default async function CategoryPage({ 

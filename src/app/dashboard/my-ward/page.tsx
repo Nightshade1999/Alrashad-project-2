@@ -72,13 +72,14 @@ interface PatientSummary {
   category: string
   is_in_er: boolean
   last_activity_at: string | null
+  created_at: string
 }
 
 async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
   const supabase = createClient()
   let query = supabase
     .from('patients')
-    .select('id, name, room_number, category, is_in_er, last_activity_at')
+    .select('id, name, room_number, category, is_in_er, last_activity_at, created_at')
     .limit(5000)
 
   // Master Ward Bypass: Admins or Master Ward users see everyone
@@ -154,12 +155,16 @@ export default function MyWardPage() {
   }, [router, isReady])
 
   const counts = {
-    'Normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
-    'ER Patients': patients.filter(p => p.is_in_er).length,
-    'Deceased/Archive': patients.filter(p => p.category === 'Deceased/Archive').length,
+    'high-risk': patients.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
+    'close-follow-up': patients.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
+    'normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
+    'er-patients': patients.filter(p => p.is_in_er).length,
+    'archive': patients.filter(p => p.category === 'Deceased/Archive').length,
     'pending-follow-up': patients.filter(p => {
       if (p.category === 'Deceased/Archive' || p.is_in_er) return false;
-      const last = p.last_activity_at ? new Date(p.last_activity_at).getTime() : 0;
+      const last = (p.last_activity_at || p.created_at) 
+        ? new Date(p.last_activity_at || p.created_at).getTime() 
+        : 0;
       const ageDays = (Date.now() - last) / (1000 * 60 * 60 * 24);
       
       if (p.category === 'High Risk') return ageDays > 7;
@@ -203,11 +208,11 @@ export default function MyWardPage() {
     <div className="space-y-8 animate-in fade-in duration-300 relative">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
-            My Ward {wardName && <span className="text-slate-400 font-medium">({wardName})</span>}
+        <div className="pt-2">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100 italic">
+            My Ward {wardName && <span className="text-slate-400 font-medium not-italic">({wardName})</span>}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm font-medium text-muted-foreground mt-1">
             {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted
           </p>
         </div>
@@ -226,10 +231,10 @@ export default function MyWardPage() {
         <DashboardSearch patients={patients || []} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {CATEGORIES.map((cat, index) => {
           const Icon = cat.icon
-          const count = counts[cat.dbValue as keyof typeof counts] as number
+          const count = counts[cat.slug as keyof typeof counts] as number
           return (
             <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`} prefetch={true}>
               <div
@@ -237,16 +242,16 @@ export default function MyWardPage() {
                 style={{ animationDelay: `${index * 60}ms` }}
               >
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cat.gradient}`} />
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-2.5 rounded-xl ${cat.iconBg} group-hover:scale-110 transition-transform duration-300`}>
-                    <Icon className={`h-5 w-5 ${cat.iconColor}`} />
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className={`p-2 rounded-lg sm:rounded-xl ${cat.iconBg} group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${cat.iconColor}`} />
                   </div>
-                  <span className="text-2xl">{cat.dot}</span>
+                  <span className="text-xl sm:text-2xl">{cat.dot}</span>
                 </div>
-                <div className={`text-4xl font-bold mb-1 ${cat.slug === 'pending-follow-up' && count > 0 ? 'text-rose-600 dark:text-rose-400' : cat.countColor}`}>
+                <div className={`text-2xl sm:text-4xl font-bold mb-0.5 sm:mb-1 ${cat.slug === 'pending-follow-up' && count > 0 ? 'text-rose-600 dark:text-rose-400' : cat.countColor}`}>
                   {count}
                 </div>
-                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{cat.label}</div>
+                <div className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{cat.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {cat.slug === 'pending-follow-up' 
                     ? (count === 0 ? 'All caught up' : `${count} overdue patient${count !== 1 ? 's' : ''}`)

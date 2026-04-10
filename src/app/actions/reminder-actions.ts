@@ -137,30 +137,45 @@ export async function getTodayRemindersAction() {
 }
 
 export async function getTodayRemindersCountAction() {
-  const supabase = await getSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { count: 0 }
+  const start = Date.now();
+  try {
+    const supabase = await getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { count: 0 }
 
-  const { data: profile } = await (supabase.from('user_profiles') as any).select('role, specialty, gender').eq('user_id', user.id).single()
-  if (!profile) return { count: 0 }
+    const { data: profile } = await (supabase.from('user_profiles') as any).select('role, specialty, gender').eq('user_id', user.id).single()
+    if (!profile) return { count: 0 }
 
-  const today = await getBaghdadDate()
+    const today = await getBaghdadDate()
 
-  let query = (supabase.from('reminders') as any)
-    .select('*', { count: 'exact', head: true })
-    .lte('reminder_date', today)
-    .eq('status', 'pending')
+    let query = (supabase.from('reminders') as any)
+      .select('*', { count: 'exact', head: true })
+      .lte('reminder_date', today)
+      .eq('status', 'pending')
 
-  if (profile.role !== 'admin') {
-    query = query.eq('target_specialty', profile.specialty)
-    if (profile.specialty === 'internal_medicine' && profile.gender) {
-      query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+    if (profile.role !== 'admin') {
+      query = query.eq('target_specialty', profile.specialty)
+      if (profile.specialty === 'internal_medicine' && profile.gender) {
+        query = query.or(`target_gender.eq.${profile.gender},target_gender.is.null`)
+      }
     }
-  }
 
-  const { count, error } = await query
-  if (error) return { count: 0 }
-  return { count: count || 0 }
+    const { count, error } = await query
+    
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.warn(`getTodayRemindersCountAction: SLOW query (${duration}ms) for ${user.email}`);
+    }
+
+    if (error) {
+      console.error('Count query error:', error.message);
+      return { count: 0 };
+    }
+    return { count: count || 0 }
+  } catch (err: any) {
+    console.error('getTodayRemindersCountAction crash:', err.message);
+    return { count: 0 };
+  }
 }
 
 export async function getRemindersArchiveAction() {

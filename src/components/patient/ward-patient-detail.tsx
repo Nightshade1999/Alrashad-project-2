@@ -75,8 +75,8 @@ export function WardPatientDetail({
       {isDeceased && (
         <div className="bg-slate-900 border border-slate-800 text-slate-100 p-3 rounded-2xl flex items-center justify-between shadow-lg animate-fade-in-up">
           <div className="flex items-center gap-3">
-            <div className="bg-slate-800 p-2 rounded-xl">
-              <Activity className="h-4 w-4 text-red-400" />
+            <div className="bg-slate-800 p-2.5 rounded-xl">
+              <Activity className="h-5 w-5 text-red-400" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Classification</p>
@@ -93,8 +93,8 @@ export function WardPatientDetail({
       {!isDeceased && patient.is_referred && (
         <div className="bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-900/50 p-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-fade-in-up">
           <div className="flex items-center gap-3">
-            <div className="bg-orange-100 dark:bg-orange-900/60 p-2 rounded-xl shrink-0">
-              <Ambulance className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <div className="bg-orange-100 dark:bg-orange-900/60 p-2.5 rounded-xl shrink-0">
+              <Ambulance className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-orange-500 dark:text-orange-400">Current Status</p>
@@ -117,8 +117,8 @@ export function WardPatientDetail({
       {!isDeceased && patient.is_in_er && (
         <div className="bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/50 p-3 rounded-2xl flex items-center justify-between shadow-sm animate-fade-in-up">
           <div className="flex items-center gap-3">
-            <div className="bg-rose-100 dark:bg-rose-900/60 p-2 rounded-xl">
-              <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            <div className="bg-rose-100 dark:bg-rose-900/60 p-2.5 rounded-xl">
+              <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400" />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 dark:text-rose-400">Current Status</p>
@@ -135,20 +135,20 @@ export function WardPatientDetail({
 
       {/* ── Top bar ── */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col xs:flex-row items-center justify-between w-full gap-3">
+          <div className="flex items-center gap-2.5 w-full min-w-0">
             <NavigationButtons />
-            <div className="min-w-0">
-              <h1 className={`text-lg sm:text-xl font-black leading-tight truncate ${isDeceased ? 'text-slate-500 line-through' : 'text-slate-900 dark:text-white'}`} dir="auto">
+            <div className="min-w-0 flex-1">
+              <h1 className={`text-xl sm:text-2xl font-black leading-tight truncate ${isDeceased ? 'text-slate-500 line-through' : 'text-slate-900 dark:text-white'}`} dir="auto">
                 {patient.name}
               </h1>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <p className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">
                 {!patient.age && patient.age !== 0 ? 'N/A' : `${patient.age}y`} · {patient.gender} · {patient.ward_name || 'General Ward'} · Room {patient.room_number}
               </p>
             </div>
           </div>
           {!isDeceased && (
-            <div className="shrink-0 scale-90 sm:scale-100 origin-right">
+            <div className="shrink-0 w-full xs:w-auto flex justify-end">
               <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
             </div>
           )}

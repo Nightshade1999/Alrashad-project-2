@@ -157,7 +157,16 @@
   input, 
   select, 
   textarea {
-    @apply min-h-12 min-w-12;
+    @apply min-h-12 min-w-12 transition-all active:scale-95 cursor-pointer;
+  }
+}
+
+/* Enhanced Mobile Touch Feedback */
+@media (hover: none) {
+  button:active, 
+  [role="button"]:active,
+  a:active {
+    @apply opacity-70 scale-[0.97];
   }
 }
 
@@ -246,11 +255,16 @@ html, body {
   text-size-adjust: none;
   /* Smooth scrolling for native feel */
   scroll-behavior: smooth;
-  /* Respect iOS notch / home bar */
-  padding-top: env(safe-area-inset-top);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
+  /* Standard mobile height fixes */
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  
+  /* Safe Area Support */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
 }
 
 /* Remove iOS tap flash on interactive elements */

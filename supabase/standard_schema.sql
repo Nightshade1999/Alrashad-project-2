@@ -30,28 +30,61 @@ BEGIN
         ALTER TABLE public.user_profiles ALTER COLUMN specialty SET DEFAULT 'psychiatry';
     END IF;
 
-    -- ... [rest of sync block remains same]
-
-    -- patients fixes
+    -- patients fixes (Comprehensive alignment with latest frontend types)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'patients') THEN
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS ward_name TEXT NOT NULL DEFAULT 'General Ward';
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS is_in_er BOOLEAN DEFAULT false;
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS er_treatment JSONB DEFAULT '[]'::jsonb;
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS education_level TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS mother_name TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS medical_record_number TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS psychological_diagnosis TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS relative_status TEXT DEFAULT 'Unknown';
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS relative_visits TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS date_of_death DATE;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS cause_of_death TEXT;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS admission_date TIMESTAMPTZ;
         
+        -- Handle terminology migration (education -> education_level)
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='patients' AND column_name='education') THEN
+            UPDATE public.patients SET education_level = education WHERE education_level IS NULL;
+        END IF;
+
         -- Initialize last_activity_at if missing
         UPDATE public.patients SET last_activity_at = COALESCE(er_admission_date, created_at) WHERE last_activity_at IS NULL;
     END IF;
 
-    -- visits fixes
+    -- visits fixes (Vital signs terminology sync)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'visits') THEN
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_er BOOLEAN DEFAULT false;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS bp_sys INTEGER;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS bp_dia INTEGER;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS pr INTEGER;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS spo2 INTEGER;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS temp NUMERIC;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_conscious BOOLEAN DEFAULT true;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_oriented BOOLEAN DEFAULT true;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_ambulatory BOOLEAN DEFAULT true;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_dyspnic BOOLEAN DEFAULT false;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_soft_abdomen BOOLEAN DEFAULT true;
+
+        -- Terminology migration
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='bp_systolic') THEN
+            UPDATE public.visits SET bp_sys = bp_systolic WHERE bp_sys IS NULL;
+        END IF;
     END IF;
 
     -- investigations fixes
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'investigations') THEN
         ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS is_er BOOLEAN DEFAULT false;
         ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS serology JSONB DEFAULT '{}'::jsonb;
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS tg NUMERIC;
+        
+        -- Terminology migration
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='investigations' AND column_name='triglycerides') THEN
+            UPDATE public.investigations SET tg = triglycerides WHERE tg IS NULL;
+        END IF;
     END IF;
 
     -- reminders fixes
@@ -117,18 +150,29 @@ CREATE TABLE IF NOT EXISTS public.patients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- Original owner
     name TEXT NOT NULL,
-    age INTEGER NOT NULL,
+    age INTEGER,
     gender TEXT NOT NULL,
     ward_name TEXT NOT NULL DEFAULT 'General Ward',
     room_number TEXT,
     category TEXT NOT NULL DEFAULT 'Normal',
     province TEXT,
-    education TEXT,
-    past_surgeries TEXT,
-    chronic_diseases TEXT,
-    psych_drugs TEXT,
-    medical_drugs TEXT,
-    allergies TEXT,
+    education_level TEXT,
+    mother_name TEXT,
+    medical_record_number TEXT,
+    psychological_diagnosis TEXT,
+    relative_status TEXT DEFAULT 'Unknown',
+    relative_visits TEXT,
+    date_of_death DATE,
+    cause_of_death TEXT,
+    admission_date TIMESTAMPTZ,
+    last_activity_at TIMESTAMPTZ,
+    
+    -- Clinical Arrays (Optimized for PWA)
+    past_surgeries TEXT[] DEFAULT '{}',
+    chronic_diseases JSONB DEFAULT '[]'::jsonb,
+    psych_drugs JSONB DEFAULT '[]'::jsonb,
+    medical_drugs JSONB DEFAULT '[]'::jsonb,
+    allergies TEXT[] DEFAULT '{}',
     
     -- ER Specific Fields
     is_in_er BOOLEAN DEFAULT false,
@@ -152,16 +196,19 @@ CREATE TABLE IF NOT EXISTS public.visits (
     exam_notes TEXT NOT NULL,
     is_er BOOLEAN DEFAULT false,
     
-    -- Vitals
-    bp_systolic INTEGER,
-    bp_diastolic INTEGER,
-    pulse INTEGER,
-    resp_rate INTEGER,
-    temp NUMERIC(3,1),
-    saturation INTEGER,
-    weight INTEGER,
-    glucose INTEGER,
-    pain_score INTEGER,
+    -- Vitals (Synced with frontend types)
+    bp_sys INTEGER,
+    bp_dia INTEGER,
+    pr INTEGER,
+    spo2 INTEGER,
+    temp NUMERIC,
+    
+    -- Clinical Status
+    is_conscious BOOLEAN DEFAULT true,
+    is_oriented BOOLEAN DEFAULT true,
+    is_ambulatory BOOLEAN DEFAULT true,
+    is_dyspnic BOOLEAN DEFAULT false,
+    is_soft_abdomen BOOLEAN DEFAULT true,
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -198,7 +245,7 @@ CREATE TABLE IF NOT EXISTS public.investigations (
     
     -- Lipid Profile
     cholesterol NUMERIC,
-    triglycerides NUMERIC,
+    tg NUMERIC,
     hdl NUMERIC,
     ldl NUMERIC,
     
@@ -270,7 +317,7 @@ RETURNS TEXT AS $$
   SELECT ward_name FROM public.user_profiles WHERE user_id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
--- 5. ROW LEVEL SECURITY (HARDENED)
+-- 5. ROW LEVEL SECURITY (HARDENED - WARD RESTRICTED)
 
 DO $$ 
 BEGIN
@@ -296,48 +343,50 @@ END $$;
 
 -- User Profiles: Self-read, Self-update, Admin All
 CREATE POLICY "Profiles_Self_Access" ON public.user_profiles 
-FOR ALL TO authenticated USING (auth.uid() = user_id OR public.fn_get_user_role() = 'admin');
+FOR ALL TO authenticated USING (auth.uid() = user_id OR (SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
 
 -- Ward Settings: Authenticated Read, Admin Write
 CREATE POLICY "Settings_Read" ON public.ward_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Settings_Admin" ON public.ward_settings FOR ALL TO authenticated USING (public.fn_get_user_role() = 'admin');
+CREATE POLICY "Settings_Admin" ON public.ward_settings FOR ALL TO authenticated USING ((SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
 
--- Patient READ: Global Access for Search (Everyone)
-CREATE POLICY "Patients_Read_Global" ON public.patients 
-FOR SELECT TO authenticated USING (true);
-
--- Patient WRITE: Restricted to Admin, Master Ward, or Assigned Ward
-CREATE POLICY "Patients_Write_Restricted" ON public.patients 
+-- Patient ACCESS: Hardened Permission-Based
+--   A) User is the owner (creator) of the record
+--   B) User is an administrator
+--   C) User is in the same ward AND has 'can_see_ward_patients' enabled
+--   D) User belongs to 'Master Ward'
+CREATE POLICY "Patient_Hardened_Access" ON public.patients 
 FOR ALL TO authenticated USING (
-    public.fn_get_user_role() = 'admin' OR 
-    public.fn_get_user_ward() = 'Master Ward' OR
-    public.fn_get_user_ward() = ward_name
+    auth.uid() = user_id 
+    OR EXISTS (
+        SELECT 1 FROM public.user_profiles 
+        WHERE user_id = auth.uid() 
+        AND (
+            role = 'admin' 
+            OR ward_name = 'Master Ward'
+            OR (ward_name = patients.ward_name AND can_see_ward_patients = true)
+            OR patients.ward_name = ANY(accessible_wards) -- Support for multi-ward access
+        )
+    )
 );
 
--- Note: We don't need a separate INSERT policy if we use ALL above, 
--- but we'll leave a standard one for compatibility if needed.
--- CREATE POLICY "Patients_Insert" ON public.patients FOR INSERT TO authenticated WITH CHECK (true);
-
--- Visits & Investigations: Access linked to Patient existence
-CREATE POLICY "Visits_Linked_Access" ON public.visits 
+-- Visits & Investigations: Access inherited from Patient access
+CREATE POLICY "Visits_Inherited_Access" ON public.visits 
 FOR ALL TO authenticated USING (
     EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
 );
 
-CREATE POLICY "Investigations_Linked_Access" ON public.investigations 
+CREATE POLICY "Investigations_Inherited_Access" ON public.investigations 
 FOR ALL TO authenticated USING (
     EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
 );
 
--- Reminders: Global visibility for coordination
-CREATE POLICY "Reminders_Global_Access" ON public.reminders 
-FOR ALL TO authenticated USING (
-    public.fn_get_user_role() IS NOT NULL
-);
+-- Reminders: Global visibility for coordination within medical team
+CREATE POLICY "Reminders_Team_Access" ON public.reminders 
+FOR ALL TO authenticated USING (true);
 
 -- System Settings: Read all, Write admin
 CREATE POLICY "System_Settings_Read" ON public.system_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "System_Settings_Admin" ON public.system_settings FOR ALL TO authenticated USING (public.fn_get_user_role() = 'admin');
+CREATE POLICY "System_Settings_Admin" ON public.system_settings FOR ALL TO authenticated USING ((SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
 
 -- 6. INDICES (OPTIMIZATION)
 CREATE INDEX IF NOT EXISTS idx_patients_ward ON public.patients(ward_name);

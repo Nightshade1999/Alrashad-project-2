@@ -21,8 +21,8 @@ export default async function PatientPage({
     { data: { user } }
   ] = await Promise.all([
     supabase.from('patients').select('*').eq('id', id).single(),
-    supabase.from('visits').select('*').eq('patient_id', id).order('visit_date', { ascending: false }),
-    supabase.from('investigations').select('*').eq('patient_id', id).order('date', { ascending: false }),
+    supabase.from('visits').select('*').eq('patient_id', id).order('visit_date', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('investigations').select('*').eq('patient_id', id).order('date', { ascending: false }).order('created_at', { ascending: false }),
     supabase.auth.getUser()
   ])
 

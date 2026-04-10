@@ -31,17 +31,28 @@ export function OfflineDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("Dashboard: Loading timeout reached, showing partial view.");
+        setLoading(false);
+      }
+    }, 6000); // 6s timeout for mobile consistency
+
     (async () => {
       try {
         setLoading(true);
         const list = await patients.list();
-        setPatientList(list);
+        if (isMounted) setPatientList(list);
       } catch (err: any) {
         console.error("Dashboard: fetch error:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
+        clearTimeout(timeoutId);
       }
     })();
+
+    return () => { isMounted = false; clearTimeout(timeoutId); };
   }, [patients]);
 
   const myWardName = profile?.ward_name ?? null;

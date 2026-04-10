@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { DatabaseProvider } from "@/hooks/useDatabase";
 import { PwaRegistry } from "@/components/pwa/pwa-registry";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import "./globals.css";
 import { Suspense } from "react";
 
@@ -67,11 +68,12 @@ export default function RootLayout({
           }, 15000);
         `}} />
         <DatabaseProvider>
-          <main className="relative flex-1 flex flex-col max-w-[1600px] mx-auto w-full overflow-x-hidden">
+          <main className="relative flex-1 flex flex-col max-w-[1600px] mx-auto w-full overflow-x-hidden pb-24 md:pb-0">
             {children}
           </main>
         </DatabaseProvider>
         <InstallPrompt />
+        <MobileNav />
         <Toaster richColors position="bottom-right" />
       </body>
     </html>

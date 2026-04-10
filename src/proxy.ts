@@ -33,8 +33,18 @@ export async function proxy(request: NextRequest) {
   // Catching this prevents the entire server process from crashing.
   let user = null;
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.warn('Proxy: Session retrieval error:', sessionError.message);
+    }
     user = session?.user;
+
+    // Log the detection for debugging sign-in refreshes
+    if (user) {
+      console.log(`Proxy: Session detected for ${user.email} on ${request.nextUrl.pathname}`);
+    } else if (request.nextUrl.pathname.startsWith('/dashboard')) {
+      console.log(`Proxy: NO session detected on protected path ${request.nextUrl.pathname}`);
+    }
   } catch (error: any) {
     console.warn('Proxy: Auth check suppressed crash:', error?.message);
     return supabaseResponse;

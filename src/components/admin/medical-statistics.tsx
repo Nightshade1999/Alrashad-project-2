@@ -270,8 +270,8 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
   const [userObjective, setUserObjective] = useState('')
 
   // ── Cohort ────────────────────────────────────────────────
-  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.ward_name || p.doctor_ward))).filter(Boolean).sort(), [patients])
-  const cohort = useMemo(() => wardFilter === 'All' ? patients : patients.filter(p => (p.ward_name || p.doctor_ward) === wardFilter), [patients, wardFilter])
+  const distinctWards = useMemo(() => Array.from(new Set(patients.map(p => p.ward_name || 'Unassigned'))).filter(Boolean).sort(), [patients])
+  const cohort = useMemo(() => wardFilter === 'All' ? patients : patients.filter(p => (p.ward_name || 'Unassigned') === wardFilter), [patients, wardFilter])
 
   // ─────────────────────────────────────────────────────────
   // QUICK INSIGHTS (auto-computed)
@@ -298,7 +298,7 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
 
     // Ward breakdown
     const wardCounts: Record<string, number> = {}
-    patients.forEach(p => { const w = p.ward_name || p.doctor_ward || 'Unknown'; wardCounts[w] = (wardCounts[w] || 0) + 1 })
+    patients.forEach(p => { const w = p.ward_name || 'Unassigned'; wardCounts[w] = (wardCounts[w] || 0) + 1 })
 
     // Deceased count
     const deceased = patients.filter(p => p.category === 'Deceased/Archive').length
@@ -720,7 +720,7 @@ export function MedicalStatistics({ patients, aiEnabled }: { patients: any[]; ai
                   className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 min-h-[36px] ${
                     wardFilter === w ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 border border-slate-700'
                   }`}
-                >{w === 'All' ? `All (${patients.length})` : `${w} (${patients.filter(p => (p.doctor_ward || p.ward_name) === w).length})`}</button>
+                >{w === 'All' ? `All (${patients.length})` : `${w} (${patients.filter(p => (p.ward_name || 'Unassigned') === w).length})`}</button>
               ))}
             </div>
           </div>

@@ -52,10 +52,10 @@ export default async function InvestigationsPage({
 
   let query = supabase
     .from("investigations")
-    .select("*")
+    .select("*, created_at")
     .eq("patient_id", id)
     .order("date", { ascending: false })
-    .order("id", { ascending: false })
+    .order("created_at", { ascending: false })
 
   if (isErFilter) {
     query = query.eq('is_er', true)
