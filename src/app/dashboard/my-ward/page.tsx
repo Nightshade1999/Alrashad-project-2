@@ -176,7 +176,7 @@ export default function MyWardPage() {
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <ExportButton />
+            <ExportButton isAdmin={profile?.role?.toLowerCase() === 'admin'} />
             <AddPatientModal />
           </div>
         </div>

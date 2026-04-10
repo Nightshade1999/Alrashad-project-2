@@ -24,7 +24,7 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
 
     try {
       const doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || "Ward Clinician"
-      const wardName = profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
+      const wardName = patient.ward_name || profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
 
       const [v, i] = await Promise.all([
         visits.list(patient.id),

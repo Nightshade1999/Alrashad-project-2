@@ -143,7 +143,7 @@ export function WardPatientDetail({
                 {patient.name}
               </h1>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                {!patient.age && patient.age !== 0 ? 'N/A' : `${patient.age}y`} · {patient.gender} · Room {patient.room_number}
+                {!patient.age && patient.age !== 0 ? 'N/A' : `${patient.age}y`} · {patient.gender} · {patient.ward_name || 'General Ward'} · Room {patient.room_number}
               </p>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function WardPatientDetail({
             <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Patient Info</h2>
           </div>
           <div className="p-4 sm:p-5 grid grid-cols-2 gap-x-4 gap-y-3">
-            <InfoRow label="Ward / Room" value={`${wardName || patient.ward_name || 'General Ward'} / Room ${patient.room_number}`} />
+            <InfoRow label="Ward / Room" value={`${patient.ward_name || 'General Ward'} / Room ${patient.room_number}`} />
             <InfoRow label="MRN" value={patient.medical_record_number} />
             <InfoRow label="Gender" value={patient.gender} />
             <InfoRow label="Age" value={!patient.age && patient.age !== 0 ? 'N/A' : `${patient.age} years`} />

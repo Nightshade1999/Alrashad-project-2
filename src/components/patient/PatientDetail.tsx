@@ -35,7 +35,7 @@ export function PatientDetail({
 
   const isErView = patient.is_in_er && view !== 'ward';
   const aiEnabled = profile?.ai_enabled ?? true;
-  const wardName = patient.ward_name || 'General Ward';
+  const wardName = initialPatient.ward_name || 'General Ward';
 
   if (!patient.name) {
     return (

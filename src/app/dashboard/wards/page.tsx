@@ -125,7 +125,7 @@ export default async function AdminWardsPage() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <ExportButton />
+          <ExportButton isAdmin={profile?.role?.toLowerCase() === 'admin'} />
         </div>
       </div>
 

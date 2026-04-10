@@ -134,7 +134,7 @@ export function OfflineDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <ExportButton />
+          <ExportButton isAdmin={isAdmin} />
           <AddPatientModal />
         </div>
       </div>

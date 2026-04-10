@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
 import { toast } from 'sonner'
 
-export function ExportButton() {
+export function ExportButton({ isAdmin = true }: { isAdmin?: boolean }) {
   const [isExporting, setIsExporting] = useState(false)
+
+  if (!isAdmin) return null;
 
   const handleExport = async () => {
     try {

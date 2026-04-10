@@ -161,33 +161,83 @@ export async function exportResearchToExcel(details: { objective: string, varX: 
 }
 
 /**
- * Robust CSV Export with UTF-8 BOM.
+ * Comprehensive CSV Export for Medical Research.
+ * Flattens patient demographics and all laboratory investigations into a single research-ready table.
  */
 export async function exportPatientsToCSV(patients: any[]) {
-  const mappedData = patients.map(p => {
-    return {
+  const allRows: any[] = []
+
+  patients.forEach((p) => {
+    const labs = p.investigations || []
+    
+    // Base patient data shared across all its lab result rows
+    const patientBase = {
       "Patient Name": p.name,
+      "Mother's Name": p.mother_name || "N/A",
+      "MRN": p.medical_record_number || "N/A",
       "Age": p.age,
       "Gender": p.gender,
+      "Ward": p.ward_name,
+      "Room": p.room_number,
+      "Psychological Diagnosis": p.psychological_diagnosis || "N/A",
       "Category": p.category,
-      "Ward": p.ward_number,
+      "Province": p.province || "N/A",
+      "Education": p.education_level || "N/A",
+      "Admission Date": p.admission_date ? format(parseISO(p.admission_date), "yyyy-MM-dd") : "N/A",
+      "System Entry Date": p.created_at ? format(parseISO(p.created_at), "yyyy-MM-dd") : "",
+      "Is in ER": p.is_in_er ? "Yes" : "No",
+      "ER Doctor": p.er_admission_doctor || "N/A",
       "Chronic Diseases": formatDiseases(p.chronic_diseases),
       "Internal Meds": formatDrugs(p.medical_drugs).join('; '),
       "Psych Meds": formatDrugs(p.psych_drugs).join('; '),
       "Allergies": parseArr(p.allergies).join(', ') || 'None',
       "Past Surgeries": parseArr(p.past_surgeries).join(', ') || 'None',
-      "Province": p.province,
-      "Education": p.education_level,
-      "System Entry Date": p.created_at ? format(parseISO(p.created_at), "yyyy-MM-dd") : ""
+    }
+
+    if (labs.length === 0) {
+      // Add one row for patient with empty lab columns
+      allRows.push({
+        ...patientBase,
+        "Lab Date": "No Labs",
+        "Lab Doctor": "",
+        "WBC": "", "Hb": "", "Urea": "", "Creatinine": "",
+        "AST": "", "ALT": "", "TSB": "", "hba1c": "",
+        "RBS": "", "LDL": "", "HDL": "", "TG": "",
+        "ESR": "", "CRP": "", "Is ER Lab": ""
+      })
+    } else {
+      // Create one row per laboratory investigation
+      labs.forEach((l: any) => {
+        allRows.push({
+          ...patientBase,
+          "Lab Date": l.date ? format(parseISO(l.date), "yyyy-MM-dd HH:mm") : "Unknown",
+          "Lab Doctor": l.doctor_name || "N/A",
+          "WBC": l.wbc,
+          "Hb": l.hb,
+          "Urea": l.s_urea,
+          "Creatinine": l.s_creatinine,
+          "AST": l.ast,
+          "ALT": l.alt,
+          "TSB": l.tsb,
+          "hba1c": l.hba1c,
+          "RBS": l.rbs,
+          "LDL": l.ldl,
+          "HDL": l.hdl,
+          "TG": l.tg,
+          "ESR": l.esr,
+          "CRP": l.crp,
+          "Is ER Lab": l.is_er ? "Yes" : "No"
+        })
+      })
     }
   })
 
-  const csv = Papa.unparse(mappedData)
+  const csv = Papa.unparse(allRows)
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url
-  link.download = `ward_patients_${new Date().toISOString().split('T')[0]}.csv`
+  link.download = `Alrashad_Research_Export_${new Date().toISOString().split('T')[0]}.csv`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

@@ -69,7 +69,7 @@ export function ErPatientDetail({
                <div className="flex items-center gap-2 mt-0.5">
                  <Badge className="bg-rose-600 text-white font-black text-[10px] h-4">ER ADMISSION</Badge>
                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
-                    {patient.age}y · {patient.gender} · {wardName}
+                    {patient.age}y · {patient.gender} · {patient.ward_name || 'General Ward'}
                  </p>
                </div>
              </div>
@@ -151,7 +151,7 @@ export function ErPatientDetail({
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Primary Ward</p>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{wardName}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{patient.ward_name || 'General Ward'}</p>
                </div>
                <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Age / Gender</p>
