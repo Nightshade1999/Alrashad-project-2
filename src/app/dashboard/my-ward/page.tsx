@@ -315,7 +315,7 @@ export default function MyWardPage() {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-rose-600 dark:text-rose-400">
-                {counts['ER Patients']}
+                {counts['er-patients']}
               </div>
               <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Current in ER</div>
             </div>
