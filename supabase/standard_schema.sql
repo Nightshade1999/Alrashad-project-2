@@ -68,22 +68,9 @@ BEGIN
 END;
 $$ language 'plpgsql' SET search_path = public;
 
--- Handle user profile creation on signup
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.user_profiles (user_id)
-  VALUES (new.id);
-  RETURN new;
-END;
-$$ language 'plpgsql' SECURITY DEFINER SET search_path = public;
-
--- 2. CORE TABLES
-
--- User Profiles (Extended user data)
+-- 2. CREATE TABLE DEFINITIONS
 CREATE TABLE IF NOT EXISTS public.user_profiles (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    role TEXT NOT NULL DEFAULT 'user',
     ward_name TEXT DEFAULT 'Unassigned',
     specialty TEXT DEFAULT 'psychiatry',
     gender TEXT,
@@ -93,9 +80,26 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     offline_mode_enabled BOOLEAN DEFAULT false,
     can_see_ward_patients BOOLEAN DEFAULT false,
     accessible_wards TEXT[] DEFAULT '{}'::text[],
+    role TEXT NOT NULL DEFAULT 'user',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 3. IDENTITY & AUTH TRIGGERS
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_profiles (user_id, role, specialty, ward_name, is_admin)
+  VALUES (new.id, 'user', 'psychiatry', 'Unassigned', false)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN new;
+END;
+$$ language 'plpgsql' SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- Ward Settings (Institutional configuration)
 CREATE TABLE IF NOT EXISTS public.ward_settings (
