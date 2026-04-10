@@ -298,7 +298,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
 
                   {/* Simplified Ward Selection */}
                   <div className="space-y-3">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Assigned Wards (First is Primary)</label>
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Assigned Wards</label>
                     <div className="flex flex-wrap gap-2 p-3 border-2 rounded-2xl bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 focus-within:border-indigo-500/50 transition-all shadow-sm">
                       {accessibleWards.map((w, idx) => (
                         <span key={w} className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 animate-in fade-in zoom-in-95 ${
