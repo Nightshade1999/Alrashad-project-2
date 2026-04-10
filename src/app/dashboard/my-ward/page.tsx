@@ -62,7 +62,6 @@ const CATEGORIES = [
     iconColor: 'text-violet-600 dark:text-violet-400',
     countColor: 'text-violet-700 dark:text-violet-300',
     dot: '🕐',
-    isPlaceholder: true
   },
 ]
 
@@ -72,13 +71,14 @@ interface PatientSummary {
   room_number: string | null
   category: string
   is_in_er: boolean
+  last_activity_at: string | null
 }
 
 async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
   const supabase = createClient()
   const { data } = await supabase
     .from('patients')
-    .select('id, name, room_number, category, is_in_er')
+    .select('id, name, room_number, category, is_in_er, last_activity_at')
     .eq('ward_name', wardName)
     .limit(5000)
   return (data as PatientSummary[]) || []
@@ -125,11 +125,19 @@ export default function MyWardPage() {
   }, [router])
 
   const counts = {
-    'High Risk': patients.filter(p => p.category === 'High Risk' && !p.is_in_er).length,
-    'Close Follow-up': patients.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
     'Normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
     'ER Patients': patients.filter(p => p.is_in_er).length,
     'Deceased/Archive': patients.filter(p => p.category === 'Deceased/Archive').length,
+    'pending-follow-up': patients.filter(p => {
+      if (p.category === 'Deceased/Archive' || p.is_in_er) return false;
+      const last = p.last_activity_at ? new Date(p.last_activity_at).getTime() : 0;
+      const ageDays = (Date.now() - last) / (1000 * 60 * 60 * 24);
+      
+      if (p.category === 'High Risk') return ageDays > 7;
+      if (p.category === 'Close Follow-up') return ageDays > 30;
+      // Normal or other
+      return ageDays > 90;
+    }).length,
     total: patients.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length,
   }
 
@@ -206,15 +214,17 @@ export default function MyWardPage() {
                   </div>
                   <span className="text-2xl">{cat.dot}</span>
                 </div>
-                <div className={`text-4xl font-bold mb-1 ${cat.countColor}`}>
-                  {cat.slug === 'pending-follow-up' ? '—' : count}
+                <div className={`text-4xl font-bold mb-1 ${cat.slug === 'pending-follow-up' && count > 0 ? 'text-rose-600 dark:text-rose-400' : cat.countColor}`}>
+                  {count}
                 </div>
                 <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{cat.label}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
-                  {cat.slug === 'pending-follow-up' ? 'Coming soon' : count === 0 ? 'No patients' : count === 1 ? '1 patient' : `${count} patients`}
+                  {cat.slug === 'pending-follow-up' 
+                    ? (count === 0 ? 'All caught up' : `${count} overdue patient${count !== 1 ? 's' : ''}`)
+                    : count === 0 ? 'No patients' : count === 1 ? '1 patient' : `${count} patients`}
                 </div>
                 <div className="mt-4 flex items-center text-xs font-medium text-muted-foreground group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
-                  {cat.slug === 'pending-follow-up' ? 'View priority' : 'View patients'}
+                  {cat.slug === 'pending-follow-up' ? 'Review priority' : 'View patients'}
                   <svg className="ml-1 h-3 w-3 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </div>
               </div>

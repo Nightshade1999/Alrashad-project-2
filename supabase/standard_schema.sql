@@ -37,6 +37,10 @@ BEGIN
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS ward_name TEXT NOT NULL DEFAULT 'General Ward';
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS is_in_er BOOLEAN DEFAULT false;
         ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS er_treatment JSONB DEFAULT '[]'::jsonb;
+        ALTER TABLE public.patients ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ;
+        
+        -- Initialize last_activity_at if missing
+        UPDATE public.patients SET last_activity_at = COALESCE(er_admission_date, created_at) WHERE last_activity_at IS NULL;
     END IF;
 
     -- visits fixes
@@ -381,3 +385,24 @@ BEGIN
   RETURN m_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+-- 5. CLINICAL ACTIVITY TRIGGERS
+-- Automatically update patient's last_activity_at column when clinical events occur
+CREATE OR REPLACE FUNCTION public.fn_update_patient_last_activity()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE public.patients
+  SET last_activity_at = COALESCE(NEW.visit_date, NEW.date, NOW())
+  WHERE id = NEW.patient_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS tr_update_patient_activity_on_visit ON public.visits;
+CREATE TRIGGER tr_update_patient_activity_on_visit
+  AFTER INSERT OR UPDATE ON public.visits
+  FOR EACH ROW EXECUTE FUNCTION public.fn_update_patient_last_activity();
+
+DROP TRIGGER IF EXISTS tr_update_patient_activity_on_investigation ON public.investigations;
+CREATE TRIGGER tr_update_patient_activity_on_investigation
+  AFTER INSERT OR UPDATE ON public.investigations
+  FOR EACH ROW EXECUTE FUNCTION public.fn_update_patient_last_activity();

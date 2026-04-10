@@ -567,3 +567,77 @@ export async function enableOfflineForAllUsersAction() {
     return { error: e.message }
   }
 }
+
+export async function exportSystemDataAction() {
+  try {
+    await verifyAdmin()
+    const admin = getSupabaseAdmin()
+    const tables = ['patients', 'visits', 'investigations', 'user_profiles', 'ward_settings', 'reminders']
+    const exportData: any = {}
+    
+    for (const table of tables) {
+      const { data, error } = await admin.from(table).select('*')
+      if (error) throw error
+      exportData[table] = data
+    }
+    
+    return { data: exportData }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
+
+export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'overwrite') {
+  try {
+    await verifyAdmin()
+    const admin = getSupabaseAdmin()
+    const results: any = {}
+    
+    // Ordered to respect potential foreign key relationships where possible
+    const tables = ['ward_settings', 'user_profiles', 'patients', 'visits', 'investigations', 'reminders']
+    
+    for (const table of tables) {
+      const tableData = data[table]
+      if (!tableData || !Array.isArray(tableData)) {
+        results[table] = { success: 0, skipped: 0, failed: 0 }
+        continue
+      }
+      
+      let success = 0, skipped = 0, failed = 0
+      
+      for (const row of tableData) {
+        try {
+          // If skip strategy, check if it exists first. 
+          // Note: for user_profiles and ward_settings we use unique keys.
+          const conflictCol = table === 'user_profiles' ? 'user_id' : (table === 'ward_settings' ? 'ward_name' : 'id')
+          
+          if (strategy === 'skip') {
+            const { data: existing } = await admin.from(table).select(conflictCol).eq(conflictCol, row[conflictCol]).maybeSingle()
+            if (existing) {
+              skipped++
+              continue
+            }
+          }
+
+          const { error } = await (admin.from(table) as any).upsert(row, { 
+            onConflict: conflictCol
+          })
+
+          if (error) {
+            console.error(`Restore error on ${table}:`, error.message)
+            failed++
+          } else {
+            success++
+          }
+        } catch (err) {
+          failed++
+        }
+      }
+      results[table] = { success, skipped, failed }
+    }
+    
+    return { results }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}

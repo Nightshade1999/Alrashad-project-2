@@ -233,8 +233,8 @@ export function PatientList({
           break
         case 'overdue':
           const getOverdueScore = (p: PatientRow) => {
-            if (!p.lastVisit) return 999999999 // Never seen = high priority
-            const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+            const lastDate = p.lastVisit ? new Date(p.lastVisit).getTime() : 0
+            const daysSince = (Date.now() - lastDate) / (1000 * 60 * 60 * 24)
             const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
             return daysSince - threshold
           }
@@ -397,12 +397,24 @@ const PatientCard = memo(({ p, index, isSelected, onToggleSelect, categorySlug }
   }
 
   const OverdueTag = () => {
-    if (!p.lastVisit) return <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">Never Seen</span>
-    const daysSince = (Date.now() - new Date(p.lastVisit).getTime()) / (1000 * 60 * 60 * 24)
+    const lastDate = p.lastVisit ? new Date(p.lastVisit).getTime() : 0
+    const daysSince = (Date.now() - lastDate) / (1000 * 60 * 60 * 24)
     const threshold = p.category === 'High Risk' ? 7 : p.category === 'Close Follow-up' ? 30 : 90
     const overdue = Math.floor(daysSince - threshold)
-    if (overdue > 0) return <span className="text-[10px] bg-amber-100 dark:bg-amber-950/40 text-amber-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">{overdue}d overdue</span>
-    return <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">On Track</span>
+    
+    if (overdue > 0) {
+      return (
+        <span className="text-[10px] bg-red-100 dark:bg-red-950/40 text-red-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap animate-pulse">
+          {overdue}d Overdue
+        </span>
+      )
+    }
+    
+    return (
+      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tight whitespace-nowrap">
+        On Track
+      </span>
+    )
   }
 
   // Stagger only first 20 rows — beyond that instant render to avoid janky scroll

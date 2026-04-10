@@ -27,7 +27,7 @@ function getDynamicAge(baseAge: number, timestampIso?: string): number {
 async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, targetWard: string | null): Promise<PatientRow[]> {
   let query = supabase
     .from('patients')
-    .select('id, name, age, room_number, chronic_diseases, category, is_in_er, created_at, date_of_death, cause_of_death, previous_category')
+    .select('id, name, age, room_number, chronic_diseases, category, is_in_er, created_at, date_of_death, cause_of_death, previous_category, last_activity_at')
     .order('created_at', { ascending: false })
     .limit(5000)
 
@@ -70,7 +70,7 @@ async function fetchRowsOnline(supabase: any, categoryDbValue: string | null, ta
     id: p.id, name: p.name, age: getDynamicAge(p.age, p.created_at), room_number: p.room_number,
     chronic_diseases: p.chronic_diseases, category: p.category,
     lastHba1c: latestInv[p.id]?.hba1c ?? null, lastHb: latestInv[p.id]?.hb ?? null,
-    lastVisit: latestVisit[p.id]?.date ?? null,
+    lastVisit: p.last_activity_at || latestVisit[p.id]?.date || null,
     lastBpSys: latestVisit[p.id]?.bp_sys ?? null, lastBpDia: latestVisit[p.id]?.bp_dia ?? null,
     lastPr: latestVisit[p.id]?.pr ?? null, lastSpo2: latestVisit[p.id]?.spo2 ?? null,
     lastTemp: latestVisit[p.id]?.temp ?? null,

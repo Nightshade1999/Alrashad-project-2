@@ -43,6 +43,7 @@ export interface Database {
           er_treatment: MedicalDrugParams[] | null;
           er_history: any[] | null;
           admission_date: string | null;
+          last_activity_at: string | null;
           mother_name: string | null;
           medical_record_number: string | null;
           psychological_diagnosis: string | null;
@@ -77,6 +78,7 @@ export interface Database {
           er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
           admission_date?: string | null;
+          last_activity_at?: string | null;
           mother_name?: string | null;
           medical_record_number?: string | null;
           psychological_diagnosis?: string | null;
@@ -111,6 +113,7 @@ export interface Database {
           er_treatment?: MedicalDrugParams[] | null;
           er_history?: any[] | null;
           admission_date?: string | null;
+          last_activity_at?: string | null;
           mother_name?: string | null;
           medical_record_number?: string | null;
           psychological_diagnosis?: string | null;
@@ -219,9 +222,28 @@ export interface Database {
         Insert: Partial<Database['public']['Tables']['system_settings']['Row']>;
         Update: Partial<Database['public']['Tables']['system_settings']['Insert']>;
       };
+      reminders: {
+        Row: {
+          id: string;
+          patient_id: string;
+          created_by: string;
+          content: string;
+          priority: string;
+          due_date: string | null;
+          is_resolved: boolean;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['reminders']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['reminders']['Insert']>;
+      };
     };
   };
 }
+
+export type Reminder = Database['public']['Tables']['reminders']['Row'];
 
 export type Patient = Database['public']['Tables']['patients']['Row'];
 export type Visit = Database['public']['Tables']['visits']['Row'];

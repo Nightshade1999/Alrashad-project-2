@@ -29,44 +29,23 @@ export function DoctorNameModal() {
   }, [])
 
   const checkDoctorName = async () => {
-    // Force the modal if the current session doesn't have a name yet
+    // 1. If we already identified for this SESSION (refresh), stay closed.
     const sessionFlag = sessionStorage.getItem('wardManager_sessionActive')
     if (sessionFlag === 'true') {
       setOpen(false)
       return
     }
 
-    try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) return
+    // 2. Load from LOCAL STORAGE (Browser Identity) to suggest to the user
+    const savedName = localStorage.getItem('wardManager_lastDoctorName')
+    const savedGender = localStorage.getItem('wardManager_lastDoctorGender')
+    
+    if (savedName) setName(savedName)
+    if (savedGender === 'Male' || savedGender === 'Female') setGender(savedGender)
 
-      // We still fetch the name from the DB as a default suggestion
-      const { data } = await (supabase as any)
-        .from('user_profiles')
-        .select('doctor_name')
-        .eq('user_id', user.id)
-        .single()
-
-      if (data?.doctor_name) {
-        setName(data.doctor_name)
-        if (data?.gender && (data.gender === 'Male' || data.gender === 'Female')) {
-          setGender(data.gender)
-        }
-        
-        // If we found a name, consider this session "pre-authed" and don't show the modal
-        sessionStorage.setItem('wardManager_sessionActive', 'true')
-        setOpen(false)
-        return
-      }
-      
-      // If no name found in DB, we MUST show the modal
-      setOpen(true)
-    } catch {
-      // On error (e.g. offline and no local profile yet), show modal to capture name
-      setOpen(true)
-    }
+    // 3. ALWAYS open the modal on a fresh session, even if the DB has a name.
+    // Multiple doctors share accounts, so they must confirm WHO is acting right now.
+    setOpen(true)
   }
 
   const handleSave = async () => {
@@ -83,6 +62,7 @@ export function DoctorNameModal() {
       const user = session?.user
       if (!user) throw new Error("Not authenticated")
 
+      // Update the profile with the current acting doctor
       await (supabase as any)
         .from('user_profiles')
         .upsert(
@@ -94,14 +74,18 @@ export function DoctorNameModal() {
           { onConflict: 'user_id' }
         )
 
-      // Set session flag so it doesn't pop up again until the browser is closed or refreshed
+      // Set session flag (Persistence for this browsing session/refreshes)
       sessionStorage.setItem('wardManager_sessionActive', 'true')
+      
+      // Set local flag (Persistence for this browser identity)
+      localStorage.setItem('wardManager_lastDoctorName', trimmed)
+      localStorage.setItem('wardManager_lastDoctorGender', gender)
       
       toast.success(`Session started as Dr. ${trimmed}!`)
       setOpen(false)
     } catch (err) {
       console.error(err)
-      toast.error("Failed to save name. Please try again.")
+      toast.error("Failed to save identity.")
     } finally {
       setIsSaving(false)
     }

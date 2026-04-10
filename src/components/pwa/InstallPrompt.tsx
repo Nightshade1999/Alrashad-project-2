@@ -10,10 +10,11 @@ export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
   useEffect(() => {
-    // 1. Check if already installed
     if (typeof window !== "undefined") {
       const isStandalone = window.matchMedia("(display-mode: standalone)").matches
-      if (isStandalone) return
+      const isDismissed = sessionStorage.getItem("pwa_install_dismissed") === "true"
+      
+      if (isStandalone || isDismissed) return
 
       // 2. Identify platform
       const userAgent = window.navigator.userAgent.toLowerCase()
@@ -46,8 +47,12 @@ export function InstallPrompt() {
       if (outcome === "accepted") {
         setShow(false)
       }
-      setDeferredPrompt(null)
     }
+  }
+
+  const handleDontShowAgain = () => {
+    sessionStorage.setItem("pwa_install_dismissed", "true")
+    setShow(false)
   }
 
   if (!show) return null
@@ -78,6 +83,9 @@ export function InstallPrompt() {
         <div className="mt-5 flex items-center justify-end gap-3">
           <Button variant="ghost" size="sm" onClick={() => setShow(false)} className="text-xs h-9">
             Not now
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleDontShowAgain} className="text-xs h-9 text-slate-400 hover:text-rose-500">
+            Don't show again
           </Button>
           
           {platform === "ios" ? (

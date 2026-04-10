@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 certificates
+
+# Excel samples and temporary data
+src/excel_*.json
+src/excel_sample.txt

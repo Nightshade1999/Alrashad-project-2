@@ -12,6 +12,7 @@ interface DatabaseContextValue {
   patients: ReturnType<typeof buildPatientApi>;
   visits: ReturnType<typeof buildVisitApi>;
   investigations: ReturnType<typeof buildInvestigationApi>;
+  reminders: ReturnType<typeof buildReminderApi>;
   delete: (table: string, id: string) => Promise<any>;
 }
 
@@ -62,6 +63,34 @@ function buildInvestigationApi(supabase: any) {
     },
     insert: async (data: any) => {
       return supabase.from('investigations').insert([data]);
+    },
+  };
+}
+
+function buildReminderApi(supabase: any) {
+  return {
+    list: async (patientId?: string) => {
+      let query = supabase.from('reminders').select('*');
+      if (patientId) query = query.eq('patient_id', patientId);
+      const { data } = await query.order('due_date', { ascending: true });
+      return (data as unknown as any[]) || [];
+    },
+    listOverdueByPatients: async (patientIds: string[]) => {
+      const { data } = await supabase
+        .from('reminders')
+        .select('patient_id')
+        .eq('is_resolved', false)
+        .lt('due_date', new Date().toISOString())
+        .in('patient_id', patientIds);
+      
+      const overduePatientIds = new Set((data as any[])?.map(r => r.patient_id) || []);
+      return overduePatientIds.size;
+    },
+    insert: async (data: any) => {
+      return supabase.from('reminders').insert([data]);
+    },
+    update: async (id: string, data: any) => {
+      return supabase.from('reminders').update(data).eq('id', id);
     },
   };
 }
@@ -121,6 +150,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     patients: buildPatientApi(supabase),
     visits: buildVisitApi(supabase),
     investigations: buildInvestigationApi(supabase),
+    reminders: buildReminderApi(supabase),
     delete: async (table: string, id: string) => {
       return supabase.from(table).delete().eq('id', id);
     },
