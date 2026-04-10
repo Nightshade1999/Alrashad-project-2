@@ -12,7 +12,7 @@ BEGIN
     -- user_profiles fixes (Nuclear Defaults to prevent trigger crashes)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_profiles') THEN
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ward_name TEXT DEFAULT 'Unassigned';
-        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS accessible_wards JSONB DEFAULT '[]'::jsonb;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS accessible_wards TEXT[] DEFAULT '{}'::text[];
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS offline_mode_enabled BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS can_see_ward_patients BOOLEAN DEFAULT false;
@@ -21,7 +21,7 @@ BEGIN
         
         -- Force re-applying defaults to existing columns
         ALTER TABLE public.user_profiles ALTER COLUMN ward_name SET DEFAULT 'Unassigned';
-        ALTER TABLE public.user_profiles ALTER COLUMN accessible_wards SET DEFAULT '[]'::jsonb;
+        ALTER TABLE public.user_profiles ALTER COLUMN accessible_wards SET DEFAULT '{}'::text[];
         ALTER TABLE public.user_profiles ALTER COLUMN ai_enabled SET DEFAULT true;
         ALTER TABLE public.user_profiles ALTER COLUMN offline_mode_enabled SET DEFAULT false;
         ALTER TABLE public.user_profiles ALTER COLUMN can_see_ward_patients SET DEFAULT false;
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     ai_enabled BOOLEAN DEFAULT true,
     offline_mode_enabled BOOLEAN DEFAULT false,
     can_see_ward_patients BOOLEAN DEFAULT false,
-    accessible_wards JSONB DEFAULT '[]'::jsonb,
+    accessible_wards TEXT[] DEFAULT '{}'::text[],
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
