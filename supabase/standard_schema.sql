@@ -16,6 +16,10 @@ BEGIN
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS offline_mode_enabled BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS can_see_ward_patients BOOLEAN DEFAULT false;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS doctor_name TEXT;
+        -- Ensure default exists for is_admin to prevent trigger failures
+        ALTER TABLE public.user_profiles ALTER COLUMN is_admin SET DEFAULT false;
     END IF;
 
     -- patients fixes
@@ -58,8 +62,8 @@ $$ language 'plpgsql' SET search_path = public;
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.user_profiles (user_id, role, specialty, gender)
-  VALUES (new.id, 'user', 'psychiatry', null);
+  INSERT INTO public.user_profiles (user_id, role, specialty, gender, is_admin, doctor_name)
+  VALUES (new.id, 'user', 'psychiatry', null, false, null);
   RETURN new;
 END;
 $$ language 'plpgsql' SECURITY DEFINER SET search_path = public;
@@ -73,6 +77,8 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     ward_name TEXT DEFAULT 'Unassigned',
     specialty TEXT DEFAULT 'psychiatry',
     gender TEXT,
+    doctor_name TEXT,
+    is_admin BOOLEAN DEFAULT false,
     ai_enabled BOOLEAN DEFAULT true,
     offline_mode_enabled BOOLEAN DEFAULT false,
     can_see_ward_patients BOOLEAN DEFAULT false,
