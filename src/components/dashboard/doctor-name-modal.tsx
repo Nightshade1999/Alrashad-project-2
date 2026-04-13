@@ -64,7 +64,7 @@ export function DoctorNameModal() {
     // 2. NEW BYPASS: If Admin set the name in the DB, or if user is an Admin, treat it as verified!
     const isFixed = profile?.is_name_fixed === true
     const isAdmin = profile?.role === 'admin'
-    const nameToUse = profile?.doctor_name || profile?.full_name
+    const nameToUse = profile?.doctor_name
 
     if ((isFixed || isAdmin) && nameToUse) {
       sessionStorage.setItem('wardManager_sessionActive', 'true')
