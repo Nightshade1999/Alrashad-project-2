@@ -268,7 +268,9 @@ export function WardPatientDetail({
                   <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} disabled={patient.is_referred} />
                 </>
               )}
-              <EditPatientModal patient={patient} disabled={patient.is_referred} role={profile?.role} />
+              {profile?.role?.toLowerCase() !== 'nurse' && (
+                <EditPatientModal patient={patient} disabled={patient.is_referred} role={profile?.role} />
+              )}
             </>
           ) : (
             <>

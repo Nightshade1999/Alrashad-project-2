@@ -233,29 +233,31 @@ export function PsychPatientDetail({
         </div>
         
         {/* Actions - specific to Psych residents */}
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1 overflow-visible">
-          {!isDeceased && (
-            <>
-              <AddPsychVisitModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
-              {!patient.is_referred && (
-                <ReferralModal 
-                  patientId={patient.id} 
-                  isReferred={false} 
-                  patient={patient}
-                  latestVisit={lastVisit}
-                  latestInvestigation={lastInv}
-                />
-              )}
-              <AddReminderModal patientId={patient.id} patientName={patient.name} />
-              <AddNurseInstructionModal 
-                  patientId={patient.id} 
-                  patientName={patient.name} 
-                  wardName={patient.ward_name || wardName || "General Ward"} 
-                  variant="icon"
-                />
-            </>
-          )}
-        </div>
+        {profile?.role?.toLowerCase() !== 'nurse' && (
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1 overflow-visible">
+            {!isDeceased && (
+              <>
+                <AddPsychVisitModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
+                {!patient.is_referred && (
+                  <ReferralModal 
+                    patientId={patient.id} 
+                    isReferred={false} 
+                    patient={patient}
+                    latestVisit={lastVisit}
+                    latestInvestigation={lastInv}
+                  />
+                )}
+                <AddReminderModal patientId={patient.id} patientName={patient.name} />
+                <AddNurseInstructionModal 
+                    patientId={patient.id} 
+                    patientName={patient.name} 
+                    wardName={patient.ward_name || wardName || "General Ward"} 
+                    variant="icon"
+                  />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Demographics + Medical Info ── */}
@@ -313,7 +315,7 @@ export function PsychPatientDetail({
               </div>
               <h2 className="font-semibold text-indigo-900 dark:text-indigo-100 text-sm">Psychiatric Medications</h2>
             </div>
-            {!patient.is_referred && !isDeceased && (
+            {!patient.is_referred && !isDeceased && profile?.role?.toLowerCase() !== 'nurse' && (
                 <EditPsychPatientModal patient={patient} disabled={patient.is_referred} />
             )}
           </div>

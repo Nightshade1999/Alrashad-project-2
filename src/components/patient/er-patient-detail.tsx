@@ -151,7 +151,7 @@ export function ErPatientDetail({
                 <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
               </>
             )}
-            {!isPsychResident && (
+            {!isPsychResident && profile?.role?.toLowerCase() !== 'nurse' && (
               <EditPatientModal patient={patient} disabled={patient.is_referred} role={profile?.role} />
             )}
         </div>
