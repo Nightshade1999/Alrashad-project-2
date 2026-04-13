@@ -332,15 +332,16 @@ export function RecycleBinView() {
                      </div>
                    </div>
                  ) : (
-                   <div className="flex flex-wrap gap-1.5 line-clamp-2">
-                      {Object.entries(item.data).slice(0, 4).map(([key, val]) => (
-                        val && typeof val !== 'object' && (
-                          <Badge key={key} variant="outline" className="text-[9px] font-medium border-slate-200 dark:border-slate-700">
-                            {key}: {String(val)}
-                          </Badge>
-                        )
-                      ))}
-                   </div>
+                    <div className="flex flex-wrap gap-1.5 line-clamp-2">
+                       {Object.entries(item.data as Record<string, any>)
+                         .filter(([_, val]) => val && typeof val !== 'object')
+                         .slice(0, 4)
+                         .map(([key, val]) => (
+                           <Badge key={key} variant="outline" className="text-[9px] font-medium border-slate-200 dark:border-slate-700">
+                             {key}: {String(val)}
+                           </Badge>
+                         ))}
+                    </div>
                  )}
               </div>
 
