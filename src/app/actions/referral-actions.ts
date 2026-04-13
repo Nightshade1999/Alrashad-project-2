@@ -9,9 +9,9 @@ import type { Referral } from "@/types/database.types"
 export async function createReferralLetterAction(data: Omit<Referral, 'id' | 'created_at'>) {
   const supabase = createClient()
   
-  const { data: referral, error } = await supabase
-    .from('referrals')
-    .insert([data as any])
+  const { data: referral, error } = await (supabase
+    .from('referrals') as any)
+    .insert(data)
     .select()
     .single()
 
