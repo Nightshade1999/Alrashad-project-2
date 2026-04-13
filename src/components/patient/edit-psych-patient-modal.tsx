@@ -84,9 +84,10 @@ export function EditPsychPatientModal({ patient, disabled = false }: { patient: 
             <div className="space-y-2">
               <Label>Chronic Psychiatric Medications</Label>
               <DrugListInput 
+                label="Psychiatric Medications"
+                category="Psych"
                 drugs={psychDrugs} 
                 onChange={setPsychDrugs} 
-                buttonText="Add Psych Med"
               />
             </div>
           </div>
