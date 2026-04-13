@@ -28,7 +28,7 @@ export default async function NurseWardPage({
     .eq('user_id', user.id)
     .single()
 
-  if (profile?.role !== 'nurse') redirect('/dashboard')
+  if (profile?.role?.toLowerCase() !== 'nurse') redirect('/dashboard')
   
   // Verify ward access
   const hasAccess = profile.accessible_wards?.includes(wardName)

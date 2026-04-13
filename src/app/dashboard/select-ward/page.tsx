@@ -39,7 +39,7 @@ export default function SelectWardPage() {
           .eq('user_id', user.id)
           .single() as any
 
-        const isAdmin = activeProfile?.role === 'admin'
+        const isAdmin = activeProfile?.role?.toLowerCase() === 'admin'
         let wards = activeProfile?.accessible_wards || (activeProfile?.ward_name ? [activeProfile.ward_name] : [])
 
         if (isAdmin) {
@@ -66,7 +66,7 @@ export default function SelectWardPage() {
     setIsSyncing(wardName)
     try {
       await syncProfileWardAction(wardName)
-      if (profile?.role === 'nurse') {
+      if (profile?.role?.toLowerCase() === 'nurse') {
         router.push(`/nurse/ward/${encodeURIComponent(wardName)}`)
       } else {
         router.push('/dashboard/my-ward')
@@ -140,7 +140,7 @@ export default function SelectWardPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Master Ward for Admins */}
-        {profile?.role === 'admin' && (
+        {profile?.role?.toLowerCase() === 'admin' && (
           <div key="Master Ward">
             <button
               disabled={!!isSyncing}
