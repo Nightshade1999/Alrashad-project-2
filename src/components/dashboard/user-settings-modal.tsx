@@ -28,12 +28,26 @@ export function UserSettingsModal() {
 
   // Pull profile from shared context — no extra server round-trip on modal open
   const { profile } = useDatabase()
-  useEffect(() => {
+  
+  const syncProfile = () => {
     if (!profile) return
-    setName((profile as any).doctor_name || "")
+    const currentName = (profile.role === 'lab_tech' && (profile as any).lab_tech_name) 
+      ? (profile as any).lab_tech_name 
+      : (profile as any).doctor_name || ""
+      
+    setName(currentName)
     setGender((profile as any).gender || "Both")
-    setUserRole((profile as any).role || "user")
+    setUserRole((profile as any).role || "doctor")
     setUserSpecialty((profile as any).specialty || "")
+  }
+
+  useEffect(() => {
+    syncProfile()
+  }, [profile])
+
+  useEffect(() => {
+    window.addEventListener('lab_tech_identity_updated', syncProfile)
+    return () => window.removeEventListener('lab_tech_identity_updated', syncProfile)
   }, [profile])
 
   // handleSave is now removed as Name and Gender are managed via the session-based initialization modal.
@@ -78,7 +92,9 @@ export function UserSettingsModal() {
                         <User className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                      </div>
                      <div>
-                        <p className="text-sm font-black text-slate-800 dark:text-slate-100 italic leading-none">Dr. {name}</p>
+                        <p className="text-sm font-black text-slate-800 dark:text-slate-100 italic leading-none">
+                          {(userRole === 'doctor' || userRole === 'admin') && !name.startsWith('Dr.') ? 'Dr. ' : ''}{name}
+                        </p>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
                            <span className={`h-1.5 w-1.5 rounded-full ${gender === 'Male' ? 'bg-blue-400' : 'bg-rose-400'}`} />
                            {gender}

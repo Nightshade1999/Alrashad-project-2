@@ -164,7 +164,7 @@ export function AddReminderModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Specialty Selection */}
-              {!assignedUserSpecialty && (
+              {(!assignedUserSpecialty || assignedUserSpecialty === 'psychiatry') && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1 flex items-center gap-2">
                     <UserPlus className="h-3 w-3 text-amber-500" />
@@ -182,6 +182,7 @@ export function AddReminderModal({
                 </div>
               )}
 
+              {specialty === 'internal_medicine' && (
                 <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">
                     Direct To (Gender)
@@ -203,6 +204,7 @@ export function AddReminderModal({
                     ))}
                   </div>
                 </div>
+              )}
             </div>
 
             {/* Notes */}

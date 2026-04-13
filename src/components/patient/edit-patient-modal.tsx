@@ -73,11 +73,13 @@ interface EditPatientModalProps {
     admission_date?: string | null
   }
   disabled?: boolean
+  role?: string | null
 }
 
-export function EditPatientModal({ patient, disabled = false }: EditPatientModalProps) {
+export function EditPatientModal({ patient, disabled = false, role: initialRole = null }: EditPatientModalProps) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [role, setRole] = useState<string | null>(initialRole || null)
   const [gender, setGender] = useState(patient.gender)
   const [category, setCategory] = useState<PatientCategory>(patient.category)
   const [province, setProvince] = useState(IRAQ_PROVINCES.includes(patient.province || "") ? (patient.province || "") : (patient.province ? "Other" : ""))
@@ -98,6 +100,16 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
 
   useEffect(() => {
     if (open) {
+      const fetchRole = async () => {
+        if (role) return; // Prop already provided
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data } = await supabase.from('user_profiles').select('role').eq('user_id', user.id).single()
+          setRole(data?.role || 'doctor')
+        }
+      }
+      fetchRole()
       setGender(patient.gender)
       setCategory(patient.category)
       setProvince(IRAQ_PROVINCES.includes(patient.province || "") ? (patient.province || "") : (patient.province ? "Other" : ""))
@@ -288,18 +300,20 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
               </div>
 
               {/* Relatives Info */}
-              <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
-                <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
-                <Select value={relativeStatus || "Unknown"} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
-                  <SelectTrigger id="relativeStatus">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Known">Known</SelectItem>
-                    <SelectItem value="Unknown">Unknown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {role?.toLowerCase() !== 'nurse' && (
+                <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                  <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
+                  <Select value={relativeStatus || "Unknown"} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
+                    <SelectTrigger id="relativeStatus">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Known">Known</SelectItem>
+                      <SelectItem value="Unknown">Unknown</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {relativeStatus === 'Known' && (
                 <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
@@ -318,70 +332,75 @@ export function EditPatientModal({ patient, disabled = false }: EditPatientModal
                 </div>
               )}
 
-              <div className="space-y-2 md:col-span-2 border-t pt-4">
-                <Label htmlFor="category">Category (Follow-up Level)</Label>
-                <Select value={category || "Normal"} onValueChange={(val) => setCategory(val as PatientCategory)}>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="High Risk">🔴 High Risk</SelectItem>
-                    <SelectItem value="Close Follow-up">🟡 Close Follow-up</SelectItem>
-                    <SelectItem value="Normal">🟢 Normal Follow-up</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {role?.toLowerCase() !== 'nurse' && (
+                <div className="space-y-2 md:col-span-2 border-t pt-4">
+                  <Label htmlFor="category">Category (Follow-up Level)</Label>
+                  <Select value={category || "Normal"} onValueChange={(val) => setCategory(val as PatientCategory)}>
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="High Risk">🔴 High Risk</SelectItem>
+                      <SelectItem value="Close Follow-up">🟡 Close Follow-up</SelectItem>
+                      <SelectItem value="Normal">🟢 Normal Follow-up</SelectItem>
+                      <SelectItem value="Awaiting Assessment">🔵 Awaiting Assessment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <hr className="border-border" />
             
             {/* ── Medical History ── */}
-            <div>
-              <h3 className="text-lg font-bold mb-4">Medical History</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <DiseaseListInput 
-                  diseases={chronicDiseases} 
-                  onChange={setChronicDiseases} 
-                />
-                
-                <StringListInput 
-                  label="Past Surgeries" 
-                  items={pastSurgeries} 
-                  onChange={setPastSurgeries}
-                  presetList={[
-                    ...GENERAL_SURGERIES,
-                    ...(gender === 'Female' ? FEMALE_SURGERIES : []),
-                    ...(gender === 'Male' ? MALE_SURGERIES : [])
-                  ]}
-                />
-
-                <DrugListInput 
-                  label="Internal Medical Drugs" 
-                  category="Internal" 
-                  drugs={medicalDrugs} 
-                  onChange={setMedicalDrugs} 
-                />
-                
-                <DrugListInput 
-                  label="Psychiatric Drugs" 
-                  category="Psych" 
-                  drugs={psychDrugs} 
-                  onChange={setPsychDrugs} 
-                />
-
-                <div className="md:col-span-2">
-                  <StringListInput 
-                    label="Allergies" 
-                    items={allergies} 
-                    onChange={setAllergies}
-                    presetList={COMMON_ALLERGIES}
-                    isDanger={true}
+            {role?.toLowerCase() !== 'nurse' && (
+              <div>
+                <h3 className="text-lg font-bold mb-4">Medical History</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  <DiseaseListInput 
+                    diseases={chronicDiseases} 
+                    onChange={setChronicDiseases} 
                   />
-                </div>
+                  
+                  <StringListInput 
+                    label="Past Surgeries" 
+                    items={pastSurgeries} 
+                    onChange={setPastSurgeries}
+                    presetList={[
+                      ...GENERAL_SURGERIES,
+                      ...(gender === 'Female' ? FEMALE_SURGERIES : []),
+                      ...(gender === 'Male' ? MALE_SURGERIES : [])
+                    ]}
+                  />
 
+                  <DrugListInput 
+                    label="Internal Medical Drugs" 
+                    category="Internal" 
+                    drugs={medicalDrugs} 
+                    onChange={setMedicalDrugs} 
+                  />
+                  
+                  <DrugListInput 
+                    label="Psychiatric Drugs" 
+                    category="Psych" 
+                    drugs={psychDrugs} 
+                    onChange={setPsychDrugs} 
+                  />
+
+                  <div className="md:col-span-2">
+                    <StringListInput 
+                      label="Allergies" 
+                      items={allergies} 
+                      onChange={setAllergies}
+                      presetList={COMMON_ALLERGIES}
+                      isDanger={true}
+                    />
+                  </div>
+
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <DialogFooter className="mt-8 gap-2">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>

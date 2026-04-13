@@ -1,18 +1,46 @@
 "use client"
 
 import { createClient } from '@/lib/supabase'
-import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react'
-import type { Patient, Visit, Investigation, UserProfile } from '@/types/database.types'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import type { Patient, Visit, Investigation, UserProfile, NurseInstruction, Reminder, Database } from '@/types/database.types'
 
-// ─── Shared Context ──────────────────────────────────────────────────────────
+interface PatientApi {
+  list: (wardName?: string) => Promise<Patient[]>;
+  get: (id: string) => Promise<Patient>;
+  insert: (data: any) => Promise<any>;
+  update: (id: string, data: any) => Promise<any>;
+}
+
+interface VisitApi {
+  list: (patientId: string) => Promise<Visit[]>;
+  insert: (data: any) => Promise<any>;
+}
+
+interface InvestigationApi {
+  list: (patientId: string) => Promise<Investigation[]>;
+  insert: (data: any) => Promise<any>;
+}
+
+interface ReminderApi {
+  list: (patientId?: string) => Promise<Reminder[]>;
+  listOverdueByPatients: (patientIds: string[]) => Promise<number>;
+  insert: (data: any) => Promise<any>;
+  update: (id: string, data: any) => Promise<any>;
+}
+
+interface NurseInstructionApi {
+  list: (patientId: string) => Promise<NurseInstruction[]>;
+}
 
 interface DatabaseContextValue {
   isReady: boolean;
   profile: UserProfile | null;
-  patients: ReturnType<typeof buildPatientApi>;
-  visits: ReturnType<typeof buildVisitApi>;
-  investigations: ReturnType<typeof buildInvestigationApi>;
-  reminders: ReturnType<typeof buildReminderApi>;
+  patients: PatientApi;
+  visits: VisitApi;
+  investigations: InvestigationApi;
+  reminders: ReminderApi;
+  nurseInstructions: NurseInstructionApi;
   delete: (table: string, id: string) => Promise<any>;
 }
 
@@ -20,7 +48,7 @@ const DatabaseContext = createContext<DatabaseContextValue | null>(null);
 
 // ─── Helper API builders (Online Only) ───────────────────────────────────────
 
-function buildPatientApi(supabase: any) {
+function buildPatientApi(supabase: any): PatientApi {
   return {
     list: async (wardName?: string) => {
       let query = supabase.from('patients').select('*').neq('category', 'Deceased/Archive').limit(5000);
@@ -43,7 +71,7 @@ function buildPatientApi(supabase: any) {
   };
 }
 
-function buildVisitApi(supabase: any) {
+function buildVisitApi(supabase: any): VisitApi {
   return {
     list: async (patientId: string) => {
       const { data } = await supabase.from('visits').select('*').eq('patient_id', patientId).order('visit_date', { ascending: false });
@@ -55,7 +83,7 @@ function buildVisitApi(supabase: any) {
   };
 }
 
-function buildInvestigationApi(supabase: any) {
+function buildInvestigationApi(supabase: any): InvestigationApi {
   return {
     list: async (patientId: string) => {
       const { data } = await supabase.from('investigations').select('*').eq('patient_id', patientId).order('date', { ascending: false });
@@ -67,7 +95,7 @@ function buildInvestigationApi(supabase: any) {
   };
 }
 
-function buildReminderApi(supabase: any) {
+function buildReminderApi(supabase: any): ReminderApi {
   return {
     list: async (patientId?: string) => {
       let query = supabase.from('reminders').select('*');
@@ -95,6 +123,20 @@ function buildReminderApi(supabase: any) {
   };
 }
 
+function buildNurseInstructionApi(supabase: SupabaseClient<Database>): NurseInstructionApi {
+  return {
+    list: async (patientId: string) => {
+      const { data } = await supabase
+        .from('nurse_instructions')
+        .select('*')
+        .eq('patient_id', patientId)
+        .order('created_at', { ascending: false });
+      return (data as unknown as NurseInstruction[]) || [];
+    },
+  };
+}
+
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function DatabaseProvider({ children }: { children: React.ReactNode }) {
@@ -103,12 +145,22 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   const loadSettings = async () => {
+    // Safety timeout: If Supabase Auth hangs (common on LAN-to-mobile SSL), 
+    // force isReady so the UI doesn't stay on the loading screen forever.
+    const timeout = setTimeout(() => {
+      if (!isReady) {
+        console.warn('DatabaseProvider: loadSettings timed out, forcing isReady');
+        setIsReady(true);
+      }
+    }, 5000);
+
     try {
+      setIsReady(false);
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
 
       if (userId) {
-        // Fetch fresh profile from Supabase
+        // Fetch fresh profile from Supabase (bypassing potentially stale local session metadata)
         const { data: userProfile, error } = await supabase
           .from('user_profiles')
           .select('*')
@@ -117,11 +169,14 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
         if (userProfile && !error) {
           setProfile(userProfile as UserProfile);
+          // Cache for faster subsequent loads (used by some components)
+          localStorage.setItem(`profile_cache_${userId}`, JSON.stringify(userProfile));
         }
       }
     } catch (err) {
       console.warn('DatabaseProvider: Failed to load profile', err);
     } finally {
+      clearTimeout(timeout);
       setIsReady(true);
     }
   };
@@ -136,6 +191,8 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setProfile(null);
         setIsReady(true);
+        // Clear identity session flag so it reappears on next login
+        sessionStorage.removeItem('wardManager_sessionActive');
       }
     });
 
@@ -151,6 +208,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
     visits: buildVisitApi(supabase),
     investigations: buildInvestigationApi(supabase),
     reminders: buildReminderApi(supabase),
+    nurseInstructions: buildNurseInstructionApi(supabase),
     delete: async (table: string, id: string) => {
       return supabase.from(table).delete().eq('id', id);
     },

@@ -58,6 +58,7 @@ export async function proxy(request: NextRequest) {
   const isPublicPath =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/api/health') ||
     request.nextUrl.pathname.startsWith('/api/remote-log') ||
     request.nextUrl.pathname === '/manifest.webmanifest' ||
     request.nextUrl.pathname === '/manifest.json' ||

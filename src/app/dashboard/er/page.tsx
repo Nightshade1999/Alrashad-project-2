@@ -1,9 +1,38 @@
 "use client"
 
 import Link from 'next/link'
-import { Activity, Users } from 'lucide-react'
+import { Activity, Users, ShieldAlert, ArrowLeft } from 'lucide-react'
+import { useDatabase } from '@/hooks/useDatabase'
+import { Button } from '@/components/ui/button'
 
 export default function ErSelectionPage() {
+  const { profile, isReady } = useDatabase()
+
+  if (!isReady) return null
+
+  const isAdmin = profile?.role === 'admin'
+  const isDoctor = profile?.role === 'doctor'
+  const hasAccess = isAdmin || isDoctor
+
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="h-20 w-20 rounded-full bg-rose-50 dark:bg-rose-950/30 flex items-center justify-center mb-6">
+          <ShieldAlert className="h-10 w-10 text-rose-600" />
+        </div>
+        <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Security Access Denied</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8 font-medium">
+          The Emergency Room module is restricted to medical doctors and senior administrators. Please return to the main dashboard.
+        </p>
+        <Link href="/dashboard">
+          <Button className="h-12 px-8 rounded-2xl bg-slate-900 dark:bg-teal-600 hover:bg-slate-800 dark:hover:bg-teal-500 text-white font-black uppercase tracking-widest transition-all">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Return to Dashboard
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-8 px-4 sm:px-0 animate-in fade-in duration-500">
       <div>

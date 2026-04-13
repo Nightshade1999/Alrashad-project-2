@@ -1,0 +1,217 @@
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { AlertCircle, Clock, Activity, CalendarClock } from 'lucide-react'
+import { ExportButton } from '@/components/dashboard/export-button'
+import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
+import { DashboardSearch } from '@/components/dashboard/dashboard-search'
+
+export const dynamic = 'force-dynamic'
+
+const CATEGORIES = [
+  {
+    slug: 'high-risk',
+    label: 'High Risk',
+    dbValue: 'High Risk',
+    icon: AlertCircle,
+    gradient: 'from-red-500 to-rose-600',
+    lightBg: 'bg-red-50 dark:bg-red-950/30',
+    border: 'border-red-200 dark:border-red-900/40',
+    iconBg: 'bg-red-100 dark:bg-red-900/50',
+    iconColor: 'text-red-600 dark:text-red-400',
+    countColor: 'text-red-700 dark:text-red-300',
+    dot: '🔴',
+  },
+  {
+    slug: 'close-follow-up',
+    label: 'Close Follow-up',
+    dbValue: 'Close Follow-up',
+    icon: Clock,
+    gradient: 'from-amber-500 to-orange-500',
+    lightBg: 'bg-amber-50 dark:bg-amber-950/30',
+    border: 'border-amber-200 dark:border-amber-900/40',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/50',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    countColor: 'text-amber-700 dark:text-amber-300',
+    dot: '🟡',
+  },
+  {
+    slug: 'normal',
+    label: 'Normal Follow-up',
+    dbValue: 'Normal',
+    icon: Activity,
+    gradient: 'from-emerald-500 to-teal-600',
+    lightBg: 'bg-emerald-50 dark:bg-emerald-950/30',
+    border: 'border-emerald-200 dark:border-emerald-900/40',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/50',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    countColor: 'text-emerald-700 dark:text-emerald-300',
+    dot: '🟢',
+  },
+  {
+    slug: 'pending-follow-up',
+    label: 'Pending Follow-up',
+    dbValue: 'ALL',
+    icon: CalendarClock,
+    gradient: 'from-violet-500 to-purple-600',
+    lightBg: 'bg-violet-50 dark:bg-violet-950/30',
+    border: 'border-violet-200 dark:border-violet-900/40',
+    iconBg: 'bg-violet-100 dark:bg-violet-900/50',
+    iconColor: 'text-violet-600 dark:text-violet-400',
+    countColor: 'text-violet-700 dark:text-violet-300',
+    dot: '🕐',
+    isPlaceholder: true
+  },
+]
+
+export default async function MyWardPage() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  const { data: authData } = await supabase.auth.getUser()
+  const user = authData?.user
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', user?.id)
+    .maybeSingle()
+    
+  // REDIRECT IF NO WARD SELECTED:
+  if (!profile?.ward_name) {
+    redirect('/dashboard/select-ward')
+  }
+    
+  const { data: patients } = await supabase
+    .from('patients')
+    .select('id, name, room_number, category, is_in_er')
+    .eq('ward_name', profile?.ward_name || '')
+
+  const counts = {
+    'High Risk': patients?.filter(p => p.category === 'High Risk' && !p.is_in_er).length ?? 0,
+    'Close Follow-up': patients?.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length ?? 0,
+    'Normal': patients?.filter(p => p.category === 'Normal' && !p.is_in_er).length ?? 0,
+    'ER Patients': patients?.filter(p => p.is_in_er).length ?? 0,
+    'Deceased/Archive': patients?.filter(p => p.category === 'Deceased/Archive').length ?? 0,
+    total: patients?.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length ?? 0,
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Top Bar */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+            My Ward ({profile?.ward_name})
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted
+          </p>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <ExportButton />
+          <AddPatientModal />
+        </div>
+      </div>
+
+      <div className="max-w-md">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block ml-1">
+          Search Patients in this Ward
+        </label>
+        <DashboardSearch patients={patients || []} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {CATEGORIES.map((cat) => {
+          const Icon = cat.icon
+          const count = counts[cat.dbValue as keyof typeof counts] as number
+          return (
+            <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`}>
+              <div className={`group relative rounded-2xl border ${cat.border} ${cat.lightBg} p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 active:translate-y-0 overflow-hidden`}>
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${cat.gradient}`} />
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
+                    <Icon className={`h-5 w-5 ${cat.iconColor}`} />
+                  </div>
+                  <span className="text-2xl">{cat.dot}</span>
+                </div>
+                <div className={`text-4xl font-bold mb-1 ${cat.countColor}`}>
+                  {cat.slug === 'pending-follow-up' ? '—' : count}
+                </div>
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{cat.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {cat.slug === 'pending-follow-up' ? 'Coming soon' : count === 0 ? 'No patients' : count === 1 ? '1 patient' : `${count} patients`}
+                </div>
+                <div className="mt-4 flex items-center text-xs font-medium text-muted-foreground group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">
+                  {cat.slug === 'pending-follow-up' ? 'View priority' : 'View patients'}
+                  <svg className="ml-1 h-3 w-3 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Archive / Deceased Section */}
+      <Link href="/dashboard/category/archive">
+        <div className="group relative rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-6 cursor-pointer transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-slate-200 dark:bg-slate-800/80">
+                <AlertCircle className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚫</span>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Archived / Deceased</h3>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Access clinical records for patients who have been discharged or declared deceased.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
+                {counts['Deceased/Archive']}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Records</div>
+            </div>
+          </div>
+        </div>
+      </Link>
+      
+      {/* ── ER Patients Section ── */}
+      <Link href="/dashboard/er">
+        <div className="group relative rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-6 cursor-pointer transition-all hover:shadow-md mt-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-rose-100 dark:bg-rose-900/60">
+                <AlertCircle className="h-6 w-6 text-rose-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🚑</span>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">ER Patients</h3>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Patients from {profile?.ward_name || 'your ward'} currently receiving emergency care.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-rose-600 dark:text-rose-400">
+                {counts['ER Patients']}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Current in ER</div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </div>
+  )
+}

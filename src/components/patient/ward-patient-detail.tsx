@@ -4,7 +4,8 @@ import Link from "next/link"
 import { 
   AlertTriangle, Activity, FileText, User, 
   Heart, Database, Layers, FlaskConical as Flask, 
-  Clipboard as ClipboardIcon, Ambulance 
+  Clipboard as ClipboardIcon, Ambulance, Stethoscope,
+  Droplets, Thermometer
 } from "lucide-react"
 import { ReferralModal } from "@/components/patient/referral-modal"
 import { DeletePatientButton } from "@/components/patient/delete-button"
@@ -24,6 +25,11 @@ import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
 import { isLabAbnormal, safeJsonParse } from "@/lib/utils"
 import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
+import { GueHistoryIcon } from "@/components/laboratory/GueHistoryIcon"
+import { AddNurseInstructionModal } from "@/components/patient/AddNurseInstructionModal"
+import { createClient } from "@/lib/supabase"
+import { useEffect, useState } from "react"
+import { Clock, Check, UserRoundCog, ClipboardList } from "lucide-react"
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   'High Risk':       { label: 'High Risk',       color: 'text-red-700 dark:text-red-300',    bg: 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800',    dot: '🔴' },
@@ -46,18 +52,95 @@ export function WardPatientDetail({
   visits, 
   investigations, 
   aiEnabled, 
-  wardName 
+  wardName,
+  profile: initialProfile
 }: { 
   patient: any, 
   visits: any[], 
   investigations: any[], 
   aiEnabled: boolean,
-  wardName?: string
+  wardName?: string,
+  profile?: any
 }) {
   const lastVisit = visits?.[0] ?? null
   const lastInv = investigations?.[0] ?? null
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
   const isDeceased = patient.category === 'Deceased/Archive';
+  const [instructions, setInstructions] = useState<any[]>([])
+  const [profile, setProfile] = useState<any>(initialProfile || null)
+  const [showAllInstructions, setShowAllInstructions] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchInstructions()
+    fetchProfile()
+  }, [patient.id])
+
+  async function fetchProfile() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data } = await supabase.from('user_profiles').select('*').eq('user_id', user.id).single()
+      setProfile(data)
+    }
+  }
+
+  async function fetchInstructions() {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('nurse_instructions')
+      .select('*')
+      .eq('patient_id', patient.id)
+      .order('created_at', { ascending: false })
+    
+    if (data) setInstructions(data)
+  }
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`patient-instructions-${patient.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'nurse_instructions',
+          filter: `patient_id=eq.${patient.id}`
+        },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT') {
+            setInstructions(prev => [payload.new, ...prev])
+          } else if (payload.eventType === 'UPDATE') {
+            setInstructions(prev => prev.map(inst => 
+              inst.id === payload.new.id ? { ...inst, ...payload.new } : inst
+            ))
+          } else if (payload.eventType === 'DELETE') {
+            setInstructions(prev => prev.filter(inst => inst.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [patient.id])
+
+  const handleDeleteInstruction = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this instruction?")) return
+    setIsDeleting(id)
+    try {
+      const { deleteNurseInstructionAction } = await import("@/app/actions/nurse-actions")
+      const res = await deleteNurseInstructionAction(id)
+      if (res.error) throw new Error(res.error)
+      setInstructions(prev => prev.filter(i => i.id !== id))
+    } catch (err: any) {
+      alert(err.message || "Failed to delete")
+    } finally {
+      setIsDeleting(null)
+    }
+  }
 
   const displayPatient = {
     ...patient,
@@ -147,7 +230,7 @@ export function WardPatientDetail({
               </p>
             </div>
           </div>
-          {!isDeceased && (
+          {!isDeceased && profile?.role?.toLowerCase() !== 'nurse' && (
             <div className="shrink-0 w-full xs:w-auto flex justify-end">
               <CategorySwitcher patientId={patient.id} currentCategory={patient.category} />
             </div>
@@ -158,22 +241,44 @@ export function WardPatientDetail({
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 px-1 py-1 overflow-visible">
           {!isDeceased ? (
             <>
-              <AddVisitModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
-              <AddInvestigationModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
-              {!patient.is_referred && <ReferralModal patientId={patient.id} isReferred={false} />}
-              <ExportPatientButton patient={displayPatient} />
-              <ShareAIPromptModal patient={displayPatient} />
-              <AddReminderModal patientId={patient.id} patientName={patient.name} />
-              <EditPatientModal patient={patient} disabled={patient.is_referred} />
-              <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} disabled={patient.is_referred} />
-              <MoveToErModal patientId={patient.id} isEr={patient.is_in_er} disabled={patient.is_referred} />
-              <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+              {profile?.role?.toLowerCase() !== 'nurse' && (
+                <>
+                  <AddVisitModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
+                  <AddInvestigationModal patientId={patient.id} variant="icon" disabled={patient.is_referred} />
+                  {!patient.is_referred && (
+                    <ReferralModal 
+                      patientId={patient.id} 
+                      isReferred={false} 
+                      patient={patient}
+                      latestVisit={lastVisit}
+                      latestInvestigation={lastInv}
+                    />
+                  )}
+                  <ExportPatientButton patient={displayPatient} initialInstructions={instructions} />
+                  <ShareAIPromptModal patient={displayPatient} />
+                  <AddReminderModal patientId={patient.id} patientName={patient.name} />
+                  <AddNurseInstructionModal 
+                     patientId={patient.id} 
+                     patientName={patient.name} 
+                     wardName={patient.ward_name || wardName || "General Ward"} 
+                     variant="icon"
+                   />
+                  <MoveToErModal patientId={patient.id} isEr={patient.is_in_er} disabled={patient.is_referred} />
+                  <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+                  <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} disabled={patient.is_referred} />
+                </>
+              )}
+              <EditPatientModal patient={patient} disabled={patient.is_referred} role={profile?.role} />
             </>
           ) : (
             <>
-              <ExportPatientButton patient={displayPatient} />
-              <ShareAIPromptModal patient={displayPatient} />
-              <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+              {profile?.role?.toLowerCase() !== 'nurse' && (
+                <>
+                  <ExportPatientButton patient={displayPatient} initialInstructions={instructions} />
+                  <ShareAIPromptModal patient={displayPatient} />
+                  <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+                </>
+              )}
             </>
           )}
         </div>
@@ -205,7 +310,7 @@ export function WardPatientDetail({
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col glass-card">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-rose-50/60 dark:bg-rose-900/40">
             <div className="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40">
               <Heart className="h-4 w-4 text-rose-500 dark:text-rose-400" />
             </div>
@@ -278,88 +383,260 @@ export function WardPatientDetail({
       </div>
 
       {/* ── Last Snapshot ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-900/10">
-            <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-              <Flask className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Investigation</h2>
-          </div>
-          {lastInv ? (
-            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-center">
-              {[
-                { key: 'wbc', label: 'WBC', value: lastInv.wbc },
-                { key: 'hb', label: 'Hb', value: lastInv.hb },
-                { key: 's_urea', label: 'Urea', value: lastInv.s_urea },
-                { key: 's_creatinine', label: 'Creat', value: lastInv.s_creatinine },
-                { key: 'ast', label: 'AST', value: lastInv.ast },
-                { key: 'alt', label: 'ALT', value: lastInv.alt },
-                { key: 'tsb', label: 'TSB', value: lastInv.tsb },
-                { key: 'hba1c', label: 'HbA1c', value: lastInv.hba1c },
-                { key: 'rbs', label: 'RBS', value: lastInv.rbs },
-                { key: 'esr', label: 'ESR', value: lastInv.esr },
-                { key: 'crp', label: 'CRP', value: lastInv.crp },
-                ...(Array.isArray(lastInv.other_labs) ? lastInv.other_labs.map((l: any) => ({ 
-                  key: 'other', 
-                  label: l.name, 
-                  value: l.value 
-                })) : [])
-              ]
-              .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
-              .map(item => (
-                <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl py-2 px-1.5 border border-slate-100 dark:border-slate-800 flex flex-col justify-center min-h-[52px]">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{item.label}</p>
-                  <p className={`text-sm font-black tabular-nums transition-colors ${isLabAbnormal(item.key === 'other' ? item.label : item.key, item.value) ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
-                    {item.value ?? '—'}
-                  </p>
+      {profile?.role?.toLowerCase() !== 'nurse' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-blue-900/10">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                    <Flask className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Investigation</h2>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-10 flex flex-col items-center justify-center opacity-40">
-               <Flask className="h-8 w-8 text-slate-300 mb-2" />
-               <p className="text-xs italic font-medium">No Investigations Recorded</p>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-emerald-50/60 dark:bg-emerald-900/10">
-            <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-              <ClipboardIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Visit</h2>
+                {lastInv && <GueHistoryIcon investigation={lastInv} />}
+              </div>
+            {lastInv ? (
+              <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-center">
+                {[
+                  { key: 'wbc', label: 'WBC', value: lastInv.wbc },
+                  { key: 'hb', label: 'Hb', value: lastInv.hb },
+                  { key: 's_urea', label: 'Urea', value: lastInv.s_urea },
+                  { key: 's_creatinine', label: 'Creat', value: lastInv.s_creatinine },
+                  { key: 'ast', label: 'AST', value: lastInv.ast },
+                  { key: 'alt', label: 'ALT', value: lastInv.alt },
+                  { key: 'tsb', label: 'TSB', value: lastInv.tsb },
+                  { key: 'hba1c', label: 'HbA1c', value: lastInv.hba1c },
+                  { key: 'rbs', label: 'RBS', value: lastInv.rbs },
+                  { key: 'ka', label: 'Ka', value: lastInv.ka },
+                  { key: 'na', label: 'Na', value: lastInv.na },
+                  { key: 'cl', label: 'Cl', value: lastInv.cl },
+                  { key: 'ca', label: 'Ca', value: lastInv.ca },
+                  { key: 'esr', label: 'ESR', value: lastInv.esr },
+                  { key: 'crp', label: 'CRP', value: lastInv.crp },
+                  ...(Array.isArray(lastInv.other_labs) ? lastInv.other_labs.map((l: any) => ({ 
+                    key: 'other', 
+                    label: l.name, 
+                    value: l.value 
+                  })) : [])
+                ]
+                .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
+                .map(item => (
+                  <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl py-2 px-1.5 border border-slate-100 dark:border-slate-800 flex flex-col justify-center min-h-[52px]">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5 leading-none">{item.label}</p>
+                    <p className={`text-sm font-black tabular-nums transition-colors ${isLabAbnormal(item.key === 'other' ? item.label : item.key, item.value) ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                      {item.value ?? '—'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-10 flex flex-col items-center justify-center opacity-40">
+                 <Flask className="h-8 w-8 text-slate-300 mb-2" />
+                 <p className="text-xs italic font-medium">No Investigations Recorded</p>
+              </div>
+            )}
           </div>
-          {lastVisit ? (
-            <div className="p-5 text-sm text-slate-700 dark:text-slate-300 italic">{lastVisit.exam_notes || 'No notes'}</div>
-          ) : <p className="p-8 text-center text-sm italic text-muted-foreground">No visits</p>}
+
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-emerald-50/60 dark:bg-emerald-900/10">
+              <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
+                <ClipboardIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h2 className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Last Visit</h2>
+            </div>
+            {lastVisit ? (
+              <div className="p-4 sm:p-5 flex flex-col gap-4">
+                <p className="text-sm text-slate-700 dark:text-slate-300 italic">
+                  "{lastVisit.exam_notes || 'No notes'}"
+                </p>
+                
+                {/* Vitals Summary */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 border-t border-slate-50 dark:border-slate-800/50">
+                  <div className="flex items-center gap-1.5">
+                    <Stethoscope className="h-3.5 w-3.5 text-rose-500" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.bp_sys || '?'}/{lastVisit.bp_dia || '?'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.pr ? `${lastVisit.pr} bpm` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-rose-600" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.rr ? `${lastVisit.rr} bpm` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Droplets className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.spo2 ? `${lastVisit.spo2}%` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Thermometer className="h-3.5 w-3.5 text-orange-500" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      {lastVisit.temp ? `${lastVisit.temp}°C` : '--'}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-bold text-emerald-600">
+                  {format(parseISO(lastVisit.visit_date), 'dd MMM yyyy, HH:mm')}
+                </p>
+              </div>
+            ) : <p className="p-8 text-center text-sm italic text-muted-foreground">No visits recorded</p>}
+          </div>
         </div>
-      </div>
+      )}
 
        {/* ── Sub-pages Link Cards ── */}
-       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <Link href={`/patient/${patient.id}/investigations`}>
-          <div className="bg-white dark:bg-slate-900 border border-blue-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
-             <div className="flex items-center gap-4">
-                <Activity className="text-blue-500" />
-                <span className="font-bold">Investigation History</span>
-             </div>
-             <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-        </Link>
-        <Link href={`/patient/${patient.id}/visits`}>
-          <div className="bg-white dark:bg-slate-900 border border-emerald-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
-             <div className="flex items-center gap-4">
-                <FileText className="text-emerald-500" />
-                <span className="font-bold">Clinical Visit History</span>
-             </div>
-             <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-        </Link>
-      </div>
+       {profile?.role?.toLowerCase() !== 'nurse' && (
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Link href={`/patient/${patient.id}/investigations`}>
+            <div className="bg-white dark:bg-slate-900 border border-blue-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
+               <div className="flex items-center gap-4">
+                  <Activity className="text-blue-500" />
+                  <span className="font-bold">Investigation History</span>
+               </div>
+               <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </Link>
+          <Link href={`/patient/${patient.id}/visits`}>
+            <div className="bg-white dark:bg-slate-900 border border-emerald-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
+               <div className="flex items-center gap-4">
+                  <FileText className="text-emerald-500" />
+                  <span className="font-bold">Clinical Visit History</span>
+               </div>
+               <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
-      {!isDeceased && <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />}
+       {!isDeceased && profile?.role?.toLowerCase() !== 'nurse' && (
+         <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />
+       )}
+
+       {/* ── Nurse Instruction History ── */}
+       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-blue-50/50 dark:bg-blue-900/10">
+             <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                   <UserRoundCog className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                   <h2 className="font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Nurse Instruction Record</h2>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clinical Coordination Log</p>
+                </div>
+             </div>
+             {profile?.role?.toLowerCase() !== 'nurse' && (
+               <AddNurseInstructionModal 
+                 patientId={patient.id} 
+                 patientName={patient.name} 
+                 wardName={patient.ward_name || wardName || "General Ward"} 
+                 variant="button" 
+               />
+             )}
+          </div>
+          
+          <div className="p-6">
+             {instructions.length === 0 ? (
+               <div className="py-12 flex flex-col items-center gap-3 opacity-30">
+                  <ClipboardList className="h-10 w-10" />
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">No instructions recorded for this patient</p>
+               </div>
+             ) : (
+                <div className="space-y-4">
+                  {(showAllInstructions ? instructions : instructions.slice(0, 1)).map((inst) => {
+                    const createdDate = new Date(inst.created_at)
+                    const isEditable = profile?.user_id === inst.doctor_id && (Date.now() - createdDate.getTime() < 24 * 60 * 60 * 1000)
+
+                    return (
+                      <div key={inst.id} className={`p-4 rounded-3xl border-2 transition-all ${
+                        inst.is_read 
+                          ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
+                          : 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 ring-2 ring-blue-500/10'
+                      }`}>
+                         <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-2 flex-1">
+                               <p className="text-sm font-bold text-slate-800 dark:text-slate-200 italic leading-relaxed">
+                                  "{inst.instruction}"
+                               </p>
+                               <div className="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-tight text-slate-500">
+                                  <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                     <Stethoscope className="h-3 w-3" /> Dr. {inst.doctor_name || 'Staff Physician'}
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                     <Clock className="h-3 w-3" /> Issued: {format(parseISO(inst.created_at), 'dd MMM yyyy, HH:mm')}
+                                  </span>
+                               </div>
+                            </div>
+                            
+                            <div className="shrink-0 flex flex-col items-end gap-2">
+                               {inst.is_read ? (
+                                 <div className="flex flex-col items-end gap-1">
+                                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200 gap-1.5 px-3 py-1 text-[9px] font-black tracking-widest">
+                                       <Check className="h-3 w-3" /> ACKNOWLEDGED
+                                    </Badge>
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                       By Nurse {inst.read_by_nurse_name}
+                                    </p>
+                                 </div>
+                               ) : (
+                                 <div className="flex flex-col items-end gap-2">
+                                   <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200 gap-1.5 px-3 py-1 text-[9px] font-black tracking-widest animate-pulse">
+                                      <Clock className="h-3 w-3" /> PENDING
+                                   </Badge>
+                                   
+                                   {isEditable && (
+                                     <div className="flex items-center gap-2">
+                                       <AddNurseInstructionModal 
+                                         patientId={patient.id} 
+                                         patientName={patient.name} 
+                                         wardName={patient.ward_name} 
+                                         variant="icon"
+                                         initialInstruction={inst.instruction}
+                                         instructionId={inst.id}
+                                       />
+                                       <Button 
+                                         variant="ghost" 
+                                         size="icon" 
+                                         className="h-8 w-8 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                                         onClick={() => handleDeleteInstruction(inst.id)}
+                                         disabled={isDeleting === inst.id}
+                                       >
+                                         <AlertTriangle className="h-4 w-4" />
+                                       </Button>
+                                     </div>
+                                   )}
+                                 </div>
+                               )}
+                            </div>
+                         </div>
+                      </div>
+                    )
+                  })}
+
+                  {instructions.length > 1 && (
+                    <div className="flex justify-center pt-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700"
+                        onClick={() => setShowAllInstructions(!showAllInstructions)}
+                      >
+                        {showAllInstructions ? "Show Less" : `Show All (${instructions.length})`}
+                      </Button>
+                    </div>
+                  )}
+               </div>
+             )}
+          </div>
+       </div>
     </div>
   )
 }

@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, Clock, Activity, CalendarClock, Loader2, RefreshCw } from 'lucide-react'
+import { AlertCircle, Clock, Activity, CalendarClock, Loader2, RefreshCw, Database, Brain } from 'lucide-react'
 import { ExportButton } from '@/components/dashboard/export-button'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { DashboardSearch } from '@/components/dashboard/dashboard-search'
 import { useDatabase } from '@/hooks/useDatabase'
+import { safeJsonParse } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const CATEGORIES = [
   {
@@ -63,6 +65,19 @@ const CATEGORIES = [
     countColor: 'text-violet-700 dark:text-violet-300',
     dot: '🕐',
   },
+  {
+    slug: 'awaiting-assessment',
+    label: 'Awaiting Assessment',
+    dbValue: 'Awaiting Assessment',
+    icon: Activity,
+    gradient: 'from-blue-500 to-indigo-600',
+    lightBg: 'bg-blue-50 dark:bg-blue-950/30',
+    border: 'border-blue-200 dark:border-blue-900/40',
+    iconBg: 'bg-blue-100 dark:bg-blue-900/50',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    countColor: 'text-blue-700 dark:text-blue-300',
+    dot: '🔵',
+  },
 ]
 
 interface PatientSummary {
@@ -73,13 +88,15 @@ interface PatientSummary {
   is_in_er: boolean
   last_activity_at: string | null
   created_at: string
+  psychological_diagnosis?: string | null
+  psych_drugs?: any
 }
 
 async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
   const supabase = createClient()
   let query = supabase
     .from('patients')
-    .select('id, name, room_number, category, is_in_er, last_activity_at, created_at')
+    .select('id, name, room_number, category, is_in_er, last_activity_at, created_at, psychological_diagnosis, psych_drugs')
     .limit(5000)
 
   // Master Ward Bypass: Admins or Master Ward users see everyone
@@ -127,6 +144,11 @@ export default function MyWardPage() {
 
         if (profError) throw profError
 
+        if (profileData?.role?.toLowerCase() === 'nurse') {
+          router.replace(`/nurse/ward/${encodeURIComponent(profileData.ward_name || 'General Ward')}`)
+          return
+        }
+
         if (!profileData?.ward_name) {
           router.replace('/dashboard/select-ward');
           return;
@@ -159,6 +181,7 @@ export default function MyWardPage() {
     'close-follow-up': patients.filter(p => p.category === 'Close Follow-up' && !p.is_in_er).length,
     'normal': patients.filter(p => p.category === 'Normal' && !p.is_in_er).length,
     'er-patients': patients.filter(p => p.is_in_er).length,
+    'awaiting-assessment': patients.filter(p => p.category === 'Awaiting Assessment' && !p.is_in_er).length,
     'archive': patients.filter(p => p.category === 'Deceased/Archive').length,
     'pending-follow-up': patients.filter(p => {
       if (p.category === 'Deceased/Archive' || p.is_in_er) return false;
@@ -175,7 +198,7 @@ export default function MyWardPage() {
     total: patients.filter(p => p.category !== 'Deceased/Archive' && !p.is_in_er).length,
   }
 
-  if (loading && !isReady) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 animate-in fade-in duration-500">
         <div className="relative">
@@ -219,7 +242,7 @@ export default function MyWardPage() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <ExportButton isAdmin={profile?.role?.toLowerCase() === 'admin'} />
-            <AddPatientModal />
+            <AddPatientModal role={profile?.role} />
           </div>
         </div>
       </div>
@@ -231,10 +254,74 @@ export default function MyWardPage() {
         <DashboardSearch patients={patients || []} />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      {profile?.specialty === 'psychiatry' ? (
+        <div className="space-y-4 pt-4 animate-in fade-in">
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Active Ward Patients</h3>
+          {patients.filter(p => !p.is_in_er && p.category !== 'Deceased/Archive').length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {patients.filter(p => !p.is_in_er && p.category !== 'Deceased/Archive').map((p, i) => (
+                <Link key={p.id} href={`/patient/${p.id}?view=ward`} prefetch={true}>
+                  <div className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer glass-card" style={{ animationDelay: `${i * 30}ms` }}>
+                    <div className="flex justify-between items-center gap-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-100 text-lg truncate">{p.name}</h4>
+                        <div className="flex flex-col gap-2 mt-2">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 rounded-md bg-indigo-50 dark:bg-indigo-900/30">
+                              <Brain className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            <div className="flex flex-col">
+                              <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
+                                {p.psychological_diagnosis || 'Unspecified'}
+                              </p>
+                              {p.psych_last_edit_by && (
+                                <p className="text-[9px] font-medium text-indigo-400/80">
+                                  Signed by {p.psych_last_edit_by}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                      
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {safeJsonParse(p.psych_drugs).length > 0 ? (
+                              safeJsonParse(p.psych_drugs).slice(0, 2).map((drug: any, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-[9px] h-4 px-1.5 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/20">
+                                  {drug.name}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-[10px] italic text-slate-400">No chronic psych meds</span>
+                            )}
+                            {safeJsonParse(p.psych_drugs).length > 2 && (
+                              <span className="text-[9px] font-bold text-slate-400">+{safeJsonParse(p.psych_drugs).length - 2} more</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 shrink-0 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/30 transition-colors">
+                        <span className="text-slate-400 group-hover:text-indigo-600 transition-colors font-bold text-lg">→</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+             <div className="flex flex-col items-center justify-center py-16 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800">
+               <Activity className="h-10 w-10 text-slate-300 mb-3" />
+               <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">No active patients found in this ward</p>
+             </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {CATEGORIES.map((cat, index) => {
           const Icon = cat.icon
           const count = counts[cat.slug as keyof typeof counts] as number
+          
+          // Hide awaiting assessment if empty
+          if (cat.slug === 'awaiting-assessment' && count === 0) return null
           return (
             <Link key={cat.slug} href={`/dashboard/category/${cat.slug}`} prefetch={true}>
               <div
@@ -322,9 +409,11 @@ export default function MyWardPage() {
           </div>
         </div>
       </Link>
+      </>
+      )}
 
       {/* Debug Monitor - Unobtrusive but accessible for diagnostics */}
-      {(profile?.role === 'admin' || profile?.ward_name === 'Master Ward') && debugInfo && (
+      {(profile?.role?.toLowerCase() === 'admin' || profile?.ward_name === 'Master Ward') && debugInfo && (
         <div className="mt-20 pt-8 border-t border-dashed border-slate-200 dark:border-slate-800 opacity-20 hover:opacity-100 transition-opacity">
            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">
              <Activity className="h-3 w-3" /> System Diagnostic Monitor

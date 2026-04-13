@@ -32,6 +32,10 @@ export function isLabAbnormal(key: string, value: number | string | undefined | 
     case "rbs": return val > 200;
     case "esr": return val > 20;
     case "crp": return val > 10;
+    case "ka": return val < 3.5 || val > 5.0;
+    case "na": return val < 135 || val > 145;
+    case "cl": return val < 98 || val > 107;
+    case "ca": return val < 8.5 || val > 10.5;
     default: return false;
   }
 }
@@ -54,3 +58,28 @@ export function safeJsonParse<T = any>(data: any): T[] {
   return [];
 }
 
+
+/**
+ * Helper to get the start of the current 9 AM Baghdad shift in UTC.
+ * Baghdad is UTC+3.
+ */
+export function getBaghdadShiftStart() {
+  const now = new Date();
+  const baghdadOffsetIdx = 3 * 60 * 60 * 1000;
+  const baghdadTime = new Date(now.getTime() + baghdadOffsetIdx);
+  
+  const shiftToday = new Date(baghdadTime);
+  shiftToday.setUTCHours(9, 0, 0, 0);
+  
+  let shiftStartBaghdad;
+  if (baghdadTime.getUTCHours() < 9) {
+    const shiftYesterday = new Date(shiftToday);
+    shiftYesterday.setUTCDate(shiftToday.getUTCDate() - 1);
+    shiftStartBaghdad = shiftYesterday;
+  } else {
+    shiftStartBaghdad = shiftToday;
+  }
+  
+  // Return the date converted back to UTC
+  return new Date(shiftStartBaghdad.getTime() - baghdadOffsetIdx);
+}

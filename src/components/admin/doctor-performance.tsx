@@ -5,6 +5,7 @@ import { Activity, Stethoscope, AlertCircle, FileText, CheckCircle2, Clock, Sear
 
 export function DoctorPerformance({ users, patients }: { users: any[], patients: any[] }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [specialtyFilter, setSpecialtyFilter] = useState('all')
   
   const performanceMetrics = useMemo(() => {
     if (!users || !patients) return []
@@ -76,12 +77,14 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
   }, [users, patients])
 
   const filteredMetrics = useMemo(() => {
-    return performanceMetrics.filter(m => 
-      m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.displayWard?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.ward_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [performanceMetrics, searchTerm])
+    return performanceMetrics.filter(m => {
+      const matchesSearch = m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          m.displayWard?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          m.ward_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSpecialty = specialtyFilter === 'all' || m.specialty === specialtyFilter
+      return matchesSearch && matchesSpecialty
+    })
+  }, [performanceMetrics, searchTerm, specialtyFilter])
 
   return (
     <div className="space-y-6">
@@ -89,15 +92,26 @@ export function DoctorPerformance({ users, patients }: { users: any[], patients:
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Activity className="h-5 w-5 text-teal-500" /> Doctor Performance Matrix
         </h2>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="Search doctor or ward..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all w-64 shadow-sm"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input 
+              type="text"
+              placeholder="Search doctor or ward..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all w-48 shadow-sm"
+            />
+          </div>
+          <select 
+            value={specialtyFilter}
+            onChange={(e) => setSpecialtyFilter(e.target.value)}
+            className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20className%3D%22lucide%20lucide-chevron-down%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%3E%3C/path%3E%3C/svg%3E')] bg-[length:16px] bg-[right_8px_center] bg-no-repeat"
+          >
+            <option value="all">All Specialties</option>
+            <option value="psychiatry">Psychiatry</option>
+            <option value="internal_medicine">Internal Medicine</option>
+          </select>
         </div>
       </div>
 

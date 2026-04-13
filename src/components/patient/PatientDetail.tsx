@@ -4,6 +4,7 @@ import { useDatabase } from '@/hooks/useDatabase'
 import { useState, useEffect } from 'react'
 import { WardPatientDetail } from '@/components/patient/ward-patient-detail'
 import { ErPatientDetail } from '@/components/patient/er-patient-detail'
+import { PsychPatientDetail } from '@/components/patient/psych-patient-detail'
 import type { Patient, Visit, Investigation, UserProfile } from '@/types/database.types'
 
 interface PatientDetailProps {
@@ -54,17 +55,35 @@ export function PatientDetail({
         investigations={invList}
         aiEnabled={aiEnabled}
         wardName={wardName}
+        profile={profile}
       />
     );
   }
 
+  if (profile?.specialty === 'psychiatry' && view !== 'er') {
+    return (
+      <PsychPatientDetail 
+        patient={patient}
+        visits={visitList}
+        investigations={invList}
+        aiEnabled={aiEnabled}
+        wardName={wardName}
+        profile={profile}
+      />
+    );
+  }
+
+  // Hide psych notes from standard Ward view
+  const wardVisits = visitList?.filter((v: any) => !v.is_psych_note) || [];
+
   return (
     <WardPatientDetail 
       patient={patient}
-      visits={visitList}
+      visits={wardVisits}
       investigations={invList}
       aiEnabled={aiEnabled}
       wardName={wardName}
+      profile={profile}
     />
   );
 }

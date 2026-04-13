@@ -8,9 +8,9 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
 // Maps route patterns to their logical parent (not history-based)
-function getParentRoute(pathname: string, isMultiWard: boolean, fromParam?: string | null): string | null {
-  // If we came from a specific category, return there
-  if (fromParam && pathname.startsWith('/patient/')) {
+function getParentRoute(pathname: string, isMultiWard: boolean, fromParam?: string | null, role?: string | null, wardName?: string | null): string | null {
+  // If we came from a specific category, return there (Doctor/Admin Only)
+  if (fromParam && pathname.startsWith('/patient/') && role?.toLowerCase() !== 'nurse') {
     return `/dashboard/category/${fromParam}`
   }
 
@@ -19,8 +19,11 @@ function getParentRoute(pathname: string, isMultiWard: boolean, fromParam?: stri
     const patientId = pathname.split('/')[2]
     return `/patient/${patientId}`
   }
-  // Patient detail → my ward
+  // Patient detail → my ward (Role Based)
   if (/^\/patient\/[^/]+$/.test(pathname)) {
+    if (role?.toLowerCase() === 'nurse') {
+        return `/nurse/ward/${encodeURIComponent(wardName || 'General Ward')}`
+    }
     return '/dashboard/my-ward'
   }
   // Category pages → my ward
@@ -51,6 +54,10 @@ function getParentRoute(pathname: string, isMultiWard: boolean, fromParam?: stri
   if (pathname.startsWith('/reminders')) {
     return '/dashboard'
   }
+  // Lab Alerts / History → back to lab dashboard for techs
+  if (pathname.startsWith('/laboratory/alerts') || pathname.startsWith('/laboratory/patient/')) {
+      return '/laboratory'
+  }
   return null
 }
 
@@ -68,27 +75,34 @@ function NavigationButtonsInner() {
   const searchParams = useSearchParams()
   const fromParam = searchParams.get('from')
   const [isMultiWard, setIsMultiWard] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
-    // Only fetch if on my-ward to avoid unnecessary requests on every page
-    if (pathname !== '/dashboard/my-ward') return
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user
       if (!user) return
       ;(supabase.from('user_profiles') as any)
-        .select('accessible_wards')
+        .select('accessible_wards, role, ward_name')
         .eq('user_id', user.id)
         .single()
         .then(({ data }: any) => {
           const wards = data?.accessible_wards
           setIsMultiWard(Array.isArray(wards) && wards.length > 1)
+          setUserRole(data?.role || null)
+          setWardName(data?.ward_name || null)
         })
     })
   }, [pathname])
 
-  const isDashboard = pathname === '/dashboard'
-  const parentRoute = getParentRoute(pathname, isMultiWard, fromParam)
+  const isDashboard = pathname === '/dashboard' || pathname === '/laboratory' || pathname === '/pharmacy' || pathname.startsWith('/nurse/ward/')
+  const [wardName, setWardName] = useState<string | null>(null)
+  const parentRoute = getParentRoute(pathname, isMultiWard, fromParam, userRole, wardName)
+
+  const homeHref = pathname.startsWith('/laboratory') ? '/laboratory' : 
+                   pathname.startsWith('/pharmacy') ? '/pharmacy' : 
+                   userRole?.toLowerCase() === 'nurse' && wardName ? `/nurse/ward/${encodeURIComponent(wardName)}` :
+                   '/dashboard'
 
   if (isDashboard) return null
 
@@ -108,7 +122,7 @@ function NavigationButtonsInner() {
 
       {!isDashboard && (
         <>
-          <Link href="/dashboard" prefetch={true}>
+          <Link href={homeHref} prefetch={true}>
             <Button
               variant="ghost"
               size="icon"

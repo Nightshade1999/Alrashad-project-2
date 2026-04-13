@@ -18,6 +18,10 @@ BEGIN
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS can_see_ward_patients BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
         ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS doctor_name TEXT;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS nurse_name TEXT;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS lab_tech_name TEXT;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS pharmacist_name TEXT;
+        ALTER TABLE public.user_profiles ADD COLUMN IF NOT EXISTS is_name_fixed BOOLEAN DEFAULT false;
         
         -- Force re-applying defaults to existing columns
         ALTER TABLE public.user_profiles ALTER COLUMN ward_name SET DEFAULT 'Unassigned';
@@ -26,7 +30,7 @@ BEGIN
         ALTER TABLE public.user_profiles ALTER COLUMN offline_mode_enabled SET DEFAULT false;
         ALTER TABLE public.user_profiles ALTER COLUMN can_see_ward_patients SET DEFAULT false;
         ALTER TABLE public.user_profiles ALTER COLUMN is_admin SET DEFAULT false;
-        ALTER TABLE public.user_profiles ALTER COLUMN role SET DEFAULT 'user';
+        ALTER TABLE public.user_profiles ALTER COLUMN role SET DEFAULT 'doctor';
         ALTER TABLE public.user_profiles ALTER COLUMN specialty SET DEFAULT 'psychiatry';
     END IF;
 
@@ -61,6 +65,7 @@ BEGIN
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS bp_sys INTEGER;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS bp_dia INTEGER;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS pr INTEGER;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS rr INTEGER;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS spo2 INTEGER;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS temp NUMERIC;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_conscious BOOLEAN DEFAULT true;
@@ -68,6 +73,7 @@ BEGIN
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_ambulatory BOOLEAN DEFAULT true;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_dyspnic BOOLEAN DEFAULT false;
         ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_soft_abdomen BOOLEAN DEFAULT true;
+        ALTER TABLE public.visits ADD COLUMN IF NOT EXISTS is_psych_note BOOLEAN DEFAULT false;
 
         -- Terminology migration
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='visits' AND column_name='bp_systolic') THEN
@@ -80,6 +86,9 @@ BEGIN
         ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS is_er BOOLEAN DEFAULT false;
         ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS serology JSONB DEFAULT '{}'::jsonb;
         ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS tg NUMERIC;
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS ldl NUMERIC;
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS hdl NUMERIC;
+        ALTER TABLE public.investigations ADD COLUMN IF NOT EXISTS cholesterol NUMERIC;
         
         -- Terminology migration
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='investigations' AND column_name='triglycerides') THEN
@@ -112,12 +121,15 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     specialty TEXT DEFAULT 'psychiatry',
     gender TEXT,
     doctor_name TEXT,
+    lab_tech_name TEXT,
+    pharmacist_name TEXT,
     is_admin BOOLEAN DEFAULT false,
     ai_enabled BOOLEAN DEFAULT true,
     offline_mode_enabled BOOLEAN DEFAULT false,
     can_see_ward_patients BOOLEAN DEFAULT false,
     accessible_wards TEXT[] DEFAULT '{}'::text[],
-    role TEXT NOT NULL DEFAULT 'user',
+    is_name_fixed BOOLEAN DEFAULT false,
+    role TEXT NOT NULL DEFAULT 'doctor',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -127,7 +139,7 @@ CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.user_profiles (user_id, role, specialty, ward_name, is_admin)
-  VALUES (new.id, 'user', 'psychiatry', 'Unassigned', false)
+  VALUES (new.id, 'doctor', 'psychiatry', 'Unassigned', false)
   ON CONFLICT (user_id) DO NOTHING;
   RETURN new;
 END;
@@ -162,10 +174,20 @@ CREATE TABLE IF NOT EXISTS public.patients (
     psychological_diagnosis TEXT,
     relative_status TEXT DEFAULT 'Unknown',
     relative_visits TEXT,
-    date_of_death DATE,
     cause_of_death TEXT,
     admission_date TIMESTAMPTZ,
     last_activity_at TIMESTAMPTZ,
+    
+    -- Audit Tracking
+    psych_last_edit_by TEXT,
+    psych_last_edit_at TIMESTAMPTZ,
+    er_treatment_last_edit_by TEXT,
+    er_treatment_last_edit_at TIMESTAMPTZ,
+    
+    -- Referral Status
+    is_referred BOOLEAN DEFAULT false,
+    referral_hospital TEXT,
+    referral_date DATE,
     
     -- Clinical Arrays (Optimized for PWA)
     past_surgeries TEXT[] DEFAULT '{}',
@@ -195,11 +217,13 @@ CREATE TABLE IF NOT EXISTS public.visits (
     visit_date TIMESTAMPTZ DEFAULT NOW(),
     exam_notes TEXT NOT NULL,
     is_er BOOLEAN DEFAULT false,
+    is_psych_note BOOLEAN DEFAULT false,
     
     -- Vitals (Synced with frontend types)
     bp_sys INTEGER,
     bp_dia INTEGER,
     pr INTEGER,
+    rr INTEGER,
     spo2 INTEGER,
     temp NUMERIC,
     
@@ -223,6 +247,9 @@ CREATE TABLE IF NOT EXISTS public.investigations (
     doctor_name TEXT,
     date TIMESTAMPTZ DEFAULT NOW(),
     is_er BOOLEAN DEFAULT false,
+    is_critical BOOLEAN DEFAULT false,
+    lab_tech_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    lab_tech_name TEXT,
     
     -- WBC & RBC
     wbc NUMERIC,
@@ -235,6 +262,7 @@ CREATE TABLE IF NOT EXISTS public.investigations (
     s_creatinine NUMERIC,
     ast NUMERIC,
     alt NUMERIC,
+    alp NUMERIC,
     tsb NUMERIC,
     
     -- Glucose & Metabolic
@@ -249,11 +277,18 @@ CREATE TABLE IF NOT EXISTS public.investigations (
     hdl NUMERIC,
     ldl NUMERIC,
     
-    -- Inflammatory & Other
+    -- Electrolytes & Chemistry
+    ka NUMERIC,
+    na NUMERIC,
+    cl NUMERIC,
+    ca NUMERIC,
+    
+    -- Inflammatory & Specialized
     esr NUMERIC,
     crp TEXT,
     serology JSONB DEFAULT '{}'::jsonb, -- Store VDRL, HBsAg, etc
-    other_tests TEXT,
+    gue JSONB DEFAULT '{}'::jsonb,      -- General Urine Exam structured data
+    other_labs JSONB DEFAULT '[]'::jsonb,
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -274,11 +309,140 @@ CREATE TABLE IF NOT EXISTS public.reminders (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Notifications (Real-time activity)
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    patient_id UUID REFERENCES public.patients(id) ON DELETE CASCADE,
+    investigation_id UUID REFERENCES public.investigations(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT false,
+    read_at TIMESTAMPTZ,
+    read_by_doctor_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Lab Reference Ranges / Config
+CREATE TABLE IF NOT EXISTS public.lab_reference_ranges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    min_value NUMERIC,
+    max_value NUMERIC,
+    unit TEXT,
+    category TEXT DEFAULT 'General',
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- Basic Seed Data
+INSERT INTO public.lab_reference_ranges (key, label, min_value, max_value, unit, category)
+VALUES 
+    ('wbc', 'WBC', 4.0, 11.0, 'x10³/µL', 'Hematology'),
+    ('hb', 'Hemoglobin', 12.0, 17.5, 'g/dL', 'Hematology'),
+    ('s_urea', 'S. Urea', 15, 45, 'mg/dL', 'Renal'),
+    ('s_creatinine', 'S. Creatinine', 0.6, 1.2, 'mg/dL', 'Renal'),
+    ('rbs', 'RBS', 70, 140, 'mg/dL', 'Metabolism'),
+    ('hba1c', 'HbA1c', NULL, 6.5, '%', 'Metabolism'),
+    ('ast', 'AST', NULL, 40, 'U/L', 'Liver'),
+    ('alt', 'ALT', NULL, 40, 'U/L', 'Liver'),
+    ('alp', 'ALP', 44, 147, 'U/L', 'Liver'),
+    ('tsb', 'TSB', NULL, 1.2, 'mg/dL', 'Liver'),
+    ('tg', 'TG', NULL, 150, 'mg/dL', 'Lipids'),
+    ('ldl', 'LDL', NULL, 130, 'mg/dL', 'Lipids'),
+    ('hdl', 'HDL', 40, NULL, 'mg/dL', 'Lipids'),
+    ('esr', 'ESR', NULL, 20, 'mm/h', 'Hematology'),
+    ('ka', 'Potassium (Ka)', 3.5, 5.0, 'mmol/L', 'Electrolytes'),
+    ('na', 'Sodium (Na)', 135, 145, 'mmol/L', 'Electrolytes'),
+    ('cl', 'Chloride (Cl)', 98, 107, 'mmol/L', 'Electrolytes'),
+    ('ca', 'Calcium (Ca)', 8.5, 10.5, 'mg/dL', 'Electrolytes')
+ON CONFLICT (key) DO NOTHING;
+
+-- Clinical Referrals (Formal letters & Status)
+CREATE TABLE IF NOT EXISTS public.referrals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES public.patients(id) ON DELETE CASCADE,
+    doctor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    destination TEXT NOT NULL,
+    department TEXT,
+    companion_name TEXT,
+
+    -- Clinical Form Fields
+    indications TEXT,
+    chief_complaint TEXT,
+    history_of_present_illness TEXT,
+    relevant_examination TEXT,
+    treatment_taken TEXT,
+    investigations_text TEXT,
+
+    -- Snapshots (Immutable medical records)
+    vitals_snapshot JSONB DEFAULT '{}'::jsonb,
+    chronic_hx_snapshot JSONB DEFAULT '{}'::jsonb,
+    investigations_snapshot JSONB DEFAULT '{}'::jsonb,
+    er_treatment_snapshot JSONB DEFAULT '[]'::jsonb,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Nurse Instructions (Live clinical orders)
+CREATE TABLE IF NOT EXISTS public.nurse_instructions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+    ward_name TEXT NOT NULL,
+    instruction TEXT NOT NULL,
+    instruction_type TEXT DEFAULT 'single' CHECK (instruction_type IN ('single', 'repetitive')),
+    duration_days INTEGER,
+    expires_at TIMESTAMPTZ,
+    doctor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    doctor_name TEXT, 
+    
+    -- Acknowledgment Fields
+    is_read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMPTZ,
+    read_by_nurse_name TEXT,
+    read_by_nurse_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    acknowledgments JSONB DEFAULT '[]'::jsonb,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Pharmacy Inventory (Storage and Stock)
+CREATE TABLE IF NOT EXISTS public.pharmacy_inventory (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scientific_name TEXT NOT NULL,
+    generic_name TEXT,
+    dosage TEXT,
+    formulation TEXT, 
+    mode_of_administration TEXT,
+    expiration_date DATE,
+    quantity INTEGER DEFAULT 0,
+    min_stock_level INTEGER DEFAULT 10,
+    batch_number TEXT,
+    manufacturer TEXT,
+    price NUMERIC,
+    pharmacist_name TEXT,
+    gudea_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- System Settings (Institutional global flags)
-CREATE TABLE IF NOT EXISTS public.system_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1), -- Singleton
     global_offline_enabled BOOLEAN DEFAULT true,
     updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Future-Proof Recycle Bin System
+CREATE TABLE IF NOT EXISTS public.trash (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    table_name TEXT NOT NULL,
+    data JSONB NOT NULL,
+    original_id UUID NOT NULL,
+    deleted_by_name TEXT,
+    deleted_by_id UUID,
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 3. TRIGGERS
@@ -303,6 +467,65 @@ BEGIN
     PERFORM create_update_trigger('visits');
     PERFORM create_update_trigger('investigations');
     PERFORM create_update_trigger('reminders');
+    PERFORM create_update_trigger('referrals');
+    PERFORM create_update_trigger('pharmacy_inventory');
+    PERFORM create_update_trigger('nurse_instructions');
+END $$;
+
+-- 4. RECYCLE BIN LOGIC
+CREATE OR REPLACE FUNCTION public.proc_move_to_trash()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_actor_name TEXT;
+BEGIN
+    SELECT COALESCE(doctor_name, nurse_name, lab_tech_name, pharmacist_name, 'System/Unidentified')
+    INTO v_actor_name 
+    FROM public.user_profiles 
+    WHERE user_id = auth.uid();
+
+    INSERT INTO public.trash (
+        table_name,
+        data,
+        original_id,
+        deleted_by_id,
+        deleted_by_name
+    ) VALUES (
+        TG_TABLE_NAME,
+        to_jsonb(OLD),
+        OLD.id,
+        auth.uid(),
+        v_actor_name
+    );
+    
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DO $$ 
+BEGIN
+    -- Apply Trash Triggers (Clean legacy variants first to prevent double logging)
+    DROP TRIGGER IF EXISTS tr_trash_inventory ON public.pharmacy_inventory;
+    
+    DROP TRIGGER IF EXISTS tr_trash_patients ON public.patients;
+    CREATE TRIGGER tr_trash_patients BEFORE DELETE ON public.patients FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_visits ON public.visits;
+    CREATE TRIGGER tr_trash_visits BEFORE DELETE ON public.visits FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_investigations ON public.investigations;
+    CREATE TRIGGER tr_trash_investigations BEFORE DELETE ON public.investigations FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_reminders ON public.reminders;
+    CREATE TRIGGER tr_trash_reminders BEFORE DELETE ON public.reminders FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_referrals ON public.referrals;
+    CREATE TRIGGER tr_trash_referrals BEFORE DELETE ON public.referrals FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_nurse_instructions ON public.nurse_instructions;
+    CREATE TRIGGER tr_trash_nurse_instructions BEFORE DELETE ON public.nurse_instructions FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
+
+    DROP TRIGGER IF EXISTS tr_trash_pharmacy_inventory ON public.pharmacy_inventory;
+    CREATE TRIGGER tr_trash_pharmacy_inventory BEFORE DELETE ON public.pharmacy_inventory FOR EACH ROW EXECUTE FUNCTION public.proc_move_to_trash();
 END $$;
 
 -- 4. RLS HELPER FUNCTIONS (Critical for Performance & Stability)
@@ -312,9 +535,16 @@ RETURNS TEXT AS $$
   SELECT role FROM public.user_profiles WHERE user_id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
-CREATE OR REPLACE FUNCTION public.fn_get_user_ward()
-RETURNS TEXT AS $$
-  SELECT ward_name FROM public.user_profiles WHERE user_id = auth.uid();
+CREATE OR REPLACE FUNCTION public.fn_is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT COALESCE(role = 'admin' OR is_admin = true, false) 
+  FROM public.user_profiles WHERE user_id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION public.fn_get_user_ward_info()
+RETURNS TABLE(ward_name TEXT, can_see_ward_patients BOOLEAN, accessible_wards TEXT[]) AS $$
+  SELECT ward_name, can_see_ward_patients, accessible_wards 
+  FROM public.user_profiles WHERE user_id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- 5. ROW LEVEL SECURITY (HARDENED - WARD RESTRICTED)
@@ -327,7 +557,11 @@ BEGIN
     ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.investigations ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.pharmacy_inventory ENABLE ROW LEVEL SECURITY;
     ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.lab_reference_ranges ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
@@ -343,30 +577,36 @@ END $$;
 
 -- User Profiles: Self-read, Self-update, Admin All
 CREATE POLICY "Profiles_Self_Access" ON public.user_profiles 
-FOR ALL TO authenticated USING (auth.uid() = user_id OR (SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
+FOR ALL TO authenticated USING (auth.uid() = user_id OR public.fn_get_user_role() = 'admin');
 
 -- Ward Settings: Authenticated Read, Admin Write
 CREATE POLICY "Settings_Read" ON public.ward_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Settings_Admin" ON public.ward_settings FOR ALL TO authenticated USING ((SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
+CREATE POLICY "Settings_Admin" ON public.ward_settings FOR ALL TO authenticated USING (public.fn_get_user_role() = 'admin');
 
--- Patient ACCESS: Hardened Permission-Based
---   A) User is the owner (creator) of the record
---   B) User is an administrator
---   C) User is in the same ward AND has 'can_see_ward_patients' enabled
---   D) User belongs to 'Master Ward'
+-- Patient ACCESS: Hardened Permission-Based (Case-Insensitive)
 CREATE POLICY "Patient_Hardened_Access" ON public.patients 
 FOR ALL TO authenticated USING (
     auth.uid() = user_id 
+    OR public.fn_is_admin()
     OR EXISTS (
-        SELECT 1 FROM public.user_profiles 
-        WHERE user_id = auth.uid() 
-        AND (
-            role = 'admin' 
-            OR ward_name = 'Master Ward'
-            OR (ward_name = patients.ward_name AND can_see_ward_patients = true)
-            OR patients.ward_name = ANY(accessible_wards) -- Support for multi-ward access
+        SELECT 1 FROM public.fn_get_user_ward_info() i
+        WHERE LOWER(REPLACE(i.ward_name, ' ', '')) = 'masterward'
+        OR (
+            LOWER(REPLACE(i.ward_name, ' ', '')) = LOWER(REPLACE(patients.ward_name, ' ', '')) 
+            AND i.can_see_ward_patients = true
+        )
+        OR EXISTS (
+             SELECT 1 FROM unnest(i.accessible_wards) aw 
+             WHERE LOWER(REPLACE(aw, ' ', '')) = LOWER(REPLACE(patients.ward_name, ' ', ''))
         )
     )
+);
+
+-- Special Laboratory Access: MLTs can search for all patients basic info
+CREATE POLICY "Patient_Lab_Global_Search" ON public.patients
+FOR SELECT TO authenticated
+USING (
+    public.fn_get_user_role() = 'lab_tech'
 );
 
 -- Visits & Investigations: Access inherited from Patient access
@@ -380,13 +620,75 @@ FOR ALL TO authenticated USING (
     EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
 );
 
+-- Laboratory Policy: Lab technicians can insert results
+CREATE POLICY "Investigations_Lab_Insert" ON public.investigations
+FOR INSERT TO authenticated
+WITH CHECK (
+    public.fn_get_user_role() IN ('lab_tech', 'admin')
+);
+
+-- Laboratory Policy: Lab technicians can edit/delete within 24 hours of creation
+CREATE POLICY "Investigations_Lab_Modify_24h" ON public.investigations
+FOR ALL TO authenticated
+USING (
+    public.fn_get_user_role() IN ('lab_tech', 'admin')
+    AND investigations.created_at > (NOW() - INTERVAL '24 hours')
+);
+
 -- Reminders: Global visibility for coordination within medical team
 CREATE POLICY "Reminders_Team_Access" ON public.reminders 
 FOR ALL TO authenticated USING (true);
 
+-- Notifications: Only receiver can see/edit
+CREATE POLICY "Notifications_Recipient_Access" ON public.notifications
+FOR ALL TO authenticated USING (auth.uid() = user_id);
+
+-- Referrals: Access inherited from Patient access
+CREATE POLICY "Referrals_Inherited_Access" ON public.referrals 
+FOR ALL TO authenticated USING (
+    EXISTS (SELECT 1 FROM public.patients WHERE id = patient_id)
+);
+
+-- Nurse Instructions: Read all, doctors manage, nurses acknowledge
+CREATE POLICY "Nurse_Instructions_Read" ON public.nurse_instructions 
+FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Nurse_Instructions_Insert" ON public.nurse_instructions 
+FOR INSERT TO authenticated WITH CHECK (public.fn_get_user_role() IN ('doctor', 'admin'));
+
+CREATE POLICY "Nurse_Instructions_Update" ON public.nurse_instructions 
+FOR UPDATE TO authenticated USING (true) WITH CHECK (
+    (is_read = true AND public.fn_get_user_role() = 'nurse') OR (doctor_id = auth.uid())
+);
+
+CREATE POLICY "Nurse_Instructions_Delete" ON public.nurse_instructions 
+FOR DELETE TO authenticated USING (doctor_id = auth.uid());
+
 -- System Settings: Read all, Write admin
 CREATE POLICY "System_Settings_Read" ON public.system_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "System_Settings_Admin" ON public.system_settings FOR ALL TO authenticated USING ((SELECT role FROM public.user_profiles WHERE user_id = auth.uid()) = 'admin');
+CREATE POLICY "System_Settings_Admin" ON public.system_settings FOR ALL TO authenticated USING (public.fn_is_admin());
+
+-- Inventory Policies
+CREATE POLICY "Inventory_Pharmacist_Full" ON public.pharmacy_inventory
+FOR ALL TO authenticated
+USING (
+    public.fn_get_user_role() IN ('pharmacist', 'admin')
+);
+
+CREATE POLICY "Inventory_Read_All" ON public.pharmacy_inventory
+FOR SELECT TO authenticated
+USING (true);
+
+-- Lab Reference Ranges: All authenticated users can read, MLT/Admin can manage
+CREATE POLICY "Lab_Ranges_Read" ON public.lab_reference_ranges 
+FOR SELECT TO authenticated 
+USING (true);
+
+CREATE POLICY "Lab_Ranges_Manage" ON public.lab_reference_ranges 
+FOR ALL TO authenticated 
+USING (
+    public.fn_get_user_role() IN ('lab_tech', 'admin')
+);
 
 -- 6. INDICES (OPTIMIZATION)
 CREATE INDEX IF NOT EXISTS idx_patients_ward ON public.patients(ward_name);
@@ -395,6 +697,8 @@ CREATE INDEX IF NOT EXISTS idx_visits_patient_date ON public.visits(patient_id, 
 CREATE INDEX IF NOT EXISTS idx_investigations_patient_date ON public.investigations(patient_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_reminders_patient ON public.reminders(patient_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_status ON public.reminders(is_resolved);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON public.notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
 
 -- 7. RPC FUNCTIONS
 
@@ -455,3 +759,117 @@ DROP TRIGGER IF EXISTS tr_update_patient_activity_on_investigation ON public.inv
 CREATE TRIGGER tr_update_patient_activity_on_investigation
   AFTER INSERT OR UPDATE ON public.investigations
   FOR EACH ROW EXECUTE FUNCTION public.fn_update_patient_last_activity();
+
+-- 6. NOTIFICATION TRIGGERS
+CREATE OR REPLACE FUNCTION public.fn_notify_doctors_on_lab_result()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_n TEXT; v_w TEXT; v_t TEXT := ''; v_c TEXT; v_d RECORD;
+BEGIN
+    -- 1. Get info and clean the ward name
+    SELECT name, ward_name INTO v_n, v_w FROM public.patients WHERE id = NEW.patient_id;
+    v_c := LOWER(REPLACE(v_w, ' ', ''));
+
+    -- 2. Build Test Summary
+    IF NEW.wbc IS NOT NULL THEN v_t := v_t || 'WBC, '; END IF;
+    IF NEW.hb IS NOT NULL THEN v_t := v_t || 'HB, '; END IF;
+    IF NEW.plt IS NOT NULL THEN v_t := v_t || 'PLT, '; END IF;
+    IF NEW.s_urea IS NOT NULL THEN v_t := v_t || 'Urea, '; END IF;
+    IF NEW.s_creatinine IS NOT NULL THEN v_t := v_t || 'Creatinine, '; END IF;
+    IF NEW.alt IS NOT NULL THEN v_t := v_t || 'ALT, '; END IF;
+    IF NEW.ast IS NOT NULL THEN v_t := v_t || 'AST, '; END IF;
+    IF NEW.alp IS NOT NULL THEN v_t := v_t || 'ALP, '; END IF;
+    IF NEW.tsb IS NOT NULL THEN v_t := v_t || 'TSB, '; END IF;
+    IF NEW.esr IS NOT NULL THEN v_t := v_t || 'ESR, '; END IF;
+    IF NEW.crp IS NOT NULL THEN v_t := v_t || 'CRP, '; END IF;
+    
+    v_t := CASE WHEN v_t != '' THEN '(' || RTRIM(v_t, ', ') || ')' ELSE '' END;
+
+    -- 3. Notify ALL Doctors who match (Primary or Accessible)
+    FOR v_d IN 
+        SELECT up.user_id 
+        FROM public.user_profiles up
+        WHERE (up.role = 'doctor' OR up.role = 'admin' OR up.is_admin = true)
+        AND (
+            LOWER(REPLACE(up.ward_name, ' ', '')) = v_c 
+            OR EXISTS (
+                SELECT 1 FROM unnest(up.accessible_wards) w 
+                WHERE LOWER(REPLACE(w, ' ', '')) = v_c
+            )
+            OR (v_w IS NULL)
+        )
+    LOOP
+        INSERT INTO public.notifications (user_id, patient_id, investigation_id, message)
+        VALUES (v_d.user_id, NEW.patient_id, NEW.id, 'New labs for ' || v_n || ' ' || v_t);
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Automatically notify nurses in the relevant ward when a new instruction is issued
+CREATE OR REPLACE FUNCTION public.fn_notify_nurse_hub_on_instruction()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_patient_name TEXT;
+    v_nurse RECORD;
+BEGIN
+    SELECT name INTO v_patient_name FROM public.patients WHERE id = NEW.patient_id;
+
+    FOR v_nurse IN 
+        SELECT user_id 
+        FROM public.user_profiles 
+        WHERE (role = 'nurse' OR role = 'admin' OR is_admin = true)
+        AND (
+            LOWER(REPLACE(ward_name, ' ', '')) = LOWER(REPLACE(NEW.ward_name, ' ', ''))
+            OR EXISTS (
+                SELECT 1 FROM unnest(accessible_wards) w 
+                WHERE LOWER(REPLACE(w, ' ', '')) = LOWER(REPLACE(NEW.ward_name, ' ', ''))
+            )
+        )
+    LOOP
+        INSERT INTO public.notifications (user_id, patient_id, message)
+        VALUES (v_nurse.user_id, NEW.patient_id, 'New instruction for ' || v_patient_name || ': ' || LEFT(NEW.instruction, 50));
+    END LOOP;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS tr_notify_on_investigation ON public.investigations;
+CREATE TRIGGER tr_notify_on_investigation
+  AFTER INSERT ON public.investigations
+  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_doctors_on_lab_result();
+
+DROP TRIGGER IF EXISTS tr_notify_on_nurse_instruction ON public.nurse_instructions;
+CREATE TRIGGER tr_notify_on_nurse_instruction
+  AFTER INSERT ON public.nurse_instructions
+  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_nurse_hub_on_instruction();
+
+-- 8. REALTIME ENABLEMENT (Idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        CREATE PUBLICATION supabase_realtime;
+    END IF;
+
+    -- Add notifications safely
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    END IF;
+
+    -- Add nurse_instructions safely
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' AND tablename = 'nurse_instructions'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.nurse_instructions;
+    END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+ALTER TABLE public.nurse_instructions REPLICA IDENTITY FULL;

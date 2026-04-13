@@ -3,6 +3,7 @@
 import { AlertCircle, Clock, Activity, CalendarClock } from 'lucide-react'
 import { AddPatientModal } from '@/components/dashboard/add-patient-modal'
 import { PatientList, type PatientRow } from '@/components/dashboard/patient-list'
+import { useDatabase } from '@/hooks/useDatabase'
 
 export const CATEGORY_MAP: Record<string, {
   label: string; dbValue: string | null; icon: any
@@ -35,6 +36,12 @@ export const CATEGORY_MAP: Record<string, {
     iconColor: 'text-violet-600 dark:text-violet-400', dot: '🕐',
     description: 'All patients sorted by oldest last visit — review who needs attention first.',
   },
+  'awaiting-assessment': {
+    label: 'Awaiting Assessment', dbValue: 'Awaiting Assessment', icon: Activity,
+    gradient: 'from-blue-500 to-indigo-600', lightBg: 'bg-blue-50 dark:bg-blue-950/20',
+    border: 'border-blue-200 dark:border-blue-900/40', iconBg: 'bg-blue-100 dark:bg-blue-900/50',
+    iconColor: 'text-blue-600 dark:text-blue-400', dot: '🔵',
+  },
   'archive': {
     label: 'Archive (Deceased)', dbValue: 'Deceased/Archive', icon: AlertCircle,
     gradient: 'from-slate-500 to-slate-700', lightBg: 'bg-slate-50 dark:bg-slate-900/20',
@@ -50,6 +57,7 @@ interface CategoryViewProps {
 }
 
 export function CategoryView({ slug, rows, isPending }: CategoryViewProps) {
+  const { profile } = useDatabase()
   const category = CATEGORY_MAP[slug]
   if (!category) return null;
   const Icon = category.icon
@@ -74,7 +82,7 @@ export function CategoryView({ slug, rows, isPending }: CategoryViewProps) {
               </p>
             </div>
           </div>
-          {!isPending && <AddPatientModal />}
+          {!isPending && <AddPatientModal role={profile?.role} />}
         </div>
       </div>
 

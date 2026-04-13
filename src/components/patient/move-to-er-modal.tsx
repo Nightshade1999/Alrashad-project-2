@@ -38,12 +38,20 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
   const [pr, setPr] = useState('')
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
+  const [rr, setRr] = useState('')
 
   // Labs (subset)
   const [wbc, setWbc] = useState('')
   const [hb, setHb] = useState('')
   const [sCreatinine, setSCreatinine] = useState('')
   const [rbs, setRbs] = useState('')
+  const [alt, setAlt] = useState('')
+  const [ast, setAst] = useState('')
+  const [alp, setAlp] = useState('')
+  const [tsb, setTsb] = useState('')
+  const [esr, setEsr] = useState('')
+  const [crp, setCrp] = useState('')
+  const [sUrea, setSUrea] = useState('')
 
   const handleChiefComplaintChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
@@ -93,7 +101,8 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
       const moveRes = await movePatientToErAction({
         patient_id: patientId,
         chief_complaint: chiefComplaint.trim(),
-        admission_notes: examNotes.trim()
+        admission_notes: examNotes.trim(),
+        actingDoctorName: localStorage.getItem('wardManager_lastDoctorName') || undefined
       })
       if (moveRes.error) throw new Error(moveRes.error)
 
@@ -111,7 +120,9 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
           pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
           spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
           temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
+          rr: rr ? parseInt(convertArabicNumbers(rr)) : null,
           is_er: true,
+          actingDoctorName: localStorage.getItem('wardManager_lastDoctorName') || undefined
         })
       }
 
@@ -125,7 +136,15 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
           hb: hb ? parseFloat(convertArabicNumbers(hb)) : null,
           s_creatinine: sCreatinine ? parseFloat(convertArabicNumbers(sCreatinine)) : null,
           rbs: rbs ? parseFloat(convertArabicNumbers(rbs)) : null,
+          alt: alt ? parseFloat(convertArabicNumbers(alt)) : null,
+          ast: ast ? parseFloat(convertArabicNumbers(ast)) : null,
+          alp: alp ? parseFloat(convertArabicNumbers(alp)) : null,
+          tsb: tsb ? parseFloat(convertArabicNumbers(tsb)) : null,
+          esr: esr ? parseFloat(convertArabicNumbers(esr)) : null,
+          crp: crp.trim() || null,
+          s_urea: sUrea ? parseFloat(convertArabicNumbers(sUrea)) : null,
           is_er: true,
+          actingDoctorName: localStorage.getItem('wardManager_lastDoctorName') || undefined
         })
       }
 
@@ -228,6 +247,10 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
                         <Label className="text-[10px] text-muted-foreground">Temp</Label>
                         <Input placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-8 text-xs mt-1" />
                      </div>
+                     <div>
+                        <Label className="text-[10px] text-muted-foreground">RR</Label>
+                        <Input placeholder="18" value={rr} onChange={e => setRr(e.target.value)} className="h-8 text-xs mt-1" />
+                     </div>
                   </div>
                 </div>
 
@@ -264,11 +287,39 @@ export function MoveToErModal({ patientId, isEr, disabled = false }: { patientId
                         <Label className="text-[10px] text-muted-foreground">Creatinine</Label>
                         <Input placeholder="creat" value={sCreatinine} onChange={e => setSCreatinine(e.target.value)} className="h-8 text-xs mt-1" />
                      </div>
-                     <div>
-                        <Label className="text-[10px] text-muted-foreground">RBS</Label>
-                        <Input placeholder="rbs" value={rbs} onChange={e => setRbs(e.target.value)} className="h-8 text-xs mt-1" />
-                     </div>
-                  </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">RBS</Label>
+                         <Input placeholder="rbs" value={rbs} onChange={e => setRbs(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">Urea</Label>
+                         <Input placeholder="urea" value={sUrea} onChange={e => setSUrea(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">ALT</Label>
+                         <Input placeholder="alt" value={alt} onChange={e => setAlt(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">AST</Label>
+                         <Input placeholder="ast" value={ast} onChange={e => setAst(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">ALP</Label>
+                         <Input placeholder="alp" value={alp} onChange={e => setAlp(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">TSB</Label>
+                         <Input placeholder="tsb" value={tsb} onChange={e => setTsb(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">ESR</Label>
+                         <Input placeholder="esr" value={esr} onChange={e => setEsr(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                      <div>
+                         <Label className="text-[10px] text-muted-foreground">CRP</Label>
+                         <Input placeholder="crp" value={crp} onChange={e => setCrp(e.target.value)} className="h-8 text-xs mt-1" />
+                      </div>
+                   </div>
                 </div>
 
                 <div className="flex gap-3 pt-2">

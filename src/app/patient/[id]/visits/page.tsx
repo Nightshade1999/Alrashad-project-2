@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, ClipboardList, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddVisitModal } from "@/components/patient/add-visit-modal"
+import { AddPsychVisitModal } from "@/components/patient/add-psych-visit-modal"
 import { format, parseISO, formatDistanceToNow } from "date-fns"
 import { DeleteRecordButton } from "@/components/patient/delete-record-button"
 
@@ -37,6 +38,9 @@ export default async function VisitsPage({
   const { data: profiles } = await supabase.from("user_profiles").select("user_id, doctor_name")
   const doctorMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.doctor_name || 'Unknown']))
 
+  const { data: currentUserProfile } = await supabase.from("user_profiles").select("specialty").eq("user_id", currentUser?.id).single()
+  const isPsych = currentUserProfile?.specialty === 'psychiatry'
+
   let query = supabase
     .from("visits")
     .select("*, created_at")
@@ -47,7 +51,10 @@ export default async function VisitsPage({
   if (isErFilter) {
     query = query.eq('is_er', true)
   }
-  // Remove the 'else' part so to show EVERYTHING in ward view (Ward + ER)
+  
+  if (!isPsych) {
+    query = query.not('is_psych_note', 'eq', true)
+  }
 
   const { data: visits } = await query
 
@@ -68,7 +75,11 @@ export default async function VisitsPage({
             <p className="text-sm text-muted-foreground" dir="auto">{patient.name} · {patient.room_number}</p>
           </div>
         </div>
-        <AddVisitModal patientId={id} isEr={isErFilter} />
+        {isPsych ? (
+          <AddPsychVisitModal patientId={id} />
+        ) : (
+          <AddVisitModal patientId={id} isEr={isErFilter} />
+        )}
       </div>
 
       {visits && visits.length > 0 ? (
@@ -85,6 +96,11 @@ export default async function VisitsPage({
                   {visit.is_er && (
                     <span className="text-[10px] bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">
                       ER
+                    </span>
+                  )}
+                  {visit.is_psych_note && (
+                    <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">
+                      PSYCH
                     </span>
                   )}
                   {i === 0 && (

@@ -1,14 +1,27 @@
 "use client"
 
-import { useState } from 'react'
-import { Users, Activity, BarChart3, Settings, ShieldAlert, Shield, Calendar } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Users, Activity, BarChart3, Settings, ShieldAlert, Shield, Calendar, Trash2, ClipboardList, Pill, FlaskConical, Search, Filter, FileSpreadsheet, FileDown } from 'lucide-react'
 import { UserManagement } from '@/components/admin/user-management'
 import { DoctorPerformance } from '@/components/admin/doctor-performance'
 import { MedicalStatistics } from '@/components/admin/medical-statistics'
 import { WardSettings } from '@/components/admin/ward-settings'
 import { ReminderArchive } from '@/components/admin/reminder-archive'
+import { RecycleBinView } from '@/components/admin/recycle-bin-view'
+import { ReferralManagement } from '@/components/admin/referral-management'
 import { NavigationButtons } from '@/components/layout/navigation-buttons'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
+import { exportPharmacyInventoryToExcel, exportPharmacyInventoryToDoc } from '@/lib/pharmacy-export-utils'
 import { updateGlobalOfflineSettingAction, enableOfflineForAllUsersAction } from '@/app/actions/admin-actions'
 import { toast } from 'sonner'
 
@@ -19,7 +32,9 @@ export default function WardManagementClient({
   wardSettingsData,
   hasServiceKey,
   aiEnabled,
-  initialGlobalOffline
+  initialGlobalOffline,
+  allInstructions = [],
+  allInventory = []
 }: {
   initialUsers: any[]
   dbSizeMB: string
@@ -28,10 +43,39 @@ export default function WardManagementClient({
   hasServiceKey: boolean
   aiEnabled: boolean
   initialGlobalOffline: boolean
+  allInstructions?: any[]
+  allInventory?: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'wards' | 'reminders' | 'settings'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'referrals' | 'pharmacy' | 'nursing' | 'reminders' | 'trash' | 'settings'>('users')
   const [globalOffline, setGlobalOffline] = useState(initialGlobalOffline)
   const [bulkEnabling, setBulkEnabling] = useState(false)
+
+  // Searching & Filtering State
+  const [pharmaSearch, setPharmaSearch] = useState("")
+  const [pharmaCategory, setPharmaCategory] = useState("All")
+  const [pharmaDept, setPharmaDept] = useState("All")
+  const [nurseSearch, setNurseSearch] = useState("")
+
+  // Filtered Data
+  const filteredInventory = useMemo(() => {
+    return allInventory.filter(item => {
+      const matchesSearch = !pharmaSearch || 
+        (item.generic_name || "").toLowerCase().includes(pharmaSearch.toLowerCase()) ||
+        (item.scientific_name || "").toLowerCase().includes(pharmaSearch.toLowerCase());
+      
+      const matchesCategory = pharmaCategory === "All" || item.category === pharmaCategory;
+      const matchesDept = pharmaDept === "All" || (item.department || "Ward") === pharmaDept;
+
+      return matchesSearch && matchesCategory && matchesDept;
+    });
+  }, [allInventory, pharmaSearch, pharmaCategory, pharmaDept]);
+
+  const filteredInstructions = useMemo(() => {
+    return allInstructions.filter(inst => {
+      const searchStr = `${inst.patients?.name || ""} ${inst.instruction || ""} ${inst.doctor_name || ""} ${inst.read_by_nurse_name || ""}`.toLowerCase();
+      return !nurseSearch || searchStr.includes(nurseSearch.toLowerCase());
+    });
+  }, [allInstructions, nurseSearch]);
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in-up">
@@ -98,6 +142,16 @@ export default function WardManagementClient({
           <BarChart3 className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Medical Research</span>
         </button>
         <button
+          onClick={() => setActiveTab('referrals')}
+          className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'referrals' 
+              ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Referral Log</span>
+        </button>
+        <button
           onClick={() => setActiveTab('reminders')}
           className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
             activeTab === 'reminders' 
@@ -116,6 +170,36 @@ export default function WardManagementClient({
           }`}
         >
           <Shield className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Ward Setup</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('pharmacy')}
+          className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'pharmacy' 
+              ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Pill className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Pharmacy Log</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('nursing')}
+          className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'nursing' 
+              ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <ClipboardList className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Nursing Log</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('trash')}
+          className={`flex items-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap shrink-0 ${
+            activeTab === 'trash' 
+              ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-sm' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Trash2 className="h-4 w-4 shrink-0" /> <span className="hidden sm:inline">Recycle Bin</span>
         </button>
         <button
           onClick={() => setActiveTab('settings')}
@@ -166,8 +250,214 @@ export default function WardManagementClient({
         {activeTab === 'performance' && <DoctorPerformance users={initialUsers} patients={patientsData} />}
 
         {activeTab === 'research' && <MedicalStatistics patients={patientsData} aiEnabled={aiEnabled} />}
+        {activeTab === 'referrals' && <ReferralManagement />}
+        {activeTab === 'pharmacy' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                  <Pill className="h-5 w-5 text-teal-600" />
+                  Global Pharmacy Inventory
+                </h2>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest italic px-7">Read-Only Central Logs</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button 
+                   variant="outline" 
+                   size="sm" 
+                   className="h-10 rounded-xl font-black border-slate-200 dark:border-slate-800 gap-2"
+                   onClick={() => exportPharmacyInventoryToExcel(filteredInventory, "Admin_Global_Log")}
+                >
+                   <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                   EXCEL
+                </Button>
+                <Button 
+                   variant="outline" 
+                   size="sm" 
+                   className="h-10 rounded-xl font-black border-slate-200 dark:border-slate-800 gap-2"
+                   onClick={() => exportPharmacyInventoryToDoc(filteredInventory, "Admin_Global_Log")}
+                >
+                   <FileDown className="h-4 w-4 text-blue-600" />
+                   DOC
+                </Button>
+              </div>
+            </div>
+
+            {/* Toolbar */}
+            <div className="flex flex-wrap items-center gap-3 bg-white/50 dark:bg-slate-900/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
+               <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Search by name..." 
+                    value={pharmaSearch}
+                    onChange={e => setPharmaSearch(e.target.value)}
+                    className="pl-9 h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 font-bold"
+                  />
+               </div>
+
+               <div className="flex items-center gap-2">
+                  <Select value={pharmaCategory} onValueChange={setPharmaCategory}>
+                    <SelectTrigger className="h-10 w-32 rounded-xl font-bold bg-white dark:bg-slate-950">
+                      <div className="flex items-center gap-2">
+                         <Filter className="h-3 w-3 text-slate-400" />
+                         <SelectValue placeholder="Category" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Categories</SelectItem>
+                      <SelectItem value="Antibiotics">Antibiotics</SelectItem>
+                      <SelectItem value="Analgesic">Analgesic</SelectItem>
+                      <SelectItem value="Psychotic">Psychotic</SelectItem>
+                      <SelectItem value="Eye drops">Eye drops</SelectItem>
+                      <SelectItem value="Fluids">Fluids</SelectItem>
+                      <SelectItem value="Creams">Creams</SelectItem>
+                      <SelectItem value="Cardiovascular">Cardiovascular</SelectItem>
+                      <SelectItem value="Gastrointestinal">Gastrointestinal</SelectItem>
+                      <SelectItem value="Respiratory">Respiratory</SelectItem>
+                      <SelectItem value="General">General</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={pharmaDept} onValueChange={setPharmaDept}>
+                    <SelectTrigger className="h-10 w-32 rounded-xl font-bold bg-white dark:bg-slate-950">
+                      <SelectValue placeholder="Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Departments</SelectItem>
+                      <SelectItem value="Ward">Ward</SelectItem>
+                      <SelectItem value="ER">ER</SelectItem>
+                    </SelectContent>
+                  </Select>
+               </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 p-4 overflow-hidden shadow-sm">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                   <thead className="bg-slate-50 dark:bg-slate-800/50">
+                     <tr className="text-[10px] uppercase font-black tracking-widest text-slate-400">
+                        <th className="px-6 py-4">Drug / Dosage</th>
+                        <th className="px-6 py-4">Stock</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4">Dept.</th>
+                        <th className="px-6 py-4">Expiry</th>
+                        <th className="px-6 py-4">Pharmacist</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                     {filteredInventory.map(item => (
+                       <tr key={item.id} className="text-sm font-bold">
+                         <td className="px-6 py-4">
+                            <p className="text-slate-900 dark:text-white">{item.generic_name}</p>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-tighter font-black">{item.scientific_name} ({item.dosage})</p>
+                         </td>
+                         <td className="px-6 py-4">
+                            <span className={item.quantity <= (item.min_stock_level || 10) ? 'text-rose-500 font-black' : 'text-slate-900 dark:text-white'}>
+                              {item.quantity}
+                            </span>
+                         </td>
+                         <td className="px-6 py-4">
+                            <Badge variant="outline" className="text-[9px] uppercase font-black">{item.category || 'General'}</Badge>
+                         </td>
+                         <td className="px-6 py-4 text-xs font-black text-slate-400 uppercase">{item.department || 'Ward'}</td>
+                         <td className="px-6 py-4 text-xs">{item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}</td>
+                         <td className="px-6 py-4 text-[10px] uppercase font-bold text-slate-500">{item.pharmacist_name || 'System'}</td>
+                       </tr>
+                     ))}
+                     {filteredInventory.length === 0 && (
+                        <tr>
+                           <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-black italic uppercase tracking-widest">No matching drugs found</td>
+                        </tr>
+                     )}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          </div>
+        )}
+        {activeTab === 'nursing' && (
+          <div className="space-y-6">
+             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-blue-600" />
+                  Global Nursing Instructions
+                </h2>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest italic px-7">Patient Care Audit Logs</p>
+              </div>
+
+               <div className="relative w-full md:w-96">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Search by patient or instruction..." 
+                    value={nurseSearch}
+                    onChange={e => setNurseSearch(e.target.value)}
+                    className="pl-9 h-10 rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 font-bold"
+                  />
+               </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                   <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] uppercase font-black tracking-widest text-slate-400">
+                     <tr>
+                        <th className="px-6 py-4">Patient / Ward</th>
+                        <th className="px-6 py-4">Instruction</th>
+                        <th className="px-6 py-4">Type</th>
+                        <th className="px-6 py-4">Physician</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Signed By</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {filteredInstructions.map(inst => (
+                        <tr key={inst.id} className="text-sm">
+                           <td className="px-6 py-4">
+                              <p className="font-bold text-slate-900 dark:text-white">{inst.patients?.name || '??'}</p>
+                              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-tighter">{inst.ward_name}</p>
+                           </td>
+                           <td className="px-6 py-4 max-w-xs">
+                              <p className="text-xs italic text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">"{inst.instruction}"</p>
+                           </td>
+                           <td className="px-6 py-4">
+                              <Badge variant="outline" className="text-[9px] uppercase font-black border-slate-200">{inst.instruction_type}</Badge>
+                           </td>
+                           <td className="px-6 py-4 text-[10px] font-bold text-slate-600">Dr. {inst.doctor_name}</td>
+                           <td className="px-6 py-4">
+                              {inst.is_read ? (
+                                <Badge variant="outline" className="text-emerald-600 border-emerald-100 bg-emerald-50/50 font-black">Signed</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-blue-600 border-blue-100 bg-blue-50/50 font-black animate-pulse">Pending</Badge>
+                              )}
+                           </td>
+                           <td className="px-6 py-4">
+                              {inst.is_read ? (
+                                <div className="flex flex-col">
+                                   <span className="text-[10px] font-black uppercase text-slate-900 dark:text-white">{inst.read_by_nurse_name || 'Staff Nurse'}</span>
+                                   <span className="text-[9px] text-slate-400 font-medium">Verified System Sign</span>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-300 italic">Not yet signed</span>
+                              )}
+                           </td>
+                        </tr>
+                      ))}
+                      {filteredInstructions.length === 0 && (
+                        <tr>
+                           <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-black italic uppercase tracking-widest">No instructions found</td>
+                        </tr>
+                      )}
+                   </tbody>
+                 </table>
+               </div>
+            </div>
+          </div>
+        )}
         {activeTab === 'reminders' && <ReminderArchive />}
         {activeTab === 'wards' && <WardSettings settings={wardSettingsData} users={initialUsers} />}
+        {activeTab === 'trash' && <RecycleBinView />}
         {activeTab === 'settings' && (
           <div className="max-w-3xl space-y-6">
             <div className="p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-900/5">

@@ -7,7 +7,10 @@ import Link from 'next/link'
 import { LayoutDashboard, CheckCircle2, ChevronRight, Stethoscope, Loader2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { syncProfileWardAction } from '@/app/actions/admin-actions'
+import { syncProfileWardAction, updateUserSelfPasswordAction } from '@/app/actions/admin-actions'
+import { ModalPortal } from '@/components/ui/modal-portal'
+import { Lock, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function SelectWardPage() {
   const router = useRouter()
@@ -16,6 +19,11 @@ export default function SelectWardPage() {
   const [profile, setProfile] = useState<any>(null)
   const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [isSyncing, setIsSyncing] = useState<string | null>(null)
+  
+  // Password Change State
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [newPass, setNewPass] = useState('')
+  const [isSavingPass, setIsSavingPass] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -42,15 +50,8 @@ export default function SelectWardPage() {
         setProfile(activeProfile)
         setAccessibleWards(wards)
 
-        // Auto-select logic: single ward users skip selection entirely
-        if (wards.length === 1) {
-          const activeWard = wards[0]
-          if (activeProfile?.ward_name !== activeWard) {
-            await syncProfileWardAction(activeWard)
-          }
-          router.replace('/dashboard/my-ward');
-          return;
-        }
+        // Auto-select logic removed as requested: clinicians now always see the selection screen
+        // even if they only have one ward assigned.
 
       } catch (err) {
         console.error("Select Ward Load Error:", err)
@@ -65,11 +66,35 @@ export default function SelectWardPage() {
     setIsSyncing(wardName)
     try {
       await syncProfileWardAction(wardName)
-      router.push('/dashboard/my-ward')
+      if (profile?.role === 'nurse') {
+        router.push(`/nurse/ward/${encodeURIComponent(wardName)}`)
+      } else {
+        router.push('/dashboard/my-ward')
+      }
     } catch (err) {
       console.error("Ward sync error:", err)
     } finally {
       setIsSyncing(null)
+    }
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newPass || newPass.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+    setIsSavingPass(true)
+    try {
+      const res = await updateUserSelfPasswordAction(newPass)
+      if (res.error) throw new Error(res.error)
+      toast.success("Security credentials updated successfully")
+      setIsPasswordModalOpen(false)
+      setNewPass('')
+    } catch (err: any) {
+      toast.error("Update failed: " + err.message)
+    } finally {
+      setIsSavingPass(false)
     }
   }
 
@@ -207,6 +232,75 @@ export default function SelectWardPage() {
           )
         })}
       </div>
+
+      {/* Account Security Section */}
+      <div className="pt-8 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-sm">
+           <div className="flex items-center gap-6 text-center sm:text-left">
+              <div className="h-16 w-16 rounded-2xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center shrink-0">
+                 <Lock className="h-7 w-7 text-slate-400" />
+              </div>
+              <div>
+                 <h3 className="text-xl font-black text-slate-900 dark:text-slate-50 uppercase tracking-tight">Account Security</h3>
+                 <p className="text-sm text-slate-500 font-medium">Manage your clinical login credentials and session privacy.</p>
+              </div>
+           </div>
+           <button 
+             onClick={() => setIsPasswordModalOpen(true)}
+             className="px-8 py-3 bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-900/10"
+           >
+             Change Password
+           </button>
+        </div>
+      </div>
+
+      {/* Password Modal */}
+      {isPasswordModalOpen && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+             <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-slate-50">Update Credentials</h3>
+                   <button onClick={() => setIsPasswordModalOpen(false)} className="h-8 w-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors">
+                      <X className="h-4 w-4" />
+                   </button>
+                </div>
+                
+                <form onSubmit={handlePasswordChange} className="p-8 space-y-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">New Password</label>
+                      <input 
+                        type="password" 
+                        required
+                        minLength={6}
+                        value={newPass}
+                        autoFocus
+                        onChange={e => setNewPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-4 text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                      />
+                   </div>
+                   
+                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight leading-relaxed">
+                      Your new password should be at least 6 characters. You will remain logged in after this change.
+                   </p>
+
+                   <button 
+                     disabled={isSavingPass}
+                     className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                   >
+                     {isSavingPass ? (
+                       <Loader2 className="h-4 w-4 animate-spin text-white" />
+                     ) : (
+                       <Lock className="h-4 w-4" />
+                     )}
+                     {isSavingPass ? 'Applying Changes...' : 'Save New Password'}
+                   </button>
+                </form>
+             </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {/* Footer Meta */}
       <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center">

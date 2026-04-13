@@ -14,7 +14,7 @@ export interface ResearchExportDetails {
  * Advanced Word document generation for one or more patients.
  * Optimized for clinical fidelity.
  */
-export async function exportToWord(patients: any[], doctorName: string = "", wardName: string = "") {
+export async function exportToWord(patients: any[], doctorName: string = "", wardName: string = "", role: string = "") {
   if (!doctorName && typeof window !== "undefined") {
     doctorName = localStorage.getItem("wardManager_doctorName") || "Ward Clinician"
   }
@@ -22,6 +22,10 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
     wardName = localStorage.getItem("wardManager_wardName") || "MEDICAL WARD"
   }
   const dynamicWardName = wardName.toUpperCase()
+
+  const nameWithPrefix = (role === 'doctor' || role === 'admin' || !role) 
+    ? (doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`)
+    : doctorName;
 
   const sections = patients.map((p) => {
     const isER = p.is_in_er === true || p.is_in_er === 1 || p.is_in_er === "1" || p.is_in_er === "true";
@@ -82,7 +86,7 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
 
     // HEADER
     children.push(new Paragraph({
-      children: [new TextRun({ text: `Dr. ${doctorName}`, bold: true, size: sz(28), color: secondaryColor })],
+      children: [new TextRun({ text: nameWithPrefix, bold: true, size: sz(28), color: secondaryColor })],
       alignment: AlignmentType.LEFT,
       spacing: { before: 200 },
     }));
@@ -357,11 +361,61 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
       }));
     }
 
+    // NURSE INSTRUCTIONS
+    if (p.instructions && p.instructions.length > 0) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: "VI. ACTIVE NURSING INSTRUCTIONS (ONGOING ORDERS)", bold: true, size: sz(18), color: secondaryColor })],
+        border: { bottom: { color: secondaryColor, space: 1, style: BorderStyle.SINGLE, size: 6 } },
+        spacing: { before: 400, after: 200 },
+      }));
+
+      p.instructions.forEach((inst: any) => {
+        const isSigned = inst.is_read && inst.acknowledgments && inst.acknowledgments.length > 0;
+        const lastAck = isSigned ? inst.acknowledgments[inst.acknowledgments.length - 1] : null;
+
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: `• ${inst.instruction}`, bold: true, size: sz(18) })
+          ],
+          indent: { left: 240 },
+          spacing: { after: 40 }
+        }));
+        
+        if (isSigned && lastAck) {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `  SIGNED BY ${lastAck.nurse_name} at ${format(new Date(lastAck.at), "HH:mm dd MMM")}`, 
+                size: sz(14), 
+                color: "059669", 
+                bold: true 
+              })
+            ],
+            indent: { left: 240 },
+            spacing: { after: 120 }
+          }));
+        } else {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `  Issued by ${inst.doctor_name || 'Staff'} • Expires: ${inst.expires_at ? format(parseISO(inst.expires_at), "dd MMM") : 'N/A'}`, 
+                size: sz(14), 
+                color: "64748B", 
+                italics: true 
+              })
+            ],
+            indent: { left: 240 },
+            spacing: { after: 120 }
+          }));
+        }
+      });
+    }
+
     children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
 
     // LABS SECTION
     children.push(new Paragraph({
-      children: [new TextRun({ text: isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS", bold: true, size: sz(18), color: secondaryColor })],
+      children: [new TextRun({ text: isER ? "VII. EMERGENCY LABORATORY FINDINGS" : "VII. CLINICAL LABORATORY FINDINGS", bold: true, size: sz(18), color: secondaryColor })],
       border: { bottom: { color: secondaryColor, space: 1, style: BorderStyle.SINGLE, size: 6 } },
       spacing: { after: 200 },
     }));
@@ -394,7 +448,7 @@ export async function exportToWord(patients: any[], doctorName: string = "", war
 
     children.push(new Paragraph({ children: [new TextRun("")], spacing: { after: 600 } }));
     children.push(new Paragraph({
-      children: [new TextRun({ text: `Generated ${format(new Date(), "dd MMM yyyy")} • Attending: Dr. ${doctorName} • ${dynamicWardName}`, size: sz(14), color: "94A3B8" })],
+      children: [new TextRun({ text: `Generated ${format(new Date(), "dd MMM yyyy")} • Attending: ${nameWithPrefix} • ${dynamicWardName}`, size: sz(14), color: "94A3B8" })],
       alignment: AlignmentType.CENTER,
       border: { top: { color: "E2E8F0", space: 1, style: BorderStyle.SINGLE, size: 6 } },
       spacing: { before: 200 }
@@ -466,13 +520,17 @@ function parseMarkdownToDocx(md: string): Paragraph[] {
 /**
  * EXPORT: Research Narrative to Word.
  */
-export async function exportResearchToWord(details: ResearchExportDetails, doctorName: string = "", wardName: string = "") {
+export async function exportResearchToWord(details: ResearchExportDetails, doctorName: string = "", wardName: string = "", role: string = "") {
   const { objective, varX, varY, math, aiReport } = details
   
   if (typeof window !== "undefined") {
     if (!doctorName) doctorName = localStorage.getItem("wardManager_doctorName") || "Senior Clinician"
     if (!wardName) wardName = localStorage.getItem("wardManager_wardName") || "ALRASHAD MEDICAL WARD"
   }
+
+  const nameWithPrefix = (role === 'doctor' || role === 'admin' || !role) 
+    ? (doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`)
+    : doctorName;
 
   const children: any[] = [
     new Paragraph({
@@ -527,7 +585,7 @@ export async function exportResearchToWord(details: ResearchExportDetails, docto
     }),
     ...parseMarkdownToDocx(aiReport || "AI Interpretation was not performed for this study."),
     new Paragraph({
-      children: [new TextRun({ text: `Report generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: Dr. ${doctorName}`, size: 14, italics: true, color: "94A3B8" })],
+      children: [new TextRun({ text: `Report generated on ${format(new Date(), "yyyy-MM-dd HH:mm")}. Attending: ${nameWithPrefix}`, size: 14, italics: true, color: "94A3B8" })],
       alignment: AlignmentType.RIGHT,
       spacing: { before: 600 }
     })

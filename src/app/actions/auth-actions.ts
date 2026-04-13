@@ -42,10 +42,17 @@ export async function signInAction(prevState: any, formData: FormData) {
     return { error: error.message };
   }
 
-  console.log(`signInAction: Login success for ${email}, redirecting to dashboard...`);
+  console.log(`signInAction: Login success for ${email}, checking role...`);
   
-  // Revalidate everything to ensure the session is fresh
-  // We use redirect outside the try-catch in the calling code normally,
-  // but here we are the end of the action.
-  redirect("/dashboard");
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+    .single();
+
+  const role = profile?.role || "doctor";
+  console.log(`signInAction: User role is ${role}, redirecting...`);
+
+  // Return success to let the client handle hard redirect
+  return { success: true };
 }

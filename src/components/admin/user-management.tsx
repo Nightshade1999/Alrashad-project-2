@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from 'react'
-import { UserPlus, KeyRound, Edit, Trash2, ArrowRightLeft, User, X, Sparkles, Search, ChevronDown, Plus, Check as CheckIcon, Activity } from 'lucide-react'
-import { createUserAction, deleteUserAction, updateUserPasswordAction, migratePatientsAction, updateUserDetailsAction } from '@/app/actions/admin-actions'
+import { UserPlus, KeyRound, Edit, Trash2, ArrowRightLeft, User, X, Sparkles, Search, ChevronDown, Plus, Check as CheckIcon, Activity, Loader2 } from 'lucide-react'
+import { createUserAction, deleteUserAction, updateUserPasswordAction, migratePatientsAction, updateUserDetailsAction, bulkResetPasswordsToDefaultAction } from '@/app/actions/admin-actions'
 import { ModalPortal } from '@/components/ui/modal-portal'
 
 export function UserManagement({ users, wardNames }: { users: any[], wardNames: string[] }) {
@@ -15,7 +15,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   // Form States
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('user')
+  const [role, setRole] = useState('doctor')
   const [specialty, setSpecialty] = useState('psychiatry')
   const [wardName, setWardName] = useState('')
   const [toUserId, setToUserId] = useState('')
@@ -25,11 +25,18 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   const [accessibleWards, setAccessibleWards] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [wardSearch, setWardSearch] = useState('')
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [updateDefault, setUpdateDefault] = useState(false)
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [userName, setUserName] = useState('')
 
-  const filteredUsers = (users || []).filter(u => 
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.ward_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredUsers = (users || []).filter(u => {
+    const matchesSearch = u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         u.ward_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         u.userName?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = roleFilter === 'all' || u.role === roleFilter
+    return matchesSearch && matchesRole
+  })
 
   const openModal = (type: any, user: any = null) => {
     setActiveModal(type)
@@ -43,16 +50,18 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
       setAiEnabled(user.ai_enabled ?? true)
       setOfflineModeEnabled(user.offline_mode_enabled ?? false)
       setAccessibleWards(user.accessible_wards || (user.ward_name ? [user.ward_name] : []))
+      setUserName(user.userName || '')
     } else {
       setEmail('')
       setPassword('')
-      setRole('user')
+      setRole('doctor')
       setSpecialty('psychiatry')
       setWardName(wardNames[0] || '')
       setGender('')
       setAiEnabled(true)
       setOfflineModeEnabled(false)
       setAccessibleWards([])
+      setUserName('')
     }
     setWardSearch('')
   }
@@ -79,10 +88,10 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     formData.append('specialty', specialty)
     formData.append('ai_enabled', String(aiEnabled))
     formData.append('offline_mode_enabled', String(offlineModeEnabled))
-    formData.append('can_see_ward_patients', 'false')
     if (gender) formData.append('gender', gender)
     formData.append('accessible_wards', JSON.stringify(updatedWards))
     formData.append('ward_name', primaryWard)
+    formData.append('user_name', userName)
 
     const res = await createUserAction(formData)
     setIsRefreshing(false)
@@ -97,7 +106,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
     const updatedWards = accessibleWards
     const primaryWard = updatedWards[0] || 'Unassigned'
 
-    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, false, gender || null, updatedWards)
+    const res = await updateUserDetailsAction(selectedUser.id, email, primaryWard, role, specialty, aiEnabled, offlineModeEnabled, undefined, gender || null, updatedWards, userName)
     setIsRefreshing(false)
     if (res?.error) alert(res.error)
     else closeModal()
@@ -106,13 +115,31 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsRefreshing(true)
-    const res = await updateUserPasswordAction(selectedUser.id, password)
+    const res = await updateUserPasswordAction(selectedUser.id, password, updateDefault)
     setIsRefreshing(false)
     if (res?.error) alert(res.error)
     else {
       alert("Password successfully changed.")
+      setUpdateDefault(false)
       closeModal()
     }
+  }
+
+  const handleBulkReset = async () => {
+    if (!confirm(`Reset ${selectedUserIds.length} users to their default passwords?`)) return
+    setIsRefreshing(true)
+    const res = await bulkResetPasswordsToDefaultAction(selectedUserIds)
+    setIsRefreshing(false)
+    if (res.error) alert(res.error)
+    else {
+      alert(res.message)
+      setSelectedUserIds([])
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedUserIds.length === filteredUsers.length) setSelectedUserIds([])
+    else setSelectedUserIds(filteredUsers.map(u => u.id))
   }
 
   const handleMigrate = async (e: React.FormEvent) => {
@@ -147,14 +174,26 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input 
               type="text"
-              placeholder="Search by email or ward..."
+              placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all w-64"
+              className="pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all w-48"
             />
           </div>
-          <button onClick={() => openModal('create')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm">
-            <UserPlus className="h-4 w-4" /> Create Doctor
+          <select 
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none cursor-pointer pr-8 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20className%3D%22lucide%20lucide-chevron-down%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%3E%3C/path%3E%3C/svg%3E')] bg-[length:16px] bg-[right_8px_center] bg-no-repeat"
+          >
+            <option value="all">All Roles</option>
+            <option value="doctor">Doctors</option>
+            <option value="nurse">Nurses</option>
+            <option value="pharmacist">Pharmacists</option>
+            <option value="lab_tech">Lab Techs</option>
+            <option value="admin">Administrators</option>
+          </select>
+          <button onClick={() => openModal('create')} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm whitespace-nowrap">
+            <UserPlus className="h-4 w-4" /> Create User
           </button>
         </div>
       </div>
@@ -164,6 +203,14 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-xs uppercase font-bold text-slate-500 dark:text-slate-400">
               <tr>
+                <th className="px-6 py-4 w-10">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedUserIds.length > 0 && selectedUserIds.length === filteredUsers.length}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                  />
+                </th>
                 <th className="px-6 py-4">Account / Email</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Ward Name</th>
@@ -175,15 +222,51 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
               {filteredUsers.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-4 text-center text-slate-500 font-medium">No doctors match your search.</td></tr>
               ) : filteredUsers.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                <tr key={u.id} className={`border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors ${selectedUserIds.includes(u.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                  <td className="px-6 py-4">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedUserIds.includes(u.id)}
+                      onChange={() => {
+                        if (selectedUserIds.includes(u.id)) setSelectedUserIds(prev => prev.filter(id => id !== u.id))
+                        else setSelectedUserIds(prev => [...prev, u.id])
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                    />
+                  </td>
                   <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                    {u.email}
+                    <div className="flex flex-col">
+                      <span className="flex items-center gap-2">
+                        {u.userName ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{u.userName}</span>
+                            {u.isNameFixed ? (
+                              <span className="text-[8px] px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded font-black uppercase tracking-tighter">Fixed</span>
+                            ) : (
+                              <span className="text-[8px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded font-black uppercase tracking-tighter">Volatile</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic font-medium text-xs">No name set</span>
+                        )}
+                      </span>
+                      <span className="text-xs text-slate-500 font-normal">{u.email}</span>
+                      {!u.default_password && (
+                        <span className="text-[9px] font-black text-rose-400 uppercase tracking-tighter">No Default Password Set</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1 items-start">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         u.role === 'admin' 
                           ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                          : u.role === 'pharmacist'
+                          ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+                          : u.role === 'lab_tech'
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                          : u.role === 'nurse'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                           : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                       }`}>
                         {u.role}
@@ -248,6 +331,36 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
         </div>
       </div>
 
+      {/* BULK ACTION TOOLBAR */}
+      {selectedUserIds.length > 0 && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-10 fade-in duration-300">
+           <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-6 border border-slate-700 backdrop-blur-md">
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Selected</span>
+                <span className="text-sm font-bold flex items-center gap-1">
+                  <User className="h-4 w-4 text-indigo-400" /> {selectedUserIds.length} Doctors
+                </span>
+              </div>
+              <div className="h-8 w-px bg-slate-700"></div>
+              <button 
+                onClick={handleBulkReset}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
+              >
+                {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                Reset to Default
+              </button>
+              <button 
+                onClick={() => setSelectedUserIds([])}
+                className="text-slate-400 hover:text-white transition-colors"
+                title="Cancel"
+              >
+                <X className="h-5 w-5" />
+              </button>
+           </div>
+        </div>
+      )}
+
       {/* ===== OVERLAYS / MODALS ===== */}
       {activeModal && (
         <ModalPortal>
@@ -255,7 +368,7 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-lg">
-                {activeModal === 'create' && 'Create New Doctor'}
+                {activeModal === 'create' && 'Create New User'}
                 {activeModal === 'edit' && 'Edit User Details'}
                 {activeModal === 'password' && 'Change Password'}
                 {activeModal === 'migrate' && 'Migrate Data'}
@@ -268,6 +381,18 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
               {/* CREATE & EDIT FORM */}
               {(activeModal === 'create' || activeModal === 'edit') && (
                 <form onSubmit={activeModal === 'create' ? handleCreateNew : handleEdit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">User name (Account Name)</label>
+                    <input 
+                      type="text" 
+                      value={userName} 
+                      onChange={e => setUserName(e.target.value)} 
+                      placeholder="e.g. Dr. Ahmed Safaa"
+                      className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700" 
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1 italic">If set, this user will bypass the identity popup on login.</p>
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-semibold mb-1">Email / Account ID</label>
                     <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700" />
@@ -283,126 +408,156 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                   <div>
                     <label className="block text-sm font-semibold mb-1">Role</label>
                     <select value={role} onChange={e => setRole(e.target.value)} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
-                      <option value="user">Doctor (Standard)</option>
+                      <option value="doctor">Doctor (Standard)</option>
+                      <option value="nurse">Nurse (Ward Staff)</option>
+                      <option value="pharmacist">Pharmacist</option>
+                      <option value="lab_tech">Lab Technician (MLT)</option>
                       <option value="admin">Administrator</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">Specialty</label>
-                    <select value={specialty} onChange={e => setSpecialty(e.target.value)} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
-                      <option value="psychiatry">Psychiatrist Resident</option>
-                      <option value="internal_medicine">Internal Medicine Resident</option>
-                    </select>
-                  </div>
-
-                  {/* Simplified Ward Selection */}
-                  <div className="space-y-3">
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Assigned Wards</label>
-                    <div className="flex flex-wrap gap-2 p-3 border-2 rounded-2xl bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 focus-within:border-indigo-500/50 transition-all shadow-sm">
-                      {accessibleWards.map((w, idx) => (
-                        <span key={w} className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 animate-in fade-in zoom-in-95 ${
-                          idx === 0 
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                        }`}>
-                          {w}
-                          <button type="button" onClick={() => setAccessibleWards(prev => prev.filter(aw => aw !== w))} className="hover:scale-125 transition-transform"><X className="h-3 w-3" /></button>
-                        </span>
-                      ))}
-                      {accessibleWards.length === 0 && (
-                        <span className="text-sm font-medium text-slate-400 p-1 italic">
-                          No wards selected...
-                        </span>
+                  {(role === 'doctor' || role === 'admin' || role === 'nurse') && (
+                    <>
+                      {(role === 'doctor' || role === 'admin') && (
+                        <div>
+                          <label className="block text-sm font-semibold mb-1">Specialty</label>
+                          <select value={specialty} onChange={e => {
+                            const val = e.target.value;
+                            setSpecialty(val);
+                            if (val === 'psychiatry') {
+                               setGender('');
+                               setAiEnabled(true);
+                               setOfflineModeEnabled(true);
+                            }
+                          }} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
+                            <option value="psychiatry">Psychiatrist Resident</option>
+                            <option value="internal_medicine">Internal Medicine Resident</option>
+                          </select>
+                        </div>
                       )}
-                    </div>
-                    
-                    <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
-                      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900">
-                        <Search className="h-3.5 w-3.5 text-slate-400" />
-                        <input 
-                          type="text"
-                          placeholder="Search existing wards..."
-                          value={wardSearch}
-                          onChange={e => setWardSearch(e.target.value)}
-                          className="bg-transparent border-none outline-none text-xs font-bold w-full"
-                        />
-                      </div>
-                      <div className="max-h-44 modal-scroll p-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
-                        {wardNames.filter(w => w.toLowerCase().includes(wardSearch.toLowerCase())).map(w => (
-                          <label key={w} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-all group border border-transparent hover:border-slate-100 dark:hover:border-slate-700 mb-1">
-                            <div className="relative flex items-center justify-center">
-                              <input 
-                                type="checkbox"
-                                checked={accessibleWards.includes(w)}
-                                onChange={e => {
-                                  if (e.target.checked) setAccessibleWards(prev => [...prev, w])
-                                  else setAccessibleWards(prev => prev.filter(aw => aw !== w))
-                                }}
-                                className="peer h-5 w-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all appearance-none border-2 checked:bg-indigo-600 checked:border-indigo-600"
-                              />
-                              <CheckIcon className="absolute h-3.5 w-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
-                            </div>
-                            <span className={`text-sm tracking-tight ${accessibleWards.includes(w) ? 'font-black text-slate-900 dark:text-slate-100' : 'font-medium text-slate-500 dark:text-slate-400'}`}>{w}</span>
-                            {accessibleWards[0] === w && (
-                              <span className="ml-auto px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 rounded-md ring-1 ring-indigo-200 dark:ring-indigo-800 animate-pulse">
-                                Primary
-                              </span>
-                            )}
-                          </label>
-                        ))}
-                        {wardNames.filter(w => w.toLowerCase().includes(wardSearch.toLowerCase())).length === 0 && (
-                          <div className="text-center py-6">
-                            <p className="text-xs text-slate-400 italic font-medium">No matching wards found.</p>
+
+                      {/* Simplified Ward Selection */}
+                      <div className="space-y-3">
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Assigned Wards</label>
+                        <div className="flex flex-wrap gap-2 p-3 border-2 rounded-2xl bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 focus-within:border-indigo-500/50 transition-all shadow-sm">
+                          {accessibleWards.map((w, idx) => (
+                            <span key={w} className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 animate-in fade-in zoom-in-95 ${
+                              idx === 0 
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            }`}>
+                              {w}
+                              <button type="button" onClick={() => setAccessibleWards(prev => prev.filter(aw => aw !== w))} className="hover:scale-125 transition-transform"><X className="h-3 w-3" /></button>
+                            </span>
+                          ))}
+                          {accessibleWards.length === 0 && (
+                            <span className="text-sm font-medium text-slate-400 p-1 italic">
+                              No wards selected...
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 shadow-inner">
+                          <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 bg-white dark:bg-slate-900">
+                            <Search className="h-3.5 w-3.5 text-slate-400" />
+                            <input 
+                              type="text"
+                              placeholder="Search existing wards..."
+                              value={wardSearch}
+                              onChange={e => setWardSearch(e.target.value)}
+                              className="bg-transparent border-none outline-none text-xs font-bold w-full"
+                            />
                           </div>
-                        )}
+                          <div className="max-h-44 modal-scroll p-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                            {wardNames.filter(w => w.toLowerCase().includes(wardSearch.toLowerCase())).map(w => (
+                              <label key={w} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-all group border border-transparent hover:border-slate-100 dark:hover:border-slate-700 mb-1">
+                                <div className="relative flex items-center justify-center">
+                                  <input 
+                                    type="checkbox"
+                                    checked={accessibleWards.includes(w)}
+                                    onChange={e => {
+                                      if (e.target.checked) setAccessibleWards(prev => [...prev, w])
+                                      else setAccessibleWards(prev => prev.filter(aw => aw !== w))
+                                    }}
+                                    className="peer h-5 w-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all appearance-none border-2 checked:bg-indigo-600 checked:border-indigo-600"
+                                  />
+                                  <CheckIcon className="absolute h-3.5 w-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
+                                </div>
+                                <span className={`text-sm tracking-tight ${accessibleWards.includes(w) ? 'font-black text-slate-900 dark:text-slate-100' : 'font-medium text-slate-500 dark:text-slate-400'}`}>{w}</span>
+                                {accessibleWards[0] === w && (
+                                  <span className="ml-auto px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 rounded-md ring-1 ring-indigo-200 dark:ring-indigo-800 animate-pulse">
+                                    Primary
+                                  </span>
+                                )}
+                              </label>
+                            ))}
+                            {wardNames.filter(w => w.toLowerCase().includes(wardSearch.toLowerCase())).length === 0 && (
+                              <div className="text-center py-6">
+                                <p className="text-xs text-slate-400 italic font-medium">No matching wards found.</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold mb-1">Gender</label>
-                    <select value={gender} onChange={e => setGender(e.target.value as any)} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
-                      <option value="">-- Not Set --</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
+                      {specialty !== 'psychiatry' && (
+                        <div>
+                          <label className="block text-sm font-semibold mb-1">Gender</label>
+                          <select value={gender} onChange={e => setGender(e.target.value as any)} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700">
+                            <option value="">-- Not Set --</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                      )}
 
-                  <div className="pt-2 flex flex-col gap-2">
-                    <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={aiEnabled} 
-                        onChange={e => setAiEnabled(e.target.checked)}
-                        className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-indigo-500" />
-                          Enable AI Features
-                        </p>
-                        <p className="text-[11px] text-slate-500">Allow doctor to use Gemini Clinical Advisor & AI Research reports</p>
-                      </div>
-                    </label>
+                      {(role === 'doctor' || role === 'admin' || role === 'nurse') && (
+                        <div className="pt-2 flex flex-col gap-2">
+                          <label className="flex items-center gap-3 p-3 border rounded-xl cursor-default bg-slate-50 dark:bg-slate-800/50 transition-colors opacity-80">
+                            <div className="flex-1">
+                              <p className="text-sm font-bold flex items-center gap-2 text-teal-600 dark:text-teal-400">
+                                <ArrowRightLeft className="h-4 w-4" />
+                                Ward-Wide Access Enabled
+                              </p>
+                              <p className="text-[11px] text-slate-500 italic">This user can see all patients in their assigned wards by default.</p>
+                            </div>
+                          </label>
 
-                    <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={offlineModeEnabled}
-                        onChange={e => setOfflineModeEnabled(e.target.checked)}
-                        className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold flex items-center gap-2">
-                          <Activity className="h-4 w-4 text-amber-500" />
-                          OfflineSync™ Support
-                        </p>
-                        <p className="text-[11px] text-slate-500">Allow doctor to use SQLite Local-First mode</p>
-                      </div>
-                    </label>
+                          <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={aiEnabled} 
+                              onChange={e => setAiEnabled(e.target.checked)}
+                              className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-indigo-500" />
+                                Enable AI Features
+                              </p>
+                              <p className="text-[11px] text-slate-500">Allow doctor to use Gemini Clinical Advisor & AI Research reports</p>
+                            </div>
+                          </label>
 
-                  </div>
+                          <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={offlineModeEnabled}
+                              onChange={e => setOfflineModeEnabled(e.target.checked)}
+                              className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <div className="flex-1">
+                              <p className="text-sm font-bold flex items-center gap-2">
+                                <Activity className="h-4 w-4 text-amber-500" />
+                                OfflineSync™ Support
+                              </p>
+                              <p className="text-[11px] text-slate-500">Allow doctor to use SQLite Local-First mode</p>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   <div className="pt-4 flex justify-end">
                     <button disabled={isRefreshing} className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg disabled:opacity-50">
@@ -419,12 +574,25 @@ export function UserManagement({ users, wardNames }: { users: any[], wardNames: 
                     You are forcing a password reset for <b>{selectedUser?.email}</b>.
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold mb-1">New Password</label>
+                    <label className="block text-sm font-semibold mb-1 text-slate-900 dark:text-white">New Password</label>
                     <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} className="w-full border rounded-lg p-2 dark:bg-slate-800 dark:border-slate-700" />
                   </div>
+                  <label className="flex items-center gap-2 p-2 border rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={updateDefault}
+                      onChange={e => setUpdateDefault(e.target.checked)}
+                      className="h-4 w-4 rounded text-indigo-600"
+                    />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">Set as Permanent Default</p>
+                      <p className="text-[9px] text-slate-500">Enable this to use this password as the recovery key for "Reset to Default"</p>
+                    </div>
+                  </label>
                   <div className="pt-4 flex justify-end">
-                    <button disabled={isRefreshing} className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg disabled:opacity-50">
-                      {isRefreshing ? 'Saving...' : 'Update Password'}
+                    <button disabled={isRefreshing} className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg disabled:opacity-50 flex items-center gap-2">
+                       {isRefreshing && <Loader2 className="h-4 w-4 animate-spin" />}
+                       {isRefreshing ? 'Saving...' : 'Update Password'}
                     </button>
                   </div>
                 </form>

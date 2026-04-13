@@ -46,9 +46,11 @@ export async function addVisitAction(payload: any) {
       exam_notes: payload.exam_notes,
       is_er: isEnforcedEr,
       doctor_id: user.id,
+      is_psych_note: !!payload.is_psych_note,
       bp_sys: typeof payload.bp_sys === 'number' && !isNaN(payload.bp_sys) ? payload.bp_sys : null,
       bp_dia: typeof payload.bp_dia === 'number' && !isNaN(payload.bp_dia) ? payload.bp_dia : null,
       pr: typeof payload.pr === 'number' && !isNaN(payload.pr) ? payload.pr : null,
+      rr: typeof payload.rr === 'number' && !isNaN(payload.rr) ? payload.rr : null,
       spo2: typeof payload.spo2 === 'number' && !isNaN(payload.spo2) ? payload.spo2 : null,
       temp: typeof payload.temp === 'number' && !isNaN(payload.temp) ? payload.temp : null,
       is_conscious: !!payload.is_conscious,
@@ -58,8 +60,11 @@ export async function addVisitAction(payload: any) {
       is_soft_abdomen: !!payload.is_soft_abdomen,
     }
 
-    // 3. Primary Insert
-    const { error } = await supabase.from('visits').insert(sanitizedPayload)
+    // 3. Primary Insert with explicit doctor name from client if available
+    const { error } = await supabase.from('visits').insert({
+      ...sanitizedPayload,
+      doctor_name: payload.actingDoctorName || null 
+    })
 
     if (error) {
       // If it's a schema cache error, retry once with the same payload.
@@ -150,7 +155,8 @@ export async function addInvestigationAction(payload: any) {
       ...sanitizedLabs,
       is_er: isEnforcedEr,
       doctor_id: user.id,
-      doctor_name: profile?.doctor_name || user.email?.split('@')[0] || "Unknown Physician"
+      doctor_name: payload.actingDoctorName || profile?.doctor_name || user.email?.split('@')[0] || "Unknown Physician",
+      lab_tech_name: payload.actingLabTechName || null
     }
 
     // 4. Primary Attempt
@@ -189,6 +195,65 @@ export async function addInvestigationAction(payload: any) {
 }
 
 /**
+ * ── Update Investigation Action ───────────────────────────────
+ * Securely updates an existing investigation record.
+ * Permission checks (48h/Admin) are enforced in the UI, 
+ * but this action ensures data sanitization.
+ */
+export async function updateInvestigationAction(id: string, payload: any) {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Authentication required" }
+
+    // 1. Combine Date and Time
+    const now = new Date()
+    const seconds = String(now.getSeconds()).padStart(2, '0')
+    const ms = String(now.getMilliseconds()).padStart(3, '0')
+
+    const combinedDateTime = payload.date && payload.time
+      ? `${payload.date}T${payload.time}:${seconds}.${ms}`
+      : now.toISOString()
+
+    // 2. Sanitize lab values
+    const sanitizedLabs: Record<string, any> = {}
+    for (const key in payload) {
+      if (['date', 'time', 'patient_id', 'id'].includes(key)) continue
+      const val = payload[key]
+      if (typeof val === 'number') {
+        sanitizedLabs[key] = isNaN(val) ? null : val
+      } else {
+        sanitizedLabs[key] = val
+      }
+    }
+
+    const { error } = await supabase
+      .from('investigations')
+      .update({
+        date: combinedDateTime,
+        ...sanitizedLabs,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+
+    if (error) throw error
+
+    revalidatePath(`/patient/${payload.patient_id}/investigations`)
+    revalidatePath(`/patient/${payload.patient_id}`)
+    return { success: true }
+  } catch (err: any) {
+    console.error("Update Investigation Failure:", err)
+    return { error: err?.message || "Failed to update lab results." }
+  }
+}
+
+/**
  * ── Move Patient to ER ────────────────────────────────────────
  * Transitions a patient from a ward to the ER ward.
  */
@@ -214,7 +279,7 @@ export async function movePatientToErAction(payload: any) {
 
     const { error } = await supabase.rpc('rpc_move_patient_to_er', {
       p_patient_id: payload.patient_id,
-      p_doctor_identifier: doctorIdentifier,
+      p_doctor_identifier: payload.actingDoctorName || doctorIdentifier,
       p_chief_complaint: payload.chief_complaint,
       p_admission_notes: payload.admission_notes
     })
@@ -264,5 +329,56 @@ export async function returnPatientToWardAction(patientId: string) {
   } catch (err: any) {
     console.error("Return to Ward Failed:", err)
     return { error: err.message || "Failed to discharge patient from ER." }
+  }
+}
+
+/**
+ * ── Update Psych Patient Action ─────────────────────────────
+ * Updates psychiatric diagnosis and chronic drugs with audit trail.
+ */
+export async function updatePsychPatientAction(
+  patientId: string, 
+  data: { 
+    psychological_diagnosis?: string; 
+    psych_drugs?: any[];
+    actingDoctorName?: string;
+  }
+) {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: "Authentication required" }
+
+    const updatePayload: any = {
+      psych_last_edit_by: data.actingDoctorName || 'Unknown Doctor',
+      psych_last_edit_at: new Date().toISOString(),
+    }
+
+    if (data.psychological_diagnosis !== undefined) {
+      updatePayload.psychological_diagnosis = data.psychological_diagnosis
+    }
+    if (data.psych_drugs !== undefined) {
+      updatePayload.psych_drugs = data.psych_drugs
+    }
+
+    const { error } = await supabase
+      .from('patients')
+      .update(updatePayload)
+      .eq('id', patientId)
+
+    if (error) throw error
+
+    revalidatePath(`/patient/${patientId}`)
+    revalidatePath('/dashboard/my-ward')
+    return { success: true }
+  } catch (err: any) {
+    console.error("Update Psych Patient Action Failed:", err)
+    return { error: err.message || "Failed to update psychiatric records." }
   }
 }

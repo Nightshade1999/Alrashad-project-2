@@ -6,13 +6,18 @@ import { parseArr, formatDiseases, isLabAbnormal } from "./export-common"
  * 
  * Optimized for speed: No heavy library dependencies.
  */
-export async function exportToPdf(patients: any[], doctorName: string = "", wardName: string = "") {
+export async function exportToPdf(patients: any[], doctorName: string = "", wardName: string = "", role: string = "") {
   if (!doctorName && typeof window !== "undefined") {
     doctorName = localStorage.getItem("wardManager_doctorName") || "Ward Clinician";
   }
   if (!wardName && typeof window !== "undefined") {
     wardName = localStorage.getItem("wardManager_wardName") || "MEDICAL WARD";
   }
+
+  // Prepend Dr. only for doctor/admin roles
+  const nameWithPrefix = (role === 'doctor' || role === 'admin' || !role) 
+    ? (doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`)
+    : doctorName;
 
   const dateStr = format(new Date(), "dd MMMM yyyy");
 
@@ -45,11 +50,13 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
     const admissionNoteLines = (p.er_admission_notes || "").split("\n").length;
     const medsCount = parseArr(p.medical_drugs).length + parseArr(p.psych_drugs).length;
     const erTxCount = parseArr(p.er_treatment).length;
+    const instructionsCount = (p.instructions || []).length;
 
     const projectedLines = 6 +
       Math.max(5 + medsCount, isER ? 6 + admissionNoteLines : 8) +
       Math.max(5, 2 + noteLines) +
       (isER ? 2 + erTxCount : 0) +
+      (instructionsCount > 0 ? 4 + instructionsCount * 2 : 0) +
       10; 
 
     let fontSizeRem = 0.82;
@@ -122,9 +129,33 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
       <div class="section-header" style="background:${themeHex};color:#fff;">V. EMERGENCY PHARMACOLOGICAL TREATMENT</div>
       <ul class="drug-list">${drugsHtml(parseArr(p.er_treatment))}</ul>` : "";
 
+    const instructionsHtml = (p.instructions && p.instructions.length > 0)
+      ? `
+        <div class="section-header" style="color:${tealHex};border-bottom:2px solid ${tealHex};background:transparent;padding-bottom:2px;margin-top:8px;">
+          ACTIVE NURSING INSTRUCTIONS (ONGOING ORDERS)
+        </div>
+        <ul class="drug-list" style="margin-top:4px;">
+          ${p.instructions.map((inst: any) => `
+            <li>
+              <strong>${field(inst.instruction)}</strong>
+              ${inst.is_read && inst.acknowledgments && inst.acknowledgments.length > 0
+                ? `<div style="font-size:0.6rem;color:#059669;font-weight:700;margin-top:2px;text-transform:uppercase;letter-spacing:0.04em;">
+                    SIGNED BY ${field(inst.acknowledgments[inst.acknowledgments.length - 1].nurse_name)} 
+                    at ${format(new Date(inst.acknowledgments[inst.acknowledgments.length - 1].at), "HH:mm dd MMM")}
+                   </div>`
+                : `<div style="font-size:0.65rem;color:#64748b;margin-top:2px;">
+                    Issued by ${field(inst.doctor_name || 'Staff')} &middot; 
+                    Expires: ${inst.expires_at ? format(parseISO(inst.expires_at), "dd MMM") : 'N/A'}
+                   </div>`
+              }
+            </li>
+          `).join('')}
+        </ul>`
+      : "";
+
     return `<div class="page" style="font-size: ${fontSizeRem}rem !important;">
       <div class="header-bar">
-        <div class="doctor-name" style="color:${tealHex};">Dr. ${doctorName}</div>
+        <div class="doctor-name" style="color:${tealHex};">${nameWithPrefix}</div>
         <div class="report-title">${isER ? "CLINICAL SUMMARY &amp; EMERGENCY EVALUATION" : "PATIENT CLINICAL SUMMARY"}</div>
         <div class="report-date">${dateStr}</div>
       </div>
@@ -190,11 +221,12 @@ export async function exportToPdf(patients: any[], doctorName: string = "", ward
         </div>
       </div>
       ${sectionErTx}
-      <div class="section-header" style="color:${tealHex};border-bottom:2px solid ${tealHex};background:transparent;padding-bottom:2px;">
+      ${instructionsHtml}
+      <div class="section-header" style="color:${tealHex};border-bottom:2px solid ${tealHex};background:transparent;padding-bottom:2px;margin-top:8px;">
         ${isER ? "VI. EMERGENCY LABORATORY FINDINGS" : "VI. CLINICAL LABORATORY FINDINGS"}
       </div>
       <div class="labs-block">${labsHtml}</div>
-      <div class="footer">Generated ${dateStr} &middot; Attending: Dr. ${doctorName} &middot; ${wardName.toUpperCase()}</div>
+      <div class="footer">Generated ${dateStr} &middot; Attending: ${nameWithPrefix} &middot; ${wardName.toUpperCase()}</div>
     </div>`;
   }).join('<div style="page-break-after:always;"></div>');
 

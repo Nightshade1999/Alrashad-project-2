@@ -8,13 +8,14 @@ import { toast } from "sonner"
 
 interface ExportPatientButtonProps {
   patient: any
+  initialInstructions?: any[]
 }
 
-export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
+export function ExportPatientButton({ patient, initialInstructions }: ExportPatientButtonProps) {
   const [isExporting, setIsExporting] = useState<false | 'word' | 'pdf'>(false)
   const [showMenu, setShowMenu] = useState(false)
 
-  const { visits, investigations, profile } = useDatabase()
+  const { visits, investigations, nurseInstructions, profile } = useDatabase()
 
   const handleExport = async (format: 'word' | 'pdf') => {
     setIsExporting(format)
@@ -26,15 +27,37 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
       const doctorName = profile?.doctor_name || localStorage.getItem('wardManager_doctorName') || "Ward Clinician"
       const wardName = patient.ward_name || profile?.ward_name || localStorage.getItem('wardManager_wardName') || "Medical Ward"
 
-      const [v, i] = await Promise.all([
+      const [v, i, n] = await Promise.all([
         visits.list(patient.id),
-        investigations.list(patient.id)
+        investigations.list(patient.id),
+        initialInstructions ? Promise.resolve(initialInstructions) : nurseInstructions.list(patient.id)
       ])
+
+      const now = new Date();
+      const oneDayAgo = now.getTime() - 24 * 60 * 60 * 1000;
+      
+      const activeInstructions = (n || []).filter((inst: any) => {
+        // 1. Repetitive and not expired
+        if (inst.instruction_type === 'repetitive') {
+          return !inst.expires_at || new Date(inst.expires_at) > now;
+        }
+        
+        // 2. Single and unread
+        if (!inst.is_read) return true;
+        
+        // 3. Single (or any) and signed in the last 24 hours
+        const lastAckAt = inst.acknowledgments && inst.acknowledgments.length > 0
+          ? new Date(inst.acknowledgments[inst.acknowledgments.length - 1].at).getTime()
+          : 0;
+          
+        return lastAckAt > oneDayAgo;
+      })
 
       const fullData = {
         ...patient,
         investigations: i || [],
-        visits: v || []
+        visits: v || [],
+        instructions: activeInstructions
       }
 
       if (format === 'word') {
@@ -42,11 +65,11 @@ export function ExportPatientButton({ patient }: ExportPatientButtonProps) {
         // Yield to the event loop so the loading spinner renders before
         // Packer.toBlob() blocks the main thread
         await new Promise(resolve => setTimeout(resolve, 0))
-        await exportToWord([fullData], doctorName, wardName)
+        await exportToWord([fullData], doctorName, wardName, profile?.role)
         toast.success("Word document ready", { id: 'export-toast' })
       } else {
         const { exportToPdf } = await import("@/lib/export-pdf")
-        await exportToPdf([fullData], doctorName, wardName)
+        await exportToPdf([fullData], doctorName, wardName, profile?.role)
         toast.success("PDF preview opened", { id: 'export-toast' })
       }
     } catch (err: any) {

@@ -1,4 +1,12 @@
-import { getAllUsersAction, getDbSizeAction, getAllPatientsForAdminAction, getWardSettingsAction, getGlobalOfflineSettingAction } from '@/app/actions/admin-actions'
+import { 
+  getAllUsersAction, 
+  getDbSizeAction, 
+  getAllPatientsForAdminAction, 
+  getWardSettingsAction, 
+  getGlobalOfflineSettingAction,
+  getAllInstructionsForAdminAction,
+  getAllPharmacyInventoryAction
+} from '@/app/actions/admin-actions'
 import { redirect } from 'next/navigation'
 import WardManagementClient from './ward-management-client'
 import { createServerClient } from '@supabase/ssr'
@@ -19,17 +27,21 @@ export default async function AdminManagePage() {
   let dbSizeMB = 'Error'
   let patientsData: any[] = []
   let wardSettingsData: any[] = []
+  let allInstructions: any[] = []
+  let allInventory: any[] = []
   let errorMessage: string | null = null
   let globalOfflineEnabled = true
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (hasServiceKey) {
-    const [usersRes, dbSizeRes, patientsRes, wardSettingsRes, globalSettingsRes] = await Promise.all([
+    const [usersRes, dbSizeRes, patientsRes, wardSettingsRes, globalSettingsRes, instructionsRes, inventoryRes] = await Promise.all([
       getAllUsersAction(),
       getDbSizeAction(),
       getAllPatientsForAdminAction(),
       getWardSettingsAction(),
-      getGlobalOfflineSettingAction()
+      getGlobalOfflineSettingAction(),
+      getAllInstructionsForAdminAction(),
+      getAllPharmacyInventoryAction()
     ])
     
     if (usersRes.users) users = usersRes.users
@@ -50,6 +62,9 @@ export default async function AdminManagePage() {
     if (globalSettingsRes) {
       globalOfflineEnabled = globalSettingsRes.enabled ?? true
     }
+
+    if (instructionsRes.data) allInstructions = instructionsRes.data
+    if (inventoryRes.data) allInventory = inventoryRes.data
   } else {
     errorMessage = "CRITICAL: SUPABASE_SERVICE_ROLE_KEY is missing from environment variables (.env). Administrators cannot see global data without it."
   }
@@ -82,6 +97,8 @@ export default async function AdminManagePage() {
         hasServiceKey={hasServiceKey}
         aiEnabled={aiEnabled}
         initialGlobalOffline={globalOfflineEnabled}
+        allInstructions={allInstructions}
+        allInventory={allInventory}
       />
       {errorMessage && (
         <div className="mt-12 overflow-hidden relative rounded-[2.5rem] bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800/40 p-8 shadow-xl shadow-amber-900/5 transition-all animate-scale-in">

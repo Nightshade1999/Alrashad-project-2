@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
+import { useDatabase } from "@/hooks/useDatabase"
 
 export function DoctorNameModal() {
   const [open, setOpen] = useState(false)
@@ -24,27 +25,60 @@ export function DoctorNameModal() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
+  const { isReady, profile } = useDatabase()
+
   useEffect(() => {
-    checkDoctorName()
-  }, [])
+    if (isReady && profile) {
+      checkDoctorName()
+    } else if (isReady && !profile) {
+      setOpen(false)
+      setName("") 
+    }
+  }, [isReady, profile])
 
   const checkDoctorName = async () => {
-    // 1. If we already identified for this SESSION (refresh), stay closed.
-    const sessionFlag = sessionStorage.getItem('wardManager_sessionActive')
-    if (sessionFlag === 'true') {
+    // 0. ROLE CHECK: This modal is only for Doctors and Admins.
+    // Pharmacists, Nurses, and Lab Techs have their own specialized modals.
+    if (profile?.role !== 'doctor' && profile?.role !== 'admin') {
       setOpen(false)
       return
     }
 
-    // 2. Load from LOCAL STORAGE (Browser Identity) to suggest to the user
+    // 1. Detect User Switch: If the logged in user is different from the one who set the session flag, clear it.
+    const lastUserId = localStorage.getItem('wardManager_lastUserId')
+    const currentUserId = profile?.user_id
+    
+    if (currentUserId && lastUserId && currentUserId !== lastUserId) {
+      sessionStorage.removeItem('wardManager_sessionActive')
+    }
+
+    // 1. If we already identified for this SESSION (tab instance), stay closed.
+    const sessionFlag = sessionStorage.getItem('wardManager_sessionActive')
     const savedName = localStorage.getItem('wardManager_lastDoctorName')
+    
+    if (sessionFlag === 'true' && savedName) {
+      setOpen(false)
+      return
+    }
+
+    // 2. NEW BYPASS: If Admin set the name in the DB, treat it as verified!
+    if (profile?.is_name_fixed && profile?.doctor_name) {
+      const adminSetName = profile.doctor_name
+      sessionStorage.setItem('wardManager_sessionActive', 'true')
+      localStorage.setItem('wardManager_lastDoctorName', adminSetName)
+      localStorage.setItem('wardManager_lastDoctorGender', profile.gender || 'Male')
+      localStorage.setItem('wardManager_lastUserId', profile.user_id)
+      setOpen(false)
+      return
+    }
+
+    // 3. Load from LOCAL STORAGE (Last used name on THIS device)
     const savedGender = localStorage.getItem('wardManager_lastDoctorGender')
     
     if (savedName) setName(savedName)
-    if (savedGender === 'Male' || savedGender === 'Female') setGender(savedGender)
+    if (savedGender === 'Male' || savedGender === 'Female') setGender(savedGender as any)
 
-    // 3. ALWAYS open the modal on a fresh session, even if the DB has a name.
-    // Multiple doctors share accounts, so they must confirm WHO is acting right now.
+    // 4. Force the modal to open on a fresh session OR if name is missing
     setOpen(true)
   }
 
@@ -80,6 +114,7 @@ export function DoctorNameModal() {
       // Set local flag (Persistence for this browser identity)
       localStorage.setItem('wardManager_lastDoctorName', trimmed)
       localStorage.setItem('wardManager_lastDoctorGender', gender)
+      localStorage.setItem('wardManager_lastUserId', user.id)
       
       toast.success(`Session started as Dr. ${trimmed}!`)
       setOpen(false)

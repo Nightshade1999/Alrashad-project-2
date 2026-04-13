@@ -2,9 +2,11 @@
 
 import { useDatabase } from '@/hooks/useDatabase'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
+import { createClient } from '@/lib/supabase'
 
 const AddPatientModal = dynamic(() => import('@/components/dashboard/add-patient-modal').then(mod => mod.AddPatientModal), {
   loading: () => <Skeleton className="h-14 w-32 rounded-xl" />
@@ -26,7 +28,7 @@ import { AlertCircle, LayoutDashboard, Settings } from 'lucide-react'
 import type { Patient } from '@/types/database.types'
 
 export function OfflineDashboard() {
-  const { patients, profile } = useDatabase();
+  const { patients, profile, isReady } = useDatabase();
   const [patientList, setPatientList] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,37 +58,31 @@ export function OfflineDashboard() {
   }, [patients]);
 
   const myWardName = profile?.ward_name ?? null;
+  const router = useRouter();
   const [isCachedAdmin, setIsCachedAdmin] = useState(false);
+  const [sessionRole, setSessionRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check localStorage directly for an emergency fallback if the reactive profile hasn't synced yet.
+    // Rely solely on the DatabaseProvider profile for authoritative role detection
     if (typeof window !== 'undefined' && profile?.user_id) {
-      try {
-        const cachedRaw = localStorage.getItem(`profile_cache_${profile.user_id}`);
-        if (cachedRaw) {
-          const cached = JSON.parse(cachedRaw);
-          if (cached.role?.toLowerCase() === 'admin') setIsCachedAdmin(true);
-        }
-      } catch (e) {
-        console.debug('Dashboard: Cache check failed', e);
-      }
+      if (profile.role === 'lab_tech') router.push('/laboratory');
+      if (profile.role === 'pharmacist') router.push('/pharmacy');
+      if (profile.role === 'nurse') router.push('/dashboard/select-ward');
     }
-  }, [profile?.user_id]);
+  }, [profile, router]);
 
   useEffect(() => {
     if (profile?.user_id) {
       console.log('[Clinical Admin Diagnostic]', {
         userId: profile.user_id,
         currentRole: profile.role,
-        metadataRole: (profile as any).metadata_role,
-        isSystemAdmin: profile?.role?.toLowerCase() === 'admin' || (profile as any)?.metadata_role?.toLowerCase() === 'admin'
+        sessionRole: sessionRole,
+        isSystemAdmin: profile?.role?.toLowerCase() === 'admin' || sessionRole?.toLowerCase() === 'admin' || isCachedAdmin
       });
     }
-  }, [profile]);
+  }, [profile, sessionRole, isCachedAdmin]);
 
-  const isAdmin = profile?.role?.toLowerCase() === 'admin' || isCachedAdmin || (profile as any)?.metadata_role?.toLowerCase() === 'admin';
-
-  // Visibility Policy: 'Master Ward', 'Unassigned', or missing ward assignment shows all for admins.
+  const isAdmin = profile?.role?.trim().toLowerCase() === 'admin';
   const isMaster = myWardName === 'Master Ward' || (isAdmin && (!myWardName || myWardName === 'Unassigned'));
   
   // Case-Insensitive Filter
@@ -108,7 +104,7 @@ export function OfflineDashboard() {
   };
 
 
-  if (loading) {
+  if (loading || !isReady) {
      return (
        <div className="space-y-10 animate-pulse">
          <div className="flex justify-between items-end">
@@ -131,9 +127,14 @@ export function OfflineDashboard() {
        </div>
      )
   }
+  
+  // Strict Role Guard: Return null (blocking Doctor UI) for specialty roles while redirection triggers.
+  const currentRole = profile?.role?.toLowerCase() || sessionRole?.toLowerCase();
+  const isSpecialtyRole = currentRole === 'nurse' || currentRole === 'lab_tech';
+  if (isSpecialtyRole) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
@@ -142,11 +143,16 @@ export function OfflineDashboard() {
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {counts.total} patient{counts.total !== 1 ? 's' : ''} currently admitted
+            {isAdmin && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[9px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded-full uppercase tracking-tighter shadow-sm border border-indigo-200/50">
+                <Settings className="h-2 w-2" /> Admin Verified
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <ExportButton isAdmin={isAdmin} />
-          <AddPatientModal />
+          <AddPatientModal role={currentRole} />
         </div>
       </div>
 
@@ -163,8 +169,9 @@ export function OfflineDashboard() {
 
       {/* Role-based Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto stagger-fade-in">
-        {/* ER Ward Card */}
-        <Link href="/dashboard/er" prefetch={true} className="block">
+        {/* ER Ward Card - RESTRICTED TO DOCTOR/ADMIN */}
+        {(isAdmin || profile?.role === 'doctor') && (
+          <Link href="/dashboard/er" prefetch={true} className="block">
           <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full glass-card">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
               <AlertCircle className="h-32 w-32 text-rose-500" />
@@ -185,9 +192,10 @@ export function OfflineDashboard() {
             </div>
           </div>
         </Link>
+        )}
 
         {/* Normal Ward Card */}
-        <Link href={(!isAdmin && (profile?.accessible_wards?.length ?? 0) <= 1) ? '/dashboard/my-ward' : '/dashboard/select-ward'} prefetch={true} className="block">
+        <Link href={(!isAdmin && profile?.specialty !== 'psychiatry' && (profile?.accessible_wards?.length ?? 0) <= 1) ? '/dashboard/my-ward' : '/dashboard/select-ward'} prefetch={true} className="block">
           <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer h-full glass-card">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
               <LayoutDashboard className="h-32 w-32 text-emerald-500" />

@@ -12,7 +12,7 @@ export function InstallPrompt() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const isStandalone = window.matchMedia("(display-mode: standalone)").matches
-      const isDismissed = sessionStorage.getItem("pwa_install_dismissed") === "true"
+      const isDismissed = localStorage.getItem("pwa_install_dismissed") === "true"
       
       if (isStandalone || isDismissed) return
 
@@ -23,9 +23,11 @@ export function InstallPrompt() {
 
       // 3. Listen for Chrome/Android prompt
       const handler = (e: any) => {
+        // Double check dismissal before showing
+        if (localStorage.getItem("pwa_install_dismissed") === "true") return
+        
         e.preventDefault()
         setDeferredPrompt(e)
-        // Only show if not dismissed recently (could add localStorage check here)
         setShow(true)
       }
 
@@ -51,7 +53,7 @@ export function InstallPrompt() {
   }
 
   const handleDontShowAgain = () => {
-    sessionStorage.setItem("pwa_install_dismissed", "true")
+    localStorage.setItem("pwa_install_dismissed", "true")
     setShow(false)
   }
 

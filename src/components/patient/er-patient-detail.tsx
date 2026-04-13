@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { ReferralModal } from "@/components/patient/referral-modal"
 import { DeletePatientButton } from "@/components/patient/delete-button"
+import { EditPatientModal } from "@/components/patient/edit-patient-modal"
 import { DeclareDeathModal } from "@/components/patient/declare-death-modal"
 import { MoveToErModal } from "@/components/patient/move-to-er-modal"
 import { ExportPatientButton } from "@/components/patient/export-button"
@@ -25,25 +26,30 @@ import { format, parseISO } from "date-fns"
 import { Pill } from "lucide-react"
 import { isLabAbnormal, safeJsonParse } from "@/lib/utils"
 import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
+import { GueHistoryIcon } from "@/components/laboratory/GueHistoryIcon"
+import { AddPsychVisitModal } from "@/components/patient/add-psych-visit-modal"
 
 export function ErPatientDetail({ 
   patient, 
   visits, 
   investigations, 
   aiEnabled, 
-  wardName 
+  wardName,
+  profile
 }: { 
   patient: any, 
   visits: any[], 
   investigations: any[], 
   aiEnabled: boolean,
-  wardName?: string
+  wardName?: string,
+  profile?: any
 }) {
   const erVisits = visits.filter(v => v.is_er)
   const erLabs = investigations.filter(i => i.is_er)
   
   const lastErVisit = erVisits[0] ?? null
   const lastErLab = erLabs[0] ?? null
+  const firstErVisit = erVisits.length > 0 ? erVisits[erVisits.length - 1] : null
 
   const displayPatient = {
     ...patient,
@@ -53,6 +59,8 @@ export function ErPatientDetail({
     investigations: erLabs,
     visits: erVisits
   }
+
+  const isPsychResident = profile?.specialty === 'psychiatry'
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto overflow-x-hidden px-1">
@@ -96,48 +104,59 @@ export function ErPatientDetail({
               isReferred={true} 
               referralHospital={patient.referral_hospital}
               referralDate={patient.referral_date}
+              patient={patient}
+              latestVisit={lastErVisit}
+              latestInvestigation={lastErLab}
             />
           </div>
         )}
 
         {/* ── ER Action Bar Icons ── */}
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-rose-100 dark:border-rose-900/30 shadow-sm overflow-visible">
-           {/* Add Lab */}
-           <AddInvestigationModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
-           
-           {/* Add Visit */}
-           <AddVisitModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
-           
-           {/* Add Treatment (Tx Icon) */}
-           <ErTreatmentEditor 
-             patientId={patient.id} 
-             initialTreatments={safeJsonParse(patient.er_treatment)} 
-             disabled={patient.is_referred}
-             trigger={
-               <Button variant="outline" size="icon" className="h-10 w-10 border-indigo-200 dark:border-indigo-900 bg-white" title="Edit Treatment">
-                 <Pill className="h-5 w-5 text-indigo-600" />
-               </Button>
-             } 
-           />
-
-           {/* Add Reminder */}
-           <AddReminderModal patientId={patient.id} patientName={patient.name} />
-
-           {/* Refer */}
-           {!patient.is_referred && <ReferralModal patientId={patient.id} isReferred={false} />}
-
-           {/* Export Doc */}
-           <ExportPatientButton patient={displayPatient} />
-           
-           {/* AI Consult */}
-           <ShareAIPromptModal patient={displayPatient} />
-
-           {/* Move back to Ward (as ER return) */}
-           <MoveToErModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
-           <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} disabled={patient.is_referred} />
-           <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+            {profile?.role?.toLowerCase() !== 'nurse' && (
+              <>
+                <AddInvestigationModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
+                {isPsychResident ? (
+                  <AddPsychVisitModal patientId={patient.id} isEr={true} variant="icon" disabled={patient.is_referred} />
+                ) : (
+                  <AddVisitModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
+                )}
+                <ErTreatmentEditor 
+                  patientId={patient.id} 
+                  initialTreatments={safeJsonParse(patient.er_treatment)} 
+                  disabled={patient.is_referred}
+                  allowDelete={!isPsychResident}
+                  trigger={
+                    <Button variant="outline" size="icon" className="h-10 w-10 border-indigo-200 dark:border-indigo-900 bg-white" title="Edit Treatment">
+                      <Pill className="h-5 w-5 text-indigo-600" />
+                    </Button>
+                  } 
+                />
+                <AddReminderModal patientId={patient.id} patientName={patient.name} />
+                {!patient.is_referred && (
+                  <ReferralModal 
+                    patientId={patient.id} 
+                    isReferred={false} 
+                    patient={patient}
+                    latestVisit={lastErVisit}
+                    latestInvestigation={lastErLab}
+                  />
+                )}
+                <ExportPatientButton patient={displayPatient} />
+                <ShareAIPromptModal patient={displayPatient} />
+                {!isPsychResident && (
+                  <MoveToErModal patientId={patient.id} isEr={true} disabled={patient.is_referred} />
+                )}
+                <DeclareDeathModal patientId={patient.id} currentCategory={patient.category} disabled={patient.is_referred} />
+                <DeletePatientButton patientId={patient.id} variant="outline" redirectOnDelete={true} />
+              </>
+            )}
+            {!isPsychResident && (
+              <EditPatientModal patient={patient} disabled={patient.is_referred} role={profile?.role} />
+            )}
         </div>
       </div>
+
 
       {/* ── Patient Demographics & Chronic History ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-fade-in">
@@ -239,35 +258,35 @@ export function ErPatientDetail({
                   <p className="text-sm text-rose-800/80 dark:text-rose-100/70 whitespace-pre-line leading-relaxed">
                     {patient.er_admission_notes || 'No notes provided at admission.'}
                   </p>
-                  {patient.er_admission_notes && (
-                    <div className="flex items-center justify-end gap-2 mt-4 opacity-20 hover:opacity-100 transition-opacity cursor-default select-none group">
+                  {patient.er_admission_doctor && (
+                    <div className="flex items-center justify-end gap-2 mt-4 opacity-60 hover:opacity-100 transition-opacity cursor-default select-none group">
                       <span className="h-[0.5px] w-8 bg-rose-900/30 dark:bg-rose-100/30"></span>
                       <span className="text-[8px] font-serif italic uppercase tracking-[0.2em] text-rose-900/80 dark:text-rose-100/80">
                         Physician Signed:
                       </span>
                       <span className="text-[10px] font-black uppercase text-rose-950 dark:text-rose-50">
-                        Dr. {patient.er_admission_doctor || 'Unknown'}
+                        {patient.er_admission_doctor.startsWith('Dr.') ? '' : 'Dr. '}{patient.er_admission_doctor}
                       </span>
                     </div>
                   )}
                </div>
-            </div>
-
-          <div className="bg-white/60 dark:bg-rose-900/20 rounded-2xl p-5 border border-rose-100 dark:border-rose-800/50 flex flex-col justify-center">
-               <p className="text-[10px] font-black uppercase tracking-wider text-rose-600 mb-2">Admission Vitals</p>
-               <div className="grid grid-cols-2 gap-4">
+                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
                     <Stethoscope className="h-4 w-4 text-rose-500" />
                     <div>
                        <p className="text-[9px] text-slate-400 uppercase leading-none">BP / HR</p>
-                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200">120/80 · 72</p>
+                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {firstErVisit?.bp_sys || '?'}/{firstErVisit?.bp_dia || '?'} · {firstErVisit?.pr || '?'}
+                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Thermometer className="h-4 w-4 text-rose-500" />
                     <div>
-                       <p className="text-[9px] text-slate-400 uppercase leading-none">Temp / SpO2</p>
-                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200">37.2°C · 98%</p>
+                       <p className="text-[9px] text-slate-400 uppercase leading-none">Temp / SpO2 / RR</p>
+                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          {firstErVisit?.temp || '?'}°C · {firstErVisit?.spo2 || '?'}% · {firstErVisit?.rr || '?'}
+                       </p>
                     </div>
                   </div>
                </div>
@@ -308,6 +327,18 @@ export function ErPatientDetail({
                       {lastErVisit.spo2 ? `${lastErVisit.spo2}%` : '--'}
                     </span>
                   </div>
+                  <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
+                    <Thermometer className="h-3 w-3 text-orange-500" />
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      {lastErVisit.temp ? `${lastErVisit.temp}°C` : '--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
+                    <Activity className="h-3 w-3 text-rose-600" />
+                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                      {lastErVisit.rr ? `${lastErVisit.rr} bpm` : '--'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Status Flags Summary */}
@@ -333,11 +364,14 @@ export function ErPatientDetail({
          </div>
 
          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-               <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                 <Flask className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center justify-between mb-3">
+               <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                    <Flask className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Labs (ER)</h3>
                </div>
-               <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Labs (ER)</h3>
+               {lastErLab && <GueHistoryIcon investigation={lastErLab} />}
             </div>
             {lastErLab ? (
                <div className="p-1 grid grid-cols-3 gap-2 text-center">
@@ -351,6 +385,10 @@ export function ErPatientDetail({
                     { key: 'tsb', label: 'TSB', value: lastErLab.tsb },
                     { key: 'hba1c', label: 'HbA1c', value: lastErLab.hba1c },
                     { key: 'rbs', label: 'RBS', value: lastErLab.rbs },
+                    { key: 'ka', label: 'Ka', value: lastErLab.ka },
+                    { key: 'na', label: 'Na', value: lastErLab.na },
+                    { key: 'cl', label: 'Cl', value: lastErLab.cl },
+                    { key: 'ca', label: 'Ca', value: lastErLab.ca },
                     { key: 'esr', label: 'ESR', value: lastErLab.esr },
                     { key: 'crp', label: 'CRP', value: lastErLab.crp },
                     ...(Array.isArray(lastErLab.other_labs) ? lastErLab.other_labs.map((l: any) => ({ 
@@ -372,8 +410,17 @@ export function ErPatientDetail({
             ) : <p className="text-xs italic text-slate-400 py-2">No lab results in ER yet.</p>}
          </div>
 
-         <ErTreatmentEditor patientId={patient.id} initialTreatments={safeJsonParse(patient.er_treatment)} />
-      </div>
+          <ErTreatmentEditor patientId={patient.id} initialTreatments={safeJsonParse(patient.er_treatment)} />
+          {(patient.er_treatment_last_edit_by || patient.er_treatment_last_edit_at) && (
+            <div className="mt-3 px-4 py-2 bg-slate-100/50 dark:bg-slate-800/30 rounded-xl flex items-center justify-between border border-slate-200/50 dark:border-slate-800/50">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Treatment Audit</p>
+              <p className="text-[9px] font-bold text-slate-500 uppercase">
+                {patient.er_treatment_last_edit_by ? `Saved By ${patient.er_treatment_last_edit_by}` : 'Stated'}
+                {patient.er_treatment_last_edit_at && ` · ${format(parseISO(patient.er_treatment_last_edit_at), 'dd MMM HH:mm')}`}
+              </p>
+            </div>
+          )}
+       </div>
 
       {/* ── History Cards & Navigation ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -415,7 +462,7 @@ export function ErPatientDetail({
       </div>
 
       {/* ── AI System ── */}
-      {aiEnabled && (
+      {aiEnabled && profile?.role?.toLowerCase() !== 'nurse' && (
          <div className="mt-4 pt-10 border-t border-rose-100 dark:border-rose-900/30">
             <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />
          </div>

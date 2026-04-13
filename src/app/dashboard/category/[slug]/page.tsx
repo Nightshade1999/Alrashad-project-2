@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { CategoryView } from '@/components/dashboard/category-view'
@@ -10,8 +10,9 @@ const SERVER_CATEGORY_DB_MAP: Record<string, string | null> = {
   'close-follow-up': 'Close Follow-up',
   'normal': 'Normal',
   'pending-follow-up': 'ALL',
+  'awaiting-assessment': 'Awaiting Assessment',
   'archive': 'Deceased/Archive',
-}
+};
 
 function getDynamicAge(baseAge: number, timestampIso?: string): number {
   if (!timestampIso) return baseAge;
@@ -128,6 +129,10 @@ export default async function CategoryPage({
     .select('role, ward_name')
     .eq('user_id', userId)
     .maybeSingle() as any
+
+  if (profile?.role?.toLowerCase() === 'nurse') {
+    redirect(`/nurse/ward/${encodeURIComponent(profile.ward_name || 'General Ward')}`)
+  }
 
   const userWard = (profile as any)?.ward_name || null
   const isAdmin = (profile as any)?.role === 'admin'

@@ -57,7 +57,7 @@ export async function createUserAction(formData: FormData) {
   }
   const email = formData.get('email') as string
   const password = formData.get('password') as string
-  const role = formData.get('role') as string || 'user'
+  const role = formData.get('role') as string || 'doctor'
   const wardName = formData.get('ward_name') as string || 'General Ward'
   const specialty = formData.get('specialty') as string || 'psychiatry'
   const aiEnabled = formData.get('ai_enabled') === 'true'
@@ -70,17 +70,21 @@ export async function createUserAction(formData: FormData) {
 
   if (!email || !password) return { error: 'Email and password required' }
   
-  // 0. Validate Wards against ward_settings
-  const { data: validWards } = await getSupabaseAdmin().from('ward_settings').select('ward_name')
-  const validNames = (validWards || []).map(w => w.ward_name)
+  // 0. Validate Wards against ward_settings (Skip for non-clinical roles)
+  const isClinicalRole = role === 'doctor' || role === 'admin'
   
-  if (!validNames.includes(wardName)) {
-    return { error: `Invalid primary ward: "${wardName}". Wards must be created in Ward Setup first.` }
-  }
-  
-  const invalidWards = accessibleWards.filter(w => !validNames.includes(w))
-  if (invalidWards.length > 0) {
-    return { error: `Invalid accessible wards: ${invalidWards.join(', ')}. Wards must be created in Ward Setup first.` }
+  if (isClinicalRole) {
+    const { data: validWards } = await getSupabaseAdmin().from('ward_settings').select('ward_name')
+    const validNames = (validWards || []).map(w => w.ward_name)
+    
+    if (!validNames.includes(wardName)) {
+      return { error: `Invalid primary ward: "${wardName}". Wards must be created in Ward Setup first.` }
+    }
+    
+    const invalidWards = accessibleWards.filter(w => !validNames.includes(w))
+    if (invalidWards.length > 0) {
+      return { error: `Invalid accessible wards: ${invalidWards.join(', ')}. Wards must be created in Ward Setup first.` }
+    }
   }
   
   // 1. Create auth user
@@ -96,19 +100,26 @@ export async function createUserAction(formData: FormData) {
   // then forcefully apply the requested role/ward settings.
   await new Promise(r => setTimeout(r, 1000))
   
-  const { error: profileError } = await (getSupabaseAdmin()
-    .from('user_profiles') as any)
-    .upsert({ 
-      user_id: authData.user.id, 
-      role, 
-      ward_name: wardName,
-      specialty,
-      gender,
-      ai_enabled: aiEnabled,
-      offline_mode_enabled: offlineModeEnabled,
-      can_see_ward_patients: canSeeWardPatients,
-      accessible_wards: accessibleWards
-    })
+    const { error: profileError } = await (getSupabaseAdmin()
+      .from('user_profiles') as any)
+      .upsert({ 
+        user_id: authData.user.id, 
+        role, 
+        ward_name: wardName,
+        specialty,
+        gender,
+        ai_enabled: aiEnabled,
+        offline_mode_enabled: offlineModeEnabled,
+        can_see_ward_patients: (role === 'doctor' || role === 'nurse' || role === 'admin'),
+        accessible_wards: accessibleWards,
+        default_password: password,
+        // Map userName to correct column
+        doctor_name: (role === 'doctor' || role === 'admin') ? formData.get('user_name') : null,
+        nurse_name: (role === 'nurse') ? formData.get('user_name') : null,
+        lab_tech_name: (role === 'lab_tech') ? formData.get('user_name') : null,
+        pharmacist_name: (role === 'pharmacist') ? formData.get('user_name') : null,
+        is_name_fixed: !!formData.get('user_name')
+      })
 
   if (profileError) return { error: 'Auth succeeded but profile update failed: ' + profileError.message }
 
@@ -147,7 +158,7 @@ export async function deleteUserAction(userId: string) {
   return { success: true }
 }
 
-export async function updateUserPasswordAction(userId: string, newPassword: string) {
+export async function updateUserPasswordAction(userId: string, newPassword: string, updateDefault: boolean = false) {
   try {
     await verifyAdmin()
   } catch (e: any) {
@@ -155,13 +166,102 @@ export async function updateUserPasswordAction(userId: string, newPassword: stri
   }
   if (!userId || !newPassword) return { error: 'User ID and password required' }
 
+  // 1. Update Auth Password
   const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, { password: newPassword })
-  
   if (error) return { error: error.message }
+
+  // 2. Optionally update the stored Default Password for future resets
+  if (updateDefault) {
+    const { error: profError } = await (getSupabaseAdmin()
+      .from('user_profiles') as any)
+      .update({ default_password: newPassword })
+      .eq('user_id', userId)
+    
+    if (profError) console.error('Failed to update default_password:', profError)
+  }
+
   return { success: true }
 }
 
-export async function updateUserDetailsAction(userId: string, email?: string, wardName?: string, role?: string, specialty?: string, aiEnabled?: boolean, offlineModeEnabled?: boolean, canSeeWardPatients?: boolean, gender?: 'Male' | 'Female' | null, accessibleWards?: string[]) {
+/** 
+ * SELF-SERVICE: Allows currently logged-in user to change their own password.
+ * This uses the user's OWN session, not admin privileges.
+ */
+export async function updateUserSelfPasswordAction(newPassword: string) {
+  if (!newPassword || newPassword.length < 6) return { error: 'Password must be at least 6 characters' }
+  
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll() } }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Authentication required' }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) return { error: error.message }
+
+  return { success: true }
+}
+
+/**
+ * BULK RESET: Reverts multiple accounts to their respective stored default_password.
+ */
+export async function bulkResetPasswordsToDefaultAction(userIds: string[]) {
+  try {
+    await verifyAdmin()
+  } catch (e: any) {
+    return { error: e.message }
+  }
+  if (!userIds || userIds.length === 0) return { error: 'No users selected' }
+
+  const admin = getSupabaseAdmin()
+  const successIds: string[] = []
+  const failureIds: string[] = []
+
+  // 1. Fetch defaults for all selected users
+  const { data: profiles } = await (admin.from('user_profiles') as any)
+    .select('user_id, default_password')
+    .in('user_id', userIds)
+
+  // 2. Process each reset individually to handle potential partial failures correctly
+  for (const userId of userIds) {
+    const prof = profiles?.find((p: any) => p.user_id === userId)
+    const defaultPass = prof?.default_password
+
+    if (!defaultPass) {
+      failureIds.push(userId)
+      continue
+    }
+
+    const { error } = await admin.auth.admin.updateUserById(userId, { password: defaultPass })
+    if (error) failureIds.push(userId)
+    else successIds.push(userId)
+  }
+
+  revalidatePath('/admin/manage')
+  return { 
+    successCount: successIds.length, 
+    failureCount: failureIds.length,
+    message: `Resetted ${successIds.length} users. ${failureIds.length} users failed or had no default password stored.`
+  }
+}
+
+export async function updateUserDetailsAction(
+  userId: string, 
+  email?: string, 
+  wardName?: string, 
+  role?: string, 
+  specialty?: string, 
+  aiEnabled?: boolean, 
+  offlineModeEnabled?: boolean, 
+  canSeeWardPatients?: boolean, 
+  gender?: 'Male' | 'Female' | null, 
+  accessibleWards?: string[],
+  userName?: string
+) {
   if (!userId) return { error: 'User ID required' }
 
   // Update email if provided
@@ -170,8 +270,11 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (authError) return { error: 'Failed to update email: ' + authError.message }
   }
 
-  // Pre-validate Wards if they are being updated
-  if (wardName || accessibleWards) {
+  // Pre-validate Wards if they are being updated (Skip for non-clinical roles)
+  const roleToUse = role || 'doctor' // default to doctor if not changing role
+  const isClinicalRole = roleToUse === 'doctor' || roleToUse === 'admin'
+
+  if (isClinicalRole && (wardName || accessibleWards)) {
      const { data: validWards } = await getSupabaseAdmin().from('ward_settings').select('ward_name')
      const validNames = (validWards || []).map(w => w.ward_name)
      
@@ -195,19 +298,18 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
     if (gender !== undefined) updatePayload.gender = gender
     if (aiEnabled !== undefined) updatePayload.ai_enabled = aiEnabled
     if (offlineModeEnabled !== undefined) updatePayload.offline_mode_enabled = offlineModeEnabled
-    if (canSeeWardPatients !== undefined) updatePayload.can_see_ward_patients = canSeeWardPatients
+    updatePayload.can_see_ward_patients = (roleToUse === 'doctor' || roleToUse === 'nurse' || roleToUse === 'admin')
     if (accessibleWards !== undefined) {
       updatePayload.accessible_wards = accessibleWards
     }
-
-    // 1. Fetch current profile to check if ward is changing
-    const { data: currentProf } = await (getSupabaseAdmin()
-      .from('user_profiles') as any)
-      .select('ward_name')
-      .eq('user_id', userId)
-      .single()
-
-    const isWardChanging = wardName && currentProf?.ward_name !== wardName
+    if (userName !== undefined) {
+      const targetRole = role || 'doctor'
+      if (targetRole === 'doctor' || targetRole === 'admin') updatePayload.doctor_name = userName
+      else if (targetRole === 'nurse') updatePayload.nurse_name = userName
+      else if (targetRole === 'lab_tech') updatePayload.lab_tech_name = userName
+      else if (targetRole === 'pharmacist') updatePayload.pharmacist_name = userName
+      updatePayload.is_name_fixed = !!userName
+    }
 
     // 2. Perform Profile Update
     const { error: profError } = await (getSupabaseAdmin()
@@ -216,16 +318,6 @@ export async function updateUserDetailsAction(userId: string, email?: string, wa
       .eq('user_id', userId)
 
     if (profError) return { error: 'Failed to update user profile: ' + profError.message }
-
-    // 3. IF WARD CHANGED: Migrate all patients to the new ward!
-    if (isWardChanging) {
-      const { error: migError } = await getSupabaseAdmin()
-        .from('patients')
-        .update({ ward_name: wardName })
-        .eq('user_id', userId)
-      
-      if (migError) console.error('Patient migration failed during ward change:', migError)
-    }
   }
 
   revalidatePath('/admin/manage')
@@ -273,14 +365,20 @@ export async function getAllUsersAction() {
       email: u.email,
       created_at: u.created_at,
       last_sign_in_at: u.last_sign_in_at,
-      role: prof?.role || 'user',
+      role: prof?.role || 'doctor',
       ward_name: prof?.ward_name || 'Unassigned',
       specialty: prof?.specialty || 'psychiatry',
       gender: prof?.gender || null,
       ai_enabled: prof?.ai_enabled ?? true,
       offline_mode_enabled: prof?.offline_mode_enabled ?? false,
       can_see_ward_patients: prof?.can_see_ward_patients ?? false,
-      accessible_wards: prof?.accessible_wards || (prof?.ward_name ? [prof.ward_name] : [])
+      accessible_wards: prof?.accessible_wards || (prof?.ward_name ? [prof.ward_name] : []),
+      default_password: prof?.default_password || null,
+      userName: prof?.role === 'lab_tech' ? prof?.lab_tech_name :
+                prof?.role === 'pharmacist' ? prof?.pharmacist_name :
+                prof?.role === 'nurse' ? prof?.nurse_name :
+                prof?.doctor_name || null,
+      isNameFixed: prof?.is_name_fixed ?? false
     }
   })
 
@@ -649,6 +747,215 @@ export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'ove
     return { results }
   } catch (e: any) {
     console.error('System Restore Action Failure:', e)
+    return { error: e.message }
+  }
+}
+
+/**
+ * ── Referral Management Actions ───────────────────────────────
+ */
+
+export async function getAllReferralsForAdminAction() {
+  try {
+    await verifyAdmin()
+    const { data, error } = await getSupabaseAdmin()
+      .from('referrals')
+      .select(`
+        *,
+        patients (
+          name,
+          medical_record_number,
+          mother_name,
+          ward_name
+        ),
+        user_profiles:doctor_id (
+          doctor_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return { data: data || [] }
+  } catch (e: any) {
+    return { error: e.message, data: [] }
+  }
+}
+
+export async function deleteReferralAction(referralId: string) {
+  try {
+    await verifyAdmin()
+    const { error } = await getSupabaseAdmin()
+      .from('referrals')
+      .delete()
+      .eq('id', referralId)
+    
+    if (error) throw error
+    revalidatePath('/admin/manage')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
+
+/**
+ * ── Global Pharmacy & Nursing Oversight ───────────────────────
+ */
+
+export async function getAllInstructionsForAdminAction() {
+  try {
+    await verifyAdmin()
+    const { data, error } = await getSupabaseAdmin()
+      .from('nurse_instructions')
+      .select(`
+        *,
+        patients (
+          name,
+          medical_record_number,
+          ward_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return { data: data || [] }
+  } catch (e: any) {
+    return { error: e.message, data: [] }
+  }
+}
+
+export async function getAllPharmacyInventoryAction() {
+  try {
+    await verifyAdmin()
+    const { data, error } = await getSupabaseAdmin()
+      .from('pharmacy_inventory')
+      .select('*')
+      .order('generic_name', { ascending: true })
+    
+    if (error) throw error
+    return { data: data || [] }
+  } catch (e: any) {
+    return { error: e.message, data: [] }
+  }
+}
+
+/**
+ * ── Recycle Bin Actions ───────────────────────────────────────
+ */
+
+export async function getTrashItemsAction() {
+  try {
+    await verifyAdmin()
+    const { data, error } = await getSupabaseAdmin()
+      .from('trash')
+      .select('*')
+      .order('deleted_at', { ascending: false })
+    
+    if (error) throw error
+    return { data: data || [] }
+  } catch (e: any) {
+    return { error: e.message, data: [] }
+  }
+}
+
+export async function restoreFromTrashAction(trashId: string) {
+  try {
+    await verifyAdmin()
+    const admin = getSupabaseAdmin()
+    
+    // 1. Get the trash record
+    const { data: trashRecord, error: fetchError } = await admin
+      .from('trash')
+      .select('*')
+      .eq('id', trashId)
+      .single()
+    
+    if (fetchError || !trashRecord) throw new Error("Trash record not found")
+    
+    // 2. Insert back into original table
+    const { error: restoreError } = await admin
+      .from(trashRecord.table_name)
+      .insert(trashRecord.data)
+    
+    if (restoreError) throw restoreError
+    
+    // 3. Delete from trash
+    await admin.from('trash').delete().eq('id', trashId)
+    
+    revalidatePath('/admin/recycle-bin')
+    // Also revalidate the patient history paths just in case
+    if (trashRecord.data.patient_id) {
+        revalidatePath(`/patient/${trashRecord.data.patient_id}/investigations`)
+        revalidatePath(`/patient/${trashRecord.data.patient_id}/visits`)
+    }
+    
+    return { success: true }
+  } catch (e: any) {
+    console.error("Restore Failure:", e)
+    return { error: e.message }
+  }
+}
+
+export async function permanentlyDeleteFromTrashAction(trashId: string) {
+  try {
+    await verifyAdmin()
+    const { error } = await getSupabaseAdmin()
+      .from('trash')
+      .delete()
+      .eq('id', trashId)
+    
+    if (error) throw error
+    revalidatePath('/admin/recycle-bin')
+    return { success: true }
+  } catch (e: any) {
+    return { error: e.message }
+  }
+}
+
+export async function bulkRestoreFromTrashAction(trashIds: string[]) {
+  try {
+    await verifyAdmin()
+    const admin = getSupabaseAdmin()
+    
+    // Fetch all trash records
+    const { data: trashRecords, error: fetchError } = await admin
+      .from('trash')
+      .select('*')
+      .in('id', trashIds)
+    
+    if (fetchError || !trashRecords) throw new Error("Trash records not found")
+    
+    // Restore each record
+    for (const record of trashRecords) {
+      const { error: restoreError } = await admin
+        .from(record.table_name)
+        .insert(record.data)
+      
+      if (!restoreError) {
+        // Only delete from trash if insert succeeded
+        await admin.from('trash').delete().eq('id', record.id)
+      }
+    }
+    
+    revalidatePath('/admin/recycle-bin')
+    return { success: true }
+  } catch (e: any) {
+    console.error("Bulk Restore Failure:", e)
+    return { error: e.message }
+  }
+}
+
+export async function bulkPermanentlyDeleteFromTrashAction(trashIds: string[]) {
+  try {
+    await verifyAdmin()
+    const { error } = await getSupabaseAdmin()
+      .from('trash')
+      .delete()
+      .in('id', trashIds)
+    
+    if (error) throw error
+    revalidatePath('/admin/recycle-bin')
+    return { success: true }
+  } catch (e: any) {
     return { error: e.message }
   }
 }

@@ -94,12 +94,14 @@ export function ErTreatmentEditor({
   patientId, 
   initialTreatments,
   trigger,
-  disabled = false
+  disabled = false,
+  allowDelete = true
 }: { 
   patientId: string, 
   initialTreatments: any[],
   trigger?: React.ReactElement,
-  disabled?: boolean
+  disabled?: boolean,
+  allowDelete?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [treatments, setTreatments] = useState<Treatment[]>(
@@ -156,7 +158,8 @@ export function ErTreatmentEditor({
 
   const handleSave = async () => {
     setIsSaving(true)
-    const result = await updateErTreatmentAction(patientId, treatments)
+    const actingDoctorName = localStorage.getItem('wardManager_lastDoctorName') || undefined
+    const result = await updateErTreatmentAction(patientId, treatments, actingDoctorName)
     setIsSaving(false)
     if (result.error) {
       toast.error(result.error)
@@ -224,12 +227,14 @@ export function ErTreatmentEditor({
                     </span>
                   )}
                 </div>
-                <button 
-                  onClick={() => removeTreatment(i)}
-                  className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {allowDelete && (
+                  <button 
+                    onClick={() => removeTreatment(i)}
+                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">

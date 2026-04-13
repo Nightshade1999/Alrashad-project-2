@@ -39,6 +39,7 @@ export function AddVisitModal({
   const [pr, setPr] = useState('')
   const [spo2, setSpo2] = useState('')
   const [temp, setTemp] = useState('')
+  const [rr, setRr] = useState('')
 
   // Clinical Status Flags
   const [isConscious, setIsConscious] = useState(true)
@@ -64,12 +65,15 @@ export function AddVisitModal({
       pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
       spo2: spo2 ? parseInt(convertArabicNumbers(spo2)) : null,
       temp: temp ? parseFloat(convertArabicNumbers(temp)) : null,
+      rr: rr ? parseInt(convertArabicNumbers(rr)) : null,
       is_er: isEr,
       is_conscious: isConscious,
       is_oriented: isOriented,
       is_ambulatory: isAmbulatory,
       is_dyspnic: isDyspnic,
-      is_soft_abdomen: isSoftAbdomen
+      is_dyspnic: isDyspnic,
+      is_soft_abdomen: isSoftAbdomen,
+      actingDoctorName: localStorage.getItem('wardManager_lastDoctorName') || undefined
     }
 
     if (payload.visit_date < getMinDate()) {
@@ -171,6 +175,10 @@ export function AddVisitModal({
               <div>
                 <Label htmlFor="temp" className="text-xs font-semibold text-muted-foreground">Temp (°C)</Label>
                 <Input id="temp" placeholder="37.0" value={temp} onChange={e => setTemp(e.target.value)} className="h-10 text-sm mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="rr" className="text-xs font-semibold text-muted-foreground">RR (BPM)</Label>
+                <Input id="rr" placeholder="18" value={rr} onChange={e => setRr(e.target.value)} className="h-10 text-sm mt-1" />
               </div>
             </div>
           </div>

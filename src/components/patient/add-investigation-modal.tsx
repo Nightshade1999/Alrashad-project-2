@@ -137,27 +137,28 @@ export function AddInvestigationModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {LAB_FIELDS.map(f => (
-              <div key={f.key}>
-                <Label htmlFor={f.key} className="text-xs font-semibold text-muted-foreground">{f.label}</Label>
+              <div key={f.key} className="space-y-1.5">
+                <Label htmlFor={f.key} className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">{f.label}</Label>
                 <Input
                   id={f.key}
                   placeholder={f.placeholder}
+                  inputMode="decimal"
                   value={values[f.key] ?? ''}
                   onChange={e => {
                     const val = convertArabicNumbers(e.target.value)
                     setValues(v => ({ ...v, [f.key]: val }))
                   }}
-                  className="mt-1 h-9 text-sm"
+                  className="h-11 sm:h-9 text-base sm:text-sm bg-slate-50/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 focus:ring-blue-500"
                 />
               </div>
             ))}
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Other Investigations</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Investigations</Label>
               <Button 
                 type="button" 
                 variant="ghost" 

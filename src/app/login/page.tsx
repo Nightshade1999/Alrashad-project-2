@@ -16,6 +16,10 @@ export default function LoginPage() {
     if (state?.error) {
       toast.error(state.error)
     }
+    if (state?.success) {
+      // FORCE HARD RELOAD to ensure Supabase session is picked up fresh and no stale SPAs state remains
+      window.location.href = '/dashboard'
+    }
   }, [state])
 
   return (

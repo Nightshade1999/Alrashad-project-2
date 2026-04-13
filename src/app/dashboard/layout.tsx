@@ -9,6 +9,7 @@ import { NavigationButtons } from '@/components/layout/navigation-buttons'
 import { Toaster } from '@/components/ui/sonner'
 import { NotificationCenter } from '@/components/dashboard/notification-center'
 import { UserSettingsModal } from '@/components/dashboard/user-settings-modal'
+import { ActiveUserBadge } from '@/components/layout/ActiveUserBadge'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies()
@@ -26,6 +27,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('user_id', user?.id)
+    .single()
+
+  const homeHref = 
+    profile?.role === 'lab_tech' ? '/laboratory' :
+    profile?.role === 'pharmacist' ? '/pharmacy' :
+    '/dashboard'
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/30 to-slate-100 dark:from-slate-950 dark:via-teal-950/20 dark:to-slate-900">
       {/* Accent line at very top */}
@@ -38,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           {/* Left: Nav Controls + Logo + Ward Name */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-hidden">
             <NavigationButtons />
-            <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3 transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer min-w-0">
+            <Link href={homeHref} className="flex items-center gap-2 sm:gap-3 transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer min-w-0">
               <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md shadow-teal-500/20 shrink-0">
                 <Stethoscope className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-white" />
               </div>
@@ -50,14 +62,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
           {/* Right: Notifications + User Identity */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <NotificationCenter />
+            <ActiveUserBadge role={profile?.role || 'doctor'} />
+            {user && <NotificationCenter userId={user.id} />}
             <UserSettingsModal />
           </div>
         </div>
       </header>
-
-      {/* Doctor Name Modal — shows on first sign-in of a session */}
-      <DoctorNameModal />
 
       {/* Main Content Area - Reduced bottom padding since Indicator is fixed bottom */}
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 max-w-screen-2xl mx-auto w-full pb-safe mb-32">

@@ -49,11 +49,11 @@ const EDUCATION_LEVELS = [
   "PhD",
 ]
 
-export function AddPatientModal() {
+export function AddPatientModal({ role, initialWard }: { role?: string, initialWard?: string }) {
   const [open, setOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [gender, setGender] = useState("")
-  const [category, setCategory] = useState<PatientCategory>("Normal")
+  const [category, setCategory] = useState<PatientCategory>(role?.toLowerCase() === 'nurse' ? "Awaiting Assessment" : "Normal")
   const [province, setProvince] = useState("")
   const [customProvince, setCustomProvince] = useState("")
   const [admissionDate, setAdmissionDate] = useState("")
@@ -112,7 +112,7 @@ export function AddPatientModal() {
     const ageStr = convertArabicNumbers(formData.get('age') as string);
     const payload: any = {
       user_id: user.id,
-      ward_name: (profile as any).ward_name,
+      ward_name: initialWard || (profile as any).ward_name,
       name: formData.get('name') as string,
       room_number: convertArabicNumbers(formData.get('roomNumber') as string),
       age: ageStr ? parseInt(ageStr) : null,
@@ -158,7 +158,7 @@ export function AddPatientModal() {
 
   const resetForm = () => {
     setGender("")
-    setCategory("Normal")
+    setCategory(role?.toLowerCase() === 'nurse' ? "Awaiting Assessment" : "Normal")
     setProvince("")
     setCustomProvince("")
     setAdmissionDate("")
@@ -280,18 +280,20 @@ export function AddPatientModal() {
               </div>
               
               {/* Relatives Info */}
-              <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
-                <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
-                <Select value={relativeStatus || "Unknown"} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
-                  <SelectTrigger id="relativeStatus">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Known">Known</SelectItem>
-                    <SelectItem value="Unknown">Unknown</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {role?.toLowerCase() !== 'nurse' && (
+                <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
+                  <Label htmlFor="relativeStatus" className="text-blue-700 dark:text-blue-400">Relative Status</Label>
+                  <Select value={relativeStatus || "Unknown"} onValueChange={(val) => setRelativeStatus(val as 'Known' | 'Unknown')}>
+                    <SelectTrigger id="relativeStatus">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Known">Known</SelectItem>
+                      <SelectItem value="Unknown">Unknown</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {relativeStatus === 'Known' && (
                 <div className="space-y-2 border-t pt-4 md:border-t-0 md:pt-0">
@@ -310,70 +312,75 @@ export function AddPatientModal() {
                 </div>
               )}
 
-              <div className="space-y-2 md:col-span-2 border-t pt-4">
-                <Label htmlFor="category">Category (Follow-up Level)</Label>
-                <Select value={category || "Normal"} onValueChange={(val) => setCategory(val as PatientCategory)}>
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="High Risk">🔴 High Risk</SelectItem>
-                    <SelectItem value="Close Follow-up">🟡 Close Follow-up</SelectItem>
-                    <SelectItem value="Normal">🟢 Normal Follow-up</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
+
+              {role?.toLowerCase() !== 'nurse' && (
+                <div className="space-y-2 md:col-span-2 border-t pt-4">
+                  <Label htmlFor="category">Category (Follow-up Level)</Label>
+                  <Select value={category || "Normal"} onValueChange={(val) => setCategory(val as PatientCategory)}>
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="High Risk">🔴 High Risk</SelectItem>
+                      <SelectItem value="Close Follow-up">🟡 Close Follow-up</SelectItem>
+                      <SelectItem value="Normal">🟢 Normal Follow-up</SelectItem>
+                      <SelectItem value="Awaiting Assessment">🔵 Awaiting Assessment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
             {/* ── Medical History ── */}
-            <hr className="border-border" />
-            
-            <div>
-              <h3 className="text-lg font-bold mb-4">Medical History</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <DiseaseListInput 
-                  diseases={chronicDiseases} 
-                  onChange={setChronicDiseases} 
-                />
-                
-                <StringListInput 
-                  label="Past Surgeries" 
-                  items={pastSurgeries} 
-                  onChange={setPastSurgeries}
-                  presetList={[
-                    ...GENERAL_SURGERIES,
-                    ...(gender === 'Female' ? FEMALE_SURGERIES : []),
-                    ...(gender === 'Male' ? MALE_SURGERIES : [])
-                  ]}
-                />
+            {role?.toLowerCase() !== 'nurse' && (
+              <>
+                <hr className="border-border" />
+                <div>
+                  <h3 className="text-lg font-bold mb-4">Medical History</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <DiseaseListInput 
+                      diseases={chronicDiseases} 
+                      onChange={setChronicDiseases} 
+                    />
+                    
+                    <StringListInput 
+                      label="Past Surgeries" 
+                      items={pastSurgeries} 
+                      onChange={setPastSurgeries}
+                      presetList={[
+                        ...GENERAL_SURGERIES,
+                        ...(gender === 'Female' ? FEMALE_SURGERIES : []),
+                        ...(gender === 'Male' ? MALE_SURGERIES : [])
+                      ]}
+                    />
 
-                <DrugListInput 
-                  label="Internal Medical Drugs" 
-                  category="Internal" 
-                  drugs={medicalDrugs} 
-                  onChange={setMedicalDrugs} 
-                />
-                
-                <DrugListInput 
-                  label="Psychiatric Drugs" 
-                  category="Psych" 
-                  drugs={psychDrugs} 
-                  onChange={setPsychDrugs} 
-                />
+                    <DrugListInput 
+                      label="Internal Medical Drugs" 
+                      category="Internal" 
+                      drugs={medicalDrugs} 
+                      onChange={setMedicalDrugs} 
+                    />
+                    
+                    <DrugListInput 
+                      label="Psychiatric Drugs" 
+                      category="Psych" 
+                      drugs={psychDrugs} 
+                      onChange={setPsychDrugs} 
+                    />
 
-                <div className="md:col-span-2">
-                  <StringListInput 
-                    label="Allergies" 
-                    items={allergies} 
-                    onChange={setAllergies}
-                    presetList={COMMON_ALLERGIES}
-                    isDanger={true}
-                  />
+                    <div className="md:col-span-2">
+                      <StringListInput 
+                        label="Allergies" 
+                        items={allergies} 
+                        onChange={setAllergies}
+                        presetList={COMMON_ALLERGIES}
+                        isDanger={true}
+                      />
+                    </div>
+                  </div>
                 </div>
-
-              </div>
-            </div>
+              </>
+            )}
           </div>
           <DialogFooter className="mt-8">
             <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
