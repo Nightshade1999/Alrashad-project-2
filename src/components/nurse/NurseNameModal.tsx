@@ -67,7 +67,7 @@ export function NurseNameModal() {
       if (!user) throw new Error("Not authenticated")
 
       // Update the profile with the current acting nurse
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
         .update({ 
           nurse_name: trimmed,

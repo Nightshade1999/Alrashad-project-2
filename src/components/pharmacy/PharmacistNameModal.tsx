@@ -79,7 +79,7 @@ export function PharmacistNameModal() {
       if (!user) throw new Error("Not authenticated")
 
       // Update the profile with the current acting pharmacist
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
         .update({ 
           pharmacist_name: trimmed,

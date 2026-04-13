@@ -70,7 +70,7 @@ export function LabTechNameModal() {
       if (!user) throw new Error("Not authenticated")
 
       // Update the profile with the current acting technician
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
         .update({ 
           lab_tech_name: trimmed,
