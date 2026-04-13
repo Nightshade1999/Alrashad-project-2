@@ -105,7 +105,7 @@ export function EditPatientModal({ patient, disabled = false, role: initialRole 
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          const { data } = await supabase.from('user_profiles').select('role').eq('user_id', user.id).single()
+          const { data } = await (supabase as any).from('user_profiles').select('role').eq('user_id', user.id).single()
           setRole(data?.role || 'doctor')
         }
       }
