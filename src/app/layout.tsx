@@ -10,6 +10,7 @@ import "./globals.css";
 import { Suspense } from "react";
 import Script from "next/script";
 import { DoctorNameModal } from "@/components/dashboard/doctor-name-modal";
+import { WelcomeSplash } from "@/components/layout/welcome-splash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,6 +62,20 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col selection:bg-teal-100 dark:selection:bg-teal-900/30 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+        {/* Anti-Flicker Splash Shell (Server-Rendered HTML) */}
+        <div 
+          id="initial-splash-shell" 
+          suppressHydrationWarning
+          className="fixed inset-0 z-[10000] bg-linear-to-tr from-emerald-50 via-white to-teal-50 flex items-center justify-center transition-opacity duration-1000"
+        >
+          <script dangerouslySetInnerHTML={{ __html: `
+            if (sessionStorage.getItem('splash_shown')) {
+              document.getElementById('initial-splash-shell').style.display = 'none';
+            }
+          `}} />
+        </div>
+
+        <WelcomeSplash />
         <DatabaseProvider>
           <div className="fixed inset-0 bg-linear-to-br from-teal-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
           <PwaRegistry />

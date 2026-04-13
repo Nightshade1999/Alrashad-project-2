@@ -43,11 +43,14 @@ export function PharmacistNameModal() {
       return
     }
 
-    // 2. NEW BYPASS: If Admin set the name in the DB, treat it as verified!
-    if (profile?.is_name_fixed && profile?.pharmacist_name) {
-      const adminSetName = profile.pharmacist_name
+    // 2. NEW BYPASS: If Admin set the name in the DB, or if user is an Admin, treat it as verified!
+    const isFixed = profile?.is_name_fixed === true
+    const isAdmin = profile?.role === 'admin'
+    const nameToUse = profile?.pharmacist_name || profile?.full_name
+
+    if ((isFixed || isAdmin) && nameToUse) {
       sessionStorage.setItem('pharmacist_sessionActive', 'true')
-      localStorage.setItem('pharmacist_lastPharmacistName', adminSetName)
+      localStorage.setItem('pharmacist_lastPharmacistName', nameToUse)
       setOpen(false)
       return
     }

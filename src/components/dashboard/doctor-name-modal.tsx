@@ -61,11 +61,14 @@ export function DoctorNameModal() {
       return
     }
 
-    // 2. NEW BYPASS: If Admin set the name in the DB, treat it as verified!
-    if (profile?.is_name_fixed && profile?.doctor_name) {
-      const adminSetName = profile.doctor_name
+    // 2. NEW BYPASS: If Admin set the name in the DB, or if user is an Admin, treat it as verified!
+    const isFixed = profile?.is_name_fixed === true
+    const isAdmin = profile?.role === 'admin'
+    const nameToUse = profile?.doctor_name || profile?.full_name
+
+    if ((isFixed || isAdmin) && nameToUse) {
       sessionStorage.setItem('wardManager_sessionActive', 'true')
-      localStorage.setItem('wardManager_lastDoctorName', adminSetName)
+      localStorage.setItem('wardManager_lastDoctorName', nameToUse)
       localStorage.setItem('wardManager_lastDoctorGender', profile.gender || 'Male')
       localStorage.setItem('wardManager_lastUserId', profile.user_id)
       setOpen(false)
