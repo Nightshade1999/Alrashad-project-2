@@ -90,13 +90,14 @@ interface PatientSummary {
   created_at: string
   psychological_diagnosis?: string | null
   psych_drugs?: any
+  psych_last_edit_by?: string | null
 }
 
 async function fetchPatientsOnline(wardName: string): Promise<PatientSummary[]> {
   const supabase = createClient()
   let query = supabase
     .from('patients')
-    .select('id, name, room_number, category, is_in_er, last_activity_at, created_at, psychological_diagnosis, psych_drugs')
+    .select('id, name, room_number, category, is_in_er, last_activity_at, created_at, psychological_diagnosis, psych_drugs, psych_last_edit_by')
     .limit(5000)
 
   // Master Ward Bypass: Admins or Master Ward users see everyone
