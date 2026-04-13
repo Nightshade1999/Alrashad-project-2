@@ -46,7 +46,7 @@ export default function WardManagementClient({
   allInstructions?: any[]
   allInventory?: any[]
 }) {
-  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'referrals' | 'pharmacy' | 'nursing' | 'reminders' | 'trash' | 'settings'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'performance' | 'research' | 'referrals' | 'pharmacy' | 'nursing' | 'reminders' | 'trash' | 'settings' | 'wards'>('users')
   const [globalOffline, setGlobalOffline] = useState(initialGlobalOffline)
   const [bulkEnabling, setBulkEnabling] = useState(false)
 
