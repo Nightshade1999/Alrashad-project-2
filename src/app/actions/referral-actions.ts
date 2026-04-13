@@ -26,8 +26,8 @@ export async function createReferralLetterAction(data: Omit<Referral, 'id' | 'cr
 export async function getLatestReferralLetterAction(patientId: string) {
   const supabase = createClient()
   
-  const { data, error } = await supabase
-    .from('referrals')
+  const { data, error } = await (supabase
+    .from('referrals') as any)
     .select('*')
     .eq('patient_id', patientId)
     .order('created_at', { ascending: false })
@@ -44,8 +44,8 @@ export async function getLatestReferralLetterAction(patientId: string) {
 export async function getReferralByIdAction(referralId: string) {
   const supabase = createClient()
   
-  const { data, error } = await supabase
-    .from('referrals')
+  const { data, error } = await (supabase
+    .from('referrals') as any)
     .select(`
       *,
       patients (
