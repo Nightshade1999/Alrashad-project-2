@@ -71,7 +71,6 @@ export function AddVisitModal({
       is_oriented: isOriented,
       is_ambulatory: isAmbulatory,
       is_dyspnic: isDyspnic,
-      is_dyspnic: isDyspnic,
       is_soft_abdomen: isSoftAbdomen,
       actingDoctorName: localStorage.getItem('wardManager_lastDoctorName') || undefined
     }
