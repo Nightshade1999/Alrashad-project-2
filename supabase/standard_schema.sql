@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS public.visits (
     is_ambulatory BOOLEAN DEFAULT true,
     is_dyspnic BOOLEAN DEFAULT false,
     is_soft_abdomen BOOLEAN DEFAULT true,
+    created_by_role TEXT DEFAULT 'doctor',
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -289,6 +290,7 @@ CREATE TABLE IF NOT EXISTS public.investigations (
     serology JSONB DEFAULT '{}'::jsonb, -- Store VDRL, HBsAg, etc
     gue JSONB DEFAULT '{}'::jsonb,      -- General Urine Exam structured data
     other_labs JSONB DEFAULT '[]'::jsonb,
+    created_by_role TEXT DEFAULT 'lab_tech',
     
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -404,6 +406,10 @@ CREATE TABLE IF NOT EXISTS public.nurse_instructions (
     read_by_nurse_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     acknowledgments JSONB DEFAULT '[]'::jsonb,
     
+    -- Versioning & Archival
+    is_archived BOOLEAN DEFAULT FALSE,
+    parent_id UUID REFERENCES public.nurse_instructions(id),
+
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -782,6 +788,7 @@ BEGIN
     IF NEW.tsb IS NOT NULL THEN v_t := v_t || 'TSB, '; END IF;
     IF NEW.esr IS NOT NULL THEN v_t := v_t || 'ESR, '; END IF;
     IF NEW.crp IS NOT NULL THEN v_t := v_t || 'CRP, '; END IF;
+    IF NEW.rbs IS NOT NULL THEN v_t := v_t || 'RBS, '; END IF;
     
     v_t := CASE WHEN v_t != '' THEN '(' || RTRIM(v_t, ', ') || ')' ELSE '' END;
 
@@ -800,7 +807,8 @@ BEGIN
         )
     LOOP
         INSERT INTO public.notifications (user_id, patient_id, investigation_id, message)
-        VALUES (v_d.user_id, NEW.patient_id, NEW.id, 'New labs for ' || v_n || ' ' || v_t);
+        VALUES (v_d.user_id, NEW.patient_id, NEW.id, 
+          'Labs ' || (CASE WHEN TG_OP = 'UPDATE' THEN '(EDITED) ' ELSE '' END) || 'for ' || v_n || ' ' || v_t);
     END LOOP;
 
     RETURN NEW;
@@ -838,7 +846,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS tr_notify_on_investigation ON public.investigations;
 CREATE TRIGGER tr_notify_on_investigation
-  AFTER INSERT ON public.investigations
+  AFTER INSERT OR UPDATE ON public.investigations
   FOR EACH ROW EXECUTE FUNCTION public.fn_notify_doctors_on_lab_result();
 
 DROP TRIGGER IF EXISTS tr_notify_on_nurse_instruction ON public.nurse_instructions;

@@ -32,6 +32,12 @@ export async function markNotificationAsReadAction(notificationId: string, actin
         doctorSignature = profile?.doctor_name || user.email || "Unknown Doctor"
     }
 
+    const { data: notification } = await supabase
+      .from('notifications')
+      .select('investigation_id')
+      .eq('id', notificationId)
+      .single()
+
     const { error } = await supabase
       .from('notifications')
       .update({
@@ -43,6 +49,15 @@ export async function markNotificationAsReadAction(notificationId: string, actin
       .eq('user_id', user.id) // Security check
 
     if (error) throw error
+
+    // Special Clean-up: If it was a lab notification being read by a doctor or admin,
+    // we "move it to the record" by deleting the notification itself to clear the center.
+    if (notification?.investigation_id) {
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', notificationId)
+    }
 
     revalidatePath('/')
     return { success: true }

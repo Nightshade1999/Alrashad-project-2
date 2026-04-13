@@ -5,7 +5,8 @@ import {
   AlertTriangle, Activity, FileText, User, 
   Heart, Database, Layers, FlaskConical as Flask, 
   Clipboard as ClipboardIcon, Ambulance, Stethoscope,
-  Droplets, Thermometer
+  Droplets, Thermometer, Plus, ClipboardList, 
+  UserRoundCog, Clock, Check
 } from "lucide-react"
 import { ReferralModal } from "@/components/patient/referral-modal"
 import { DeletePatientButton } from "@/components/patient/delete-button"
@@ -29,7 +30,6 @@ import { GueHistoryIcon } from "@/components/laboratory/GueHistoryIcon"
 import { AddNurseInstructionModal } from "@/components/patient/AddNurseInstructionModal"
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
-import { Clock, Check, UserRoundCog, ClipboardList } from "lucide-react"
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   'High Risk':       { label: 'High Risk',       color: 'text-red-700 dark:text-red-300',    bg: 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800',    dot: '🔴' },
@@ -62,8 +62,17 @@ export function WardPatientDetail({
   wardName?: string,
   profile?: any
 }) {
-  const lastVisit = visits?.[0] ?? null
-  const lastInv = investigations?.[0] ?? null
+  const lastVisit = visits?.filter(v => v.created_by_role !== 'nurse')?.[0] ?? null
+  const lastInv = investigations?.filter(i => i.created_by_role !== 'nurse')?.[0] ?? null
+  
+  // Filter for Nurse Action Card
+  const nurseVisits = visits?.filter(v => v.created_by_role === 'nurse') || []
+  const nurseInvs = investigations?.filter(i => i.created_by_role === 'nurse') || []
+  const nurseDataPoints = [...nurseVisits, ...nurseInvs].sort((a, b) => 
+    new Date(b.visit_date || b.date || b.created_at).getTime() - 
+    new Date(a.visit_date || a.date || a.created_at).getTime()
+  )
+
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
   const isDeceased = patient.category === 'Deceased/Archive';
   const [instructions, setInstructions] = useState<any[]>([])
@@ -86,11 +95,13 @@ export function WardPatientDetail({
   }
 
   async function fetchInstructions() {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
     const supabase = createClient()
     const { data } = await supabase
       .from('nurse_instructions')
       .select('*')
       .eq('patient_id', patient.id)
+      .gt('created_at', thirtyDaysAgo)
       .order('created_at', { ascending: false })
     
     if (data) setInstructions(data)
@@ -147,8 +158,8 @@ export function WardPatientDetail({
     lastHba1c: lastInv?.hba1c,
     lastHb: lastInv?.hb,
     lastVisit: lastVisit?.visit_date,
-    investigations: investigations || [],
-    visits: visits || []
+    investigations: investigations?.filter(i => i.created_by_role !== 'nurse') || [],
+    visits: visits?.filter(v => v.created_by_role !== 'nurse') || []
   }
 
   return (
@@ -331,6 +342,65 @@ export function WardPatientDetail({
         </div>
       </div>
 
+      {/* ── (Nurse action) Card ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-blue-200 dark:border-blue-900 shadow-xl overflow-hidden glass-card animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-blue-100 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+              <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                      <Thermometer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                      <h2 className="font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Nurse Action</h2>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nursing Clinical Log</p>
+                  </div>
+              </div>
+              {profile?.role?.toLowerCase() === 'nurse' && (
+                  <div className="flex items-center gap-2">
+                      <AddVisitModal patientId={patient.id} role="nurse" variant="button" />
+                      <AddInvestigationModal patientId={patient.id} role="nurse" variant="button" />
+                  </div>
+              )}
+          </div>
+          
+          <div className="p-6">
+              {nurseDataPoints.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center gap-2 opacity-30 text-center">
+                      <Plus className="h-8 w-8 text-blue-300" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">No nurse entries found</p>
+                  </div>
+              ) : (
+                  <div className="space-y-4">
+                      {nurseDataPoints.slice(0, 5).map((entry, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-blue-900/30">
+                              <div className="flex-1">
+                                  {entry.exam_notes ? (
+                                      <div className="space-y-1">
+                                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Vitals Check</p>
+                                          <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                              {entry.bp_sys && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">BP: {entry.bp_sys}/{entry.bp_dia}</span>}
+                                              {entry.pr && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">PR: {entry.pr}</span>}
+                                              {entry.temp && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">T: {entry.temp}°C</span>}
+                                              {entry.spo2 && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">SpO2: {entry.spo2}%</span>}
+                                          </div>
+                                      </div>
+                                  ) : (
+                                      <div className="space-y-1">
+                                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">RBS Check</p>
+                                          <span className="text-sm font-black text-slate-800 dark:text-slate-100">{entry.rbs} mg/dL</span>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="text-right">
+                                  <p className="text-[10px] font-bold text-slate-400 capitalize">Nurse {entry.doctor_name || 'Staff'}</p>
+                                  <p className="text-[9px] text-slate-500">{format(parseISO(entry.visit_date || entry.date || entry.created_at), 'dd MMM, HH:mm')}</p>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </div>
+
        {/* ── Medications ── */}
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-fade-in" style={{ animationDelay: '0.4s' }}>
         {/* Psych Drugs */}
@@ -440,6 +510,7 @@ export function WardPatientDetail({
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+
             <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-emerald-50/60 dark:bg-emerald-900/10">
               <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
                 <ClipboardIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -495,6 +566,7 @@ export function WardPatientDetail({
         </div>
       )}
 
+
        {/* ── Sub-pages Link Cards ── */}
        {profile?.role?.toLowerCase() !== 'nurse' && (
          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -519,12 +591,15 @@ export function WardPatientDetail({
         </div>
       )}
 
+
        {!isDeceased && profile?.role?.toLowerCase() !== 'nurse' && (
          <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />
        )}
 
        {/* ── Nurse Instruction History ── */}
-       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
+       {profile?.role?.toLowerCase() !== 'nurse' && (
+         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
+
           <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-blue-50/50 dark:bg-blue-900/10">
              <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
@@ -553,21 +628,26 @@ export function WardPatientDetail({
                </div>
              ) : (
                 <div className="space-y-4">
-                  {(showAllInstructions ? instructions : instructions.slice(0, 1)).map((inst) => {
+                  {(showAllInstructions ? instructions : instructions.filter(i => !i.is_archived).slice(0, 2)).map((inst) => {
                     const createdDate = new Date(inst.created_at)
-                    const isEditable = profile?.user_id === inst.doctor_id && (Date.now() - createdDate.getTime() < 24 * 60 * 60 * 1000)
+                    const isEditable = profile?.user_id === inst.doctor_id 
 
                     return (
                       <div key={inst.id} className={`p-4 rounded-3xl border-2 transition-all ${
-                        inst.is_read 
-                          ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
-                          : 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 ring-2 ring-blue-500/10'
+                        inst.is_archived
+                          ? 'bg-slate-100/50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800 opacity-60'
+                          : inst.is_read 
+                            ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800' 
+                            : 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 ring-2 ring-blue-500/10'
                       }`}>
                          <div className="flex items-start justify-between gap-4">
                             <div className="space-y-2 flex-1">
-                               <p className="text-sm font-bold text-slate-800 dark:text-slate-200 italic leading-relaxed">
-                                  "{inst.instruction}"
-                               </p>
+                               <div className="flex items-center gap-2">
+                                  {inst.is_archived && <Badge variant="secondary" className="text-[8px] font-black">ARCHIVED/VERSION</Badge>}
+                                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200 italic leading-relaxed">
+                                     "{inst.instruction}"
+                                  </p>
+                               </div>
                                <div className="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase tracking-tight text-slate-500">
                                   <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                                      <Stethoscope className="h-3 w-3" /> Dr. {inst.doctor_name || 'Staff Physician'}
@@ -579,7 +659,9 @@ export function WardPatientDetail({
                             </div>
                             
                             <div className="shrink-0 flex flex-col items-end gap-2">
-                               {inst.is_read ? (
+                               {inst.is_archived ? (
+                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Previous Version</p>
+                               ) : inst.is_read ? (
                                  <div className="flex flex-col items-end gap-1">
                                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200 gap-1.5 px-3 py-1 text-[9px] font-black tracking-widest">
                                        <Check className="h-3 w-3" /> ACKNOWLEDGED
@@ -587,6 +669,17 @@ export function WardPatientDetail({
                                     <p className="text-[10px] font-bold text-slate-400">
                                        By Nurse {inst.read_by_nurse_name}
                                     </p>
+                                    
+                                    {inst.instruction_type === 'repetitive' && isEditable && (
+                                       <AddNurseInstructionModal 
+                                         patientId={patient.id} 
+                                         patientName={patient.name} 
+                                         wardName={patient.ward_name} 
+                                         variant="icon"
+                                         initialInstruction={inst.instruction}
+                                         instructionId={inst.id}
+                                       />
+                                    )}
                                  </div>
                                ) : (
                                  <div className="flex flex-col items-end gap-2">
@@ -638,7 +731,8 @@ export function WardPatientDetail({
                </div>
              )}
           </div>
-       </div>
+        </div>
+      )}
     </div>
   )
 }

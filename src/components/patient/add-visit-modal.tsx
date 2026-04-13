@@ -16,12 +16,14 @@ export function AddVisitModal({
   patientId, 
   variant = "button", 
   isEr = false,
-  disabled = false
+  disabled = false,
+  role = 'doctor'
 }: { 
   patientId: string; 
   variant?: "button" | "icon"; 
   isEr?: boolean;
-  disabled?: boolean
+  disabled?: boolean;
+  role?: string;
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -52,14 +54,14 @@ export function AddVisitModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!notes.trim()) { toast.error('Please enter visit notes'); return }
+    if (role !== 'nurse' && !notes.trim()) { toast.error('Please enter visit notes'); return }
     setLoading(true)
 
     const payload = {
       patient_id: patientId,
       visit_date: date,
       visit_time: time,
-      exam_notes: notes.trim(),
+      exam_notes: role === 'nurse' ? (notes.trim() || "Nurse Vital Check") : notes.trim(),
       bp_sys: bpSys ? parseInt(convertArabicNumbers(bpSys)) : null,
       bp_dia: bpDia ? parseInt(convertArabicNumbers(bpDia)) : null,
       pr: pr ? parseInt(convertArabicNumbers(pr)) : null,
@@ -183,49 +185,64 @@ export function AddVisitModal({
           </div>
 
           {/* Clinical Status Flags Section */}
-          <div className="bg-slate-50/50 dark:bg-slate-800/20 p-3 sm:p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 space-y-3">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-blue-500" />
-              Clinical Assessment
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: 'Conscious', value: isConscious, setter: setIsConscious, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
-                { label: 'Oriented', value: isOriented, setter: setIsOriented, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
-                { label: 'Ambulatory', value: isAmbulatory, setter: setIsAmbulatory, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
-                { label: 'Dyspnic', value: isDyspnic, setter: setIsDyspnic, activeClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800' },
-                { label: 'Soft Abdomen', value: isSoftAbdomen, setter: setIsSoftAbdomen, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => item.setter(!item.value)}
-                  className={`
-                    px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ring-offset-background
-                    ${item.value 
-                      ? `${item.activeClass} shadow-sm` 
-                      : 'bg-white dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }
-                  `}
-                >
-                  {item.label}
-                </button>
-              ))}
+          {role !== 'nurse' && (
+            <div className="bg-slate-50/50 dark:bg-slate-800/20 p-3 sm:p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 space-y-3">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-blue-500" />
+                Clinical Assessment
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Conscious', value: isConscious, setter: setIsConscious, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                  { label: 'Oriented', value: isOriented, setter: setIsOriented, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                  { label: 'Ambulatory', value: isAmbulatory, setter: setIsAmbulatory, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                  { label: 'Dyspnic', value: isDyspnic, setter: setIsDyspnic, activeClass: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800' },
+                  { label: 'Soft Abdomen', value: isSoftAbdomen, setter: setIsSoftAbdomen, activeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => item.setter(!item.value)}
+                    className={`
+                      px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ring-offset-background
+                      ${item.value 
+                        ? `${item.activeClass} shadow-sm` 
+                        : 'bg-white dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }
+                    `}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div>
-            <Label htmlFor="visit-notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Exam Notes</Label>
-            <Textarea
-              id="visit-notes"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Write clinical findings, patient status, medication changes..."
-              rows={4}
-              className="mt-1.5 resize-none text-sm leading-relaxed"
-              required
-            />
-          </div>
+          {role !== 'nurse' ? (
+            <div>
+              <Label htmlFor="visit-notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Exam Notes</Label>
+              <Textarea
+                id="visit-notes"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Write clinical findings, patient status, medication changes..."
+                rows={4}
+                className="mt-1.5 resize-none text-sm leading-relaxed"
+                required
+              />
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="visit-notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nurse Comments (Optional)</Label>
+              <Input
+                id="visit-notes"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Optional notes about the vitals check..."
+                className="mt-1.5 text-sm"
+              />
+            </div>
+          )}
           <div className="flex gap-3 pt-1">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">

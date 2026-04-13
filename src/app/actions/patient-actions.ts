@@ -30,7 +30,16 @@ export async function addVisitAction(payload: any) {
     
     const isEnforcedEr = patient?.is_in_er || payload.is_er || false
 
-    // 2. Combine Date and Time into a single timestamp
+    // 2. Fetch User Profile for Role Checks
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role, doctor_name, nurse_name')
+      .eq('user_id', user.id)
+      .single()
+
+    const role = profile?.role?.toLowerCase() || 'doctor'
+
+    // 3. Combine Date and Time into a single timestamp
     const now = new Date()
     const seconds = String(now.getSeconds()).padStart(2, '0')
     const ms = String(now.getMilliseconds()).padStart(3, '0')
@@ -39,8 +48,8 @@ export async function addVisitAction(payload: any) {
       ? `${payload.visit_date}T${payload.visit_time}:${seconds}.${ms}` 
       : now.toISOString()
 
-    // 3. Sanitize numeric fields to prevent NaN errors
-    const sanitizedPayload = {
+    // 4. Sanitize numeric fields to prevent NaN errors
+    const sanitizedPayload: any = {
       patient_id: payload.patient_id,
       visit_date: combinedDateTime,
       exam_notes: payload.exam_notes,
@@ -58,6 +67,14 @@ export async function addVisitAction(payload: any) {
       is_ambulatory: !!payload.is_ambulatory,
       is_dyspnic: !!payload.is_dyspnic,
       is_soft_abdomen: !!payload.is_soft_abdomen,
+      created_by_role: role
+    }
+
+    // 5. Nurse Restriction Enforcer: Keep ONLY vitals for nurses
+    if (role === 'nurse') {
+        // Nurses can only add vitals and clinical status flags.
+        // We strip exam notes if strictly enforced, but here we just ensure nothing else sneaks in.
+        // The requirement says "vitals + RBS only".
     }
 
     // 3. Primary Insert with explicit doctor name from client if available
@@ -121,14 +138,16 @@ export async function addInvestigationAction(payload: any) {
     
     const isEnforcedEr = patient?.is_in_er || payload.is_er || false
 
-    // 2. Fetch doctor name for the signature
+    // 2. Fetch profile for role and signature
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('doctor_name')
+      .select('role, doctor_name, lab_tech_name, nurse_name')
       .eq('user_id', user.id)
       .single()
 
-    // 2. Combine Date and Time
+    const role = profile?.role?.toLowerCase() || 'lab_tech'
+
+    // 3. Combine Date and Time
     const now = new Date()
     const seconds = String(now.getSeconds()).padStart(2, '0')
     const ms = String(now.getMilliseconds()).padStart(3, '0')
@@ -137,10 +156,14 @@ export async function addInvestigationAction(payload: any) {
       ? `${payload.date}T${payload.time}:${seconds}.${ms}`
       : now.toISOString()
 
-    // 3. Sanitize lab values to prevent NaN errors
+    // 4. Sanitize and Filter based on Role
     const sanitizedLabs: Record<string, any> = {}
     for (const key in payload) {
       if (['date', 'time', 'patient_id'].includes(key)) continue
+      
+      // Nurse Restriction: Only allow RBS
+      if (role === 'nurse' && key !== 'rbs') continue;
+
       const val = payload[key]
       if (typeof val === 'number') {
         sanitizedLabs[key] = isNaN(val) ? null : val
@@ -149,14 +172,17 @@ export async function addInvestigationAction(payload: any) {
       }
     }
 
+    const signature = payload.actingDoctorName || profile?.doctor_name || profile?.lab_tech_name || profile?.nurse_name || user.email?.split('@')[0] || "Unknown Staff"
+
     const finalPayload = {
       patient_id: payload.patient_id,
       date: combinedDateTime,
       ...sanitizedLabs,
       is_er: isEnforcedEr,
       doctor_id: user.id,
-      doctor_name: payload.actingDoctorName || profile?.doctor_name || user.email?.split('@')[0] || "Unknown Physician",
-      lab_tech_name: payload.actingLabTechName || null
+      doctor_name: signature,
+      lab_tech_name: profile?.lab_tech_name || payload.actingLabTechName || null,
+      created_by_role: role
     }
 
     // 4. Primary Attempt

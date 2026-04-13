@@ -32,12 +32,14 @@ export function AddInvestigationModal({
   patientId, 
   variant = "button", 
   isEr = false,
-  disabled = false
+  disabled = false,
+  role = 'lab_tech'
 }: { 
   patientId: string; 
   variant?: "button" | "icon"; 
   isEr?: boolean;
-  disabled?: boolean
+  disabled?: boolean;
+  role?: string;
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -138,7 +140,7 @@ export function AddInvestigationModal({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {LAB_FIELDS.map(f => (
+            {LAB_FIELDS.filter(f => role !== 'nurse' || f.key === 'rbs').map(f => (
               <div key={f.key} className="space-y-1.5">
                 <Label htmlFor={f.key} className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">{f.label}</Label>
                 <Input
@@ -156,54 +158,56 @@ export function AddInvestigationModal({
             ))}
           </div>
 
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Investigations</Label>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setOtherLabs([...otherLabs, { name: '', value: '' }])}
-                className="h-7 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-              >
-                <Plus className="h-3 w-3 mr-1" /> Add Custom
-              </Button>
-            </div>
-            
-            {otherLabs.map((lab, index) => (
-              <div key={index} className="flex gap-2 animate-in fade-in slide-in-from-top-1">
-                <Input
-                  placeholder="Test Name"
-                  value={lab.name}
-                  onChange={e => {
-                    const newLabs = [...otherLabs]
-                    newLabs[index].name = e.target.value
-                    setOtherLabs(newLabs)
-                  }}
-                  className="flex-1 h-9 text-sm"
-                />
-                <Input
-                  placeholder="Value"
-                  value={lab.value}
-                  onChange={e => {
-                    const newLabs = [...otherLabs]
-                    newLabs[index].value = convertArabicNumbers(e.target.value)
-                    setOtherLabs(newLabs)
-                  }}
-                  className="w-24 h-9 text-sm"
-                />
+          {role !== 'nurse' && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Other Investigations</Label>
                 <Button 
                   type="button" 
                   variant="ghost" 
-                  size="icon" 
-                  onClick={() => setOtherLabs(otherLabs.filter((_, i) => i !== index))}
-                  className="h-9 w-9 text-slate-400 hover:text-rose-500"
+                  size="sm" 
+                  onClick={() => setOtherLabs([...otherLabs, { name: '', value: '' }])}
+                  className="h-7 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                 >
-                  <X className="h-4 w-4" />
+                  <Plus className="h-3 w-3 mr-1" /> Add Custom
                 </Button>
               </div>
-            ))}
-          </div>
+              
+              {otherLabs.map((lab, index) => (
+                <div key={index} className="flex gap-2 animate-in fade-in slide-in-from-top-1">
+                  <Input
+                    placeholder="Test Name"
+                    value={lab.name}
+                    onChange={e => {
+                      const newLabs = [...otherLabs]
+                      newLabs[index].name = e.target.value
+                      setOtherLabs(newLabs)
+                    }}
+                    className="flex-1 h-9 text-sm"
+                  />
+                  <Input
+                    placeholder="Value"
+                    value={lab.value}
+                    onChange={e => {
+                      const newLabs = [...otherLabs]
+                      newLabs[index].value = convertArabicNumbers(e.target.value)
+                      setOtherLabs(newLabs)
+                    }}
+                    className="w-24 h-9 text-sm"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setOtherLabs(otherLabs.filter((_, i) => i !== index))}
+                    className="h-9 w-9 text-slate-400 hover:text-rose-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-1">
             <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancel</Button>

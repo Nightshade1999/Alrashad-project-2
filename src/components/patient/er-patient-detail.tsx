@@ -44,12 +44,21 @@ export function ErPatientDetail({
   wardName?: string,
   profile?: any
 }) {
-  const erVisits = visits.filter(v => v.is_er)
-  const erLabs = investigations.filter(i => i.is_er)
+  const erVisits = visits.filter(v => v.is_er && v.created_by_role !== 'nurse')
+  const erLabs = investigations.filter(i => i.is_er && i.created_by_role !== 'nurse')
   
   const lastErVisit = erVisits[0] ?? null
   const lastErLab = erLabs[0] ?? null
   const firstErVisit = erVisits.length > 0 ? erVisits[erVisits.length - 1] : null
+
+  // Filter for Nurse Action Card
+  const nurseVisits = visits?.filter(v => v.created_by_role === 'nurse') || []
+  const nurseInvs = investigations?.filter(i => i.created_by_role === 'nurse') || []
+  const nurseDataPoints = [...nurseVisits, ...nurseInvs].sort((a, b) => 
+    new Date(b.visit_date || b.date || b.created_at).getTime() - 
+    new Date(a.visit_date || a.date || a.created_at).getTime()
+  )
+
 
   const displayPatient = {
     ...patient,
@@ -226,8 +235,66 @@ export function ErPatientDetail({
                   </ul>
                </div>
             </div>
-         </div>
-      </div>
+          </div>
+       </div>
+
+       {/* ── (Nurse action) Card ── */}
+       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-blue-200 dark:border-blue-900 shadow-xl overflow-hidden glass-card animate-in fade-in slide-in-from-bottom-5 duration-700">
+           <div className="flex items-center justify-between px-6 py-5 border-b border-blue-100 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+               <div className="flex items-center gap-3">
+                   <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                       <Thermometer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                   </div>
+                   <div>
+                       <h2 className="font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Nurse Action</h2>
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nursing Clinical Log</p>
+                   </div>
+               </div>
+               {profile?.role?.toLowerCase() === 'nurse' && (
+                   <div className="flex items-center gap-2">
+                       <AddVisitModal patientId={patient.id} role="nurse" variant="button" />
+                       <AddInvestigationModal patientId={patient.id} role="nurse" variant="button" />
+                   </div>
+               )}
+           </div>
+           
+           <div className="p-6">
+               {nurseDataPoints.length === 0 ? (
+                   <div className="py-8 flex flex-col items-center gap-2 opacity-30 text-center">
+                       <p className="text-[10px] font-black uppercase tracking-widest">No nurse entries found</p>
+                   </div>
+               ) : (
+                   <div className="space-y-4">
+                       {nurseDataPoints.slice(0, 5).map((entry, idx) => (
+                           <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-blue-900/30">
+                               <div className="flex-1">
+                                   {entry.exam_notes ? (
+                                       <div className="space-y-1">
+                                           <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Vitals Check</p>
+                                           <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                               {entry.bp_sys && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">BP: {entry.bp_sys}/{entry.bp_dia}</span>}
+                                               {entry.pr && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">PR: {entry.pr}</span>}
+                                               {entry.temp && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">T: {entry.temp}°C</span>}
+                                               {entry.spo2 && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">SpO2: {entry.spo2}%</span>}
+                                           </div>
+                                       </div>
+                                   ) : (
+                                       <div className="space-y-1">
+                                           <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">RBS Check</p>
+                                           <span className="text-sm font-black text-slate-800 dark:text-slate-100">{entry.rbs} mg/dL</span>
+                                       </div>
+                                   )}
+                               </div>
+                               <div className="text-right">
+                                   <p className="text-[10px] font-bold text-slate-400 capitalize">Nurse {entry.doctor_name || 'Staff'}</p>
+                                   <p className="text-[9px] text-slate-500">{format(parseISO(entry.visit_date || entry.date || entry.created_at), 'dd MMM, HH:mm')}</p>
+                               </div>
+                           </div>
+                       ))}
+                   </div>
+               )}
+           </div>
+       </div>
 
       {/* ── ER Admission Note ── */}
       <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900/30 rounded-2xl p-6 shadow-sm">
@@ -295,171 +362,166 @@ export function ErPatientDetail({
       </div>
 
       {/* ── Live ER Status ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-               <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-                 <ClipboardIcon className="h-4 w-4 text-emerald-600" />
+      {profile?.role?.toLowerCase() !== 'nurse' && (
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+               <div className="flex items-center gap-2 mb-3">
+                  <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
+                    <ClipboardIcon className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Visit (ER)</h3>
                </div>
-               <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Visit (ER)</h3>
+               {lastErVisit ? (
+                 <div className="space-y-3">
+                   <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 italic">"{lastErVisit.exam_notes}"</p>
+                   
+                   {/* Vitals Summary */}
+                   <div className="flex flex-wrap gap-x-3 gap-y-1 py-2 border-y border-slate-50 dark:border-slate-800/50">
+                     <div className="flex items-center gap-1.5">
+                       <Stethoscope className="h-3 w-3 text-rose-500" />
+                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                         {lastErVisit.bp_sys || '?'}/{lastErVisit.bp_dia || '?'}
+                       </span>
+                     </div>
+                     <div className="flex items-center gap-1.5">
+                       <Activity className="h-3 w-3 text-emerald-500" />
+                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                         {lastErVisit.pr ? `${lastErVisit.pr} bpm` : '--'}
+                       </span>
+                     </div>
+                     <div className="flex items-center gap-1.5">
+                       <Droplets className="h-3 w-3 text-blue-500" />
+                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                         {lastErVisit.spo2 ? `${lastErVisit.spo2}%` : '--'}
+                       </span>
+                     </div>
+                     <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
+                       <Thermometer className="h-3 w-3 text-orange-500" />
+                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                         {lastErVisit.temp ? `${lastErVisit.temp}°C` : '--'}
+                       </span>
+                     </div>
+                     <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
+                       <Activity className="h-3 w-3 text-rose-600" />
+                       <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
+                         {lastErVisit.rr ? `${lastErVisit.rr} bpm` : '--'}
+                       </span>
+                     </div>
+                   </div>
+
+                   {/* Status Flags Summary */}
+                   <div className="flex flex-wrap gap-1">
+                     {[
+                       lastErVisit.is_conscious ? 'Conscious' : 'Unconscious',
+                       lastErVisit.is_oriented ? 'Oriented' : 'Disoriented',
+                       lastErVisit.is_ambulatory ? 'Ambulatory' : 'Bed-bound',
+                       lastErVisit.is_dyspnic ? 'Dyspnic' : null,
+                       lastErVisit.is_soft_abdomen ? 'Soft Abdomen' : 'Abdomen Not Soft'
+                     ].filter(Boolean).map((flag) => (
+                       <span key={flag} className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                         {flag}
+                       </span>
+                     ))}
+                   </div>
+
+                   <p className="text-[10px] font-bold text-emerald-600 pt-1">
+                     {format(parseISO(lastErVisit.visit_date), 'dd MMM, HH:mm')}
+                   </p>
+                 </div>
+               ) : <p className="text-xs italic text-slate-400 py-2">No follow-up visits in ER yet.</p>}
             </div>
-            {lastErVisit ? (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 italic">"{lastErVisit.exam_notes}"</p>
-                
-                {/* Vitals Summary */}
-                <div className="flex flex-wrap gap-x-3 gap-y-1 py-2 border-y border-slate-50 dark:border-slate-800/50">
-                  <div className="flex items-center gap-1.5">
-                    <Stethoscope className="h-3 w-3 text-rose-500" />
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                      {lastErVisit.bp_sys || '?'}/{lastErVisit.bp_dia || '?'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Activity className="h-3 w-3 text-emerald-500" />
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                      {lastErVisit.pr ? `${lastErVisit.pr} bpm` : '--'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Droplets className="h-3 w-3 text-blue-500" />
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                      {lastErVisit.spo2 ? `${lastErVisit.spo2}%` : '--'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
-                    <Thermometer className="h-3 w-3 text-orange-500" />
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                      {lastErVisit.temp ? `${lastErVisit.temp}°C` : '--'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 border-l pl-2 border-slate-100 dark:border-slate-800">
-                    <Activity className="h-3 w-3 text-rose-600" />
-                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">
-                      {lastErVisit.rr ? `${lastErVisit.rr} bpm` : '--'}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Status Flags Summary */}
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    lastErVisit.is_conscious ? 'Conscious' : 'Unconscious',
-                    lastErVisit.is_oriented ? 'Oriented' : 'Disoriented',
-                    lastErVisit.is_ambulatory ? 'Ambulatory' : 'Bed-bound',
-                    lastErVisit.is_dyspnic ? 'Dyspnic' : null,
-                    lastErVisit.is_soft_abdomen ? 'Soft Abdomen' : 'Abdomen Not Soft'
-                  ].filter(Boolean).map((flag) => (
-                    <span key={flag} className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="text-[10px] font-bold text-emerald-600 pt-1">
-                  {format(parseISO(lastErVisit.visit_date), 'dd MMM, HH:mm')}
-                </p>
-              </div>
-            ) : <p className="text-xs italic text-slate-400 py-2">No follow-up visits in ER yet.</p>}
-         </div>
-
-         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-               <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                    <Flask className="h-4 w-4 text-blue-600" />
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+               <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                     <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                       <Flask className="h-4 w-4 text-blue-600" />
+                     </div>
+                     <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Labs (ER)</h3>
                   </div>
-                  <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Last Labs (ER)</h3>
+                  {lastErLab && <GueHistoryIcon investigation={lastErLab} />}
                </div>
-               {lastErLab && <GueHistoryIcon investigation={lastErLab} />}
+               {lastErLab ? (
+                  <div className="p-1 grid grid-cols-3 gap-2 text-center">
+                     {[
+                       { key: 'wbc', label: 'WBC', value: lastErLab.wbc },
+                       { key: 'hb', label: 'Hb', value: lastErLab.hb },
+                       { key: 'urea', label: 'Urea', value: lastErLab.s_urea },
+                       { key: 'creat', label: 'Creat', value: lastErLab.s_creatinine },
+                       { key: 'ast', label: 'AST', value: lastErLab.ast },
+                       { key: 'alt', label: 'ALT', value: lastErLab.alt },
+                       { key: 'tsb', label: 'TSB', value: lastErLab.tsb },
+                       { key: 'hba1c', label: 'HbA1c', value: lastErLab.hba1c },
+                       { key: 'rbs', label: 'RBS', value: lastErLab.rbs },
+                       { key: 'ka', label: 'Ka', value: lastErLab.ka },
+                       { key: 'na', label: 'Na', value: lastErLab.na },
+                       { key: 'cl', label: 'Cl', value: lastErLab.cl },
+                       { key: 'ca', label: 'Ca', value: lastErLab.ca },
+                       { key: 'esr', label: 'ESR', value: lastErLab.esr },
+                       { key: 'crp', label: 'CRP', value: lastErLab.crp },
+                       ...(Array.isArray(lastErLab.other_labs) ? lastErLab.other_labs.map((l: any) => ({ 
+                            key: 'other', 
+                            label: l.name, 
+                            value: l.value 
+                       })) : [])
+                     ]
+                     .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
+                     .map(item => (
+                       <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl py-2 px-1">
+                         <p className="text-[10px] text-muted-foreground mb-0.5">{item.label}</p>
+                         <p className={`text-sm font-bold ${isLabAbnormal(item.key === 'other' ? item.label : item.key, item.value) ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                           {item.value ?? '—'}
+                         </p>
+                       </div>
+                     ))}
+                  </div>
+               ) : <p className="text-xs italic text-slate-400 py-2">No lab results in ER yet.</p>}
             </div>
-            {lastErLab ? (
-               <div className="p-1 grid grid-cols-3 gap-2 text-center">
-                  {[
-                    { key: 'wbc', label: 'WBC', value: lastErLab.wbc },
-                    { key: 'hb', label: 'Hb', value: lastErLab.hb },
-                    { key: 'urea', label: 'Urea', value: lastErLab.s_urea },
-                    { key: 'creat', label: 'Creat', value: lastErLab.s_creatinine },
-                    { key: 'ast', label: 'AST', value: lastErLab.ast },
-                    { key: 'alt', label: 'ALT', value: lastErLab.alt },
-                    { key: 'tsb', label: 'TSB', value: lastErLab.tsb },
-                    { key: 'hba1c', label: 'HbA1c', value: lastErLab.hba1c },
-                    { key: 'rbs', label: 'RBS', value: lastErLab.rbs },
-                    { key: 'ka', label: 'Ka', value: lastErLab.ka },
-                    { key: 'na', label: 'Na', value: lastErLab.na },
-                    { key: 'cl', label: 'Cl', value: lastErLab.cl },
-                    { key: 'ca', label: 'Ca', value: lastErLab.ca },
-                    { key: 'esr', label: 'ESR', value: lastErLab.esr },
-                    { key: 'crp', label: 'CRP', value: lastErLab.crp },
-                    ...(Array.isArray(lastErLab.other_labs) ? lastErLab.other_labs.map((l: any) => ({ 
-                         key: 'other', 
-                         label: l.name, 
-                         value: l.value 
-                    })) : [])
-                  ]
-                  .filter(item => item.value !== null && item.value !== undefined && item.value !== '')
-                  .map(item => (
-                    <div key={item.label} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl py-2 px-1">
-                      <p className="text-[10px] text-muted-foreground mb-0.5">{item.label}</p>
-                      <p className={`text-sm font-bold ${isLabAbnormal(item.key === 'other' ? item.label : item.key, item.value) ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-100'}`}>
-                        {item.value ?? '—'}
-                      </p>
-                    </div>
-                  ))}
-               </div>
-            ) : <p className="text-xs italic text-slate-400 py-2">No lab results in ER yet.</p>}
-         </div>
 
-          <ErTreatmentEditor patientId={patient.id} initialTreatments={safeJsonParse(patient.er_treatment)} />
-          {(patient.er_treatment_last_edit_by || patient.er_treatment_last_edit_at) && (
-            <div className="mt-3 px-4 py-2 bg-slate-100/50 dark:bg-slate-800/30 rounded-xl flex items-center justify-between border border-slate-200/50 dark:border-slate-800/50">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Treatment Audit</p>
-              <p className="text-[9px] font-bold text-slate-500 uppercase">
-                {patient.er_treatment_last_edit_by ? `Saved By ${patient.er_treatment_last_edit_by}` : 'Stated'}
-                {patient.er_treatment_last_edit_at && ` · ${format(parseISO(patient.er_treatment_last_edit_at), 'dd MMM HH:mm')}`}
-              </p>
-            </div>
-          )}
-       </div>
+             <ErTreatmentEditor patientId={patient.id} initialTreatments={safeJsonParse(patient.er_treatment)} />
+          </div>
+       )}
 
       {/* ── History Cards & Navigation ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-         <Link href={`/patient/${patient.id}/visits?filter=er`} className="block">
-           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-colors group cursor-pointer h-full">
-              <div className="flex items-center gap-3">
-                 <FileText className="h-6 w-6 text-indigo-400" />
-                 <div className="flex-1">
-                    <h4 className="font-bold text-white group-hover:text-indigo-300">Doctor Visits</h4>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{erVisits.length} ER Records</p>
+      {profile?.role?.toLowerCase() !== 'nurse' && (
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <Link href={`/patient/${patient.id}/visits?filter=er`} className="block">
+              <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-colors group cursor-pointer h-full">
+                 <div className="flex items-center gap-3">
+                    <FileText className="h-6 w-6 text-indigo-400" />
+                    <div className="flex-1">
+                       <h4 className="font-bold text-white group-hover:text-indigo-300">Doctor Visits</h4>
+                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{erVisits.length} ER Records</p>
+                    </div>
                  </div>
               </div>
-           </div>
-         </Link>
+            </Link>
 
-         <Link href={`/patient/${patient.id}/investigations?filter=er`} className="block">
-           <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-colors group cursor-pointer h-full">
-              <div className="flex items-center gap-3">
-                 <Flask className="h-6 w-6 text-blue-400" />
-                 <div className="flex-1">
-                    <h4 className="font-bold text-white group-hover:text-blue-300">Lab Values</h4>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{erLabs.length} ER Records</p>
+            <Link href={`/patient/${patient.id}/investigations?filter=er`} className="block">
+              <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 hover:bg-slate-700 transition-colors group cursor-pointer h-full">
+                 <div className="flex items-center gap-3">
+                    <Flask className="h-6 w-6 text-blue-400" />
+                    <div className="flex-1">
+                       <h4 className="font-bold text-white group-hover:text-blue-300">Lab Values</h4>
+                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{erLabs.length} ER Records</p>
+                    </div>
                  </div>
               </div>
-           </div>
-         </Link>
+            </Link>
 
-         <Link href={`/patient/${patient.id}?view=ward`} className="block">
-           <div className="bg-emerald-950 p-5 rounded-2xl border border-emerald-900 hover:bg-emerald-900 transition-colors group cursor-pointer h-full shadow-lg shadow-emerald-950/20">
-              <div className="flex items-center gap-3">
-                 <Home className="h-6 w-6 text-emerald-400" />
-                 <div className="flex-1">
-                    <h4 className="font-bold text-white">Ward Info</h4>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Permanent Record</p>
+            <Link href={`/patient/${patient.id}?view=ward`} className="block">
+              <div className="bg-emerald-950 p-5 rounded-2xl border border-emerald-900 hover:bg-emerald-900 transition-colors group cursor-pointer h-full shadow-lg shadow-emerald-950/20">
+                 <div className="flex items-center gap-3">
+                    <Home className="h-6 w-6 text-emerald-400" />
+                    <div className="flex-1">
+                       <h4 className="font-bold text-white">Ward Info</h4>
+                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Permanent Record</p>
+                    </div>
                  </div>
               </div>
-           </div>
-         </Link>
-      </div>
+            </Link>
+         </div>
+      )}
 
       {/* ── AI System ── */}
       {aiEnabled && profile?.role?.toLowerCase() !== 'nurse' && (

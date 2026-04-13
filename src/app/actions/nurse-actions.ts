@@ -106,7 +106,10 @@ export async function acknowledgeNurseInstructionAction(payload: {
 }
 
 /**
- * Update an existing instruction within 24 hours of creation.
+ * Update logic for Nurse Instructions:
+ * 1. Single instructions: Only editable if not yet acknowledged (is_read=false).
+ * 2. Repetitive instructions: Editable anytime.
+ * 3. Archival: Mark old as archived and insert NEW version to trigger new notification.
  */
 export async function updateNurseInstructionAction(payload: {
   instructionId: string,
@@ -122,32 +125,52 @@ export async function updateNurseInstructionAction(payload: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Authentication required" }
 
-  // 1. Fetch current record to verify ownership and timing
+  // 1. Fetch current record
   const { data: current, error: fetchError } = await supabase
     .from('nurse_instructions')
-    .select('created_at, doctor_id, patient_id')
+    .select('*')
     .eq('id', payload.instructionId)
     .single()
 
   if (fetchError || !current) return { error: "Instruction not found" }
   if (current.doctor_id !== user.id) return { error: "Only the issuing doctor can edit this instruction" }
 
-  // 2. Check 24h window
-  const createdTime = new Date(current.created_at).getTime()
-  const now = new Date().getTime()
-  if (now - createdTime > 24 * 60 * 60 * 1000) {
-    return { error: "Editing window expired (24 hours reached)" }
+  // 2. Enforce Editability Rules
+  if (current.instruction_type === 'single' && current.is_read) {
+    return { error: "Cannot edit single instructions once acknowledged by a nurse" }
   }
 
-  // 3. Update
-  const { error: updateError } = await supabase
+  // 3. ARCHIVE & REPLACE
+  // Instead of updating the row, we mark the old one as archived and insert a new one.
+  // This satisfies the "keep old instruction" and "send new notification" requirements.
+  
+  // Step A: Mark old as archived
+  const { error: archiveError } = await supabase
     .from('nurse_instructions')
-    .update({ instruction: payload.newText })
+    .update({ is_archived: true })
     .eq('id', payload.instructionId)
 
-  if (updateError) return { error: updateError.message }
+  if (archiveError) throw archiveError
+
+  // Step B: Insert new version
+  const { error: insertError } = await supabase
+    .from('nurse_instructions')
+    .insert({
+      patient_id: current.patient_id,
+      ward_name: current.ward_name,
+      instruction: payload.newText,
+      doctor_id: current.doctor_id,
+      doctor_name: current.doctor_name,
+      instruction_type: current.instruction_type,
+      duration_days: current.duration_days,
+      expires_at: current.expires_at,
+      parent_id: current.id
+    })
+
+  if (insertError) return { error: insertError.message }
 
   revalidatePath(`/patient/${current.patient_id}`)
+  revalidatePath('/')
   return { success: true }
 }
 
@@ -221,6 +244,7 @@ export async function getWardPendingInstructionsAction(wardName: string) {
       patient:patients(name)
     `)
     .eq('ward_name', wardName)
+    .eq('is_archived', false)
     .or(`is_read.eq.false,and(instruction_type.eq.repetitive,expires_at.gt.${now})`)
     .gt('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: false })

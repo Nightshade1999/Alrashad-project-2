@@ -5,7 +5,8 @@ import {
   AlertTriangle, Activity, FileText, User, 
   Heart, Database, Layers, FlaskConical as Flask, 
   Clipboard as ClipboardIcon, Ambulance, Stethoscope,
-  Droplets, Thermometer, Brain
+  Droplets, Thermometer, Brain, Plus, Clock, 
+  Check, UserRoundCog, ClipboardList
 } from "lucide-react"
 import { ReferralModal } from "@/components/patient/referral-modal"
 import { CategorySwitcher } from "@/components/patient/category-switcher"
@@ -16,13 +17,14 @@ import { GueHistoryIcon } from "@/components/laboratory/GueHistoryIcon"
 import { AddNurseInstructionModal } from "@/components/patient/AddNurseInstructionModal"
 import { AddPsychVisitModal } from "@/components/patient/add-psych-visit-modal"
 import { EditPsychPatientModal } from "@/components/patient/edit-psych-patient-modal"
+import { AddInvestigationModal } from "@/components/patient/add-investigation-modal"
+import { AddVisitModal } from "@/components/patient/add-visit-modal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { format, parseISO } from "date-fns"
 import { isLabAbnormal, safeJsonParse } from "@/lib/utils"
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
-import { Clock, Check, UserRoundCog, ClipboardList } from "lucide-react"
 import { RestorePatientButton } from "@/components/patient/restore-patient-button"
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string; dot: string }> = {
@@ -59,9 +61,18 @@ export function PsychPatientDetail({
   const psychVisits = visits?.filter(v => v.is_psych_note) || [];
   const medVisits = visits?.filter(v => !v.is_psych_note) || [];
 
-  const lastVisit = medVisits[0] ?? null;
-  const lastPsychVisit = psychVisits[0] ?? null;
-  const lastInv = investigations?.[0] ?? null;
+  const lastVisit = medVisits.filter(v => v.created_by_role !== 'nurse')[0] ?? null;
+  const lastPsychVisit = psychVisits.filter(v => v.created_by_role !== 'nurse')[0] ?? null;
+  const lastInv = investigations?.filter(i => i.created_by_role !== 'nurse')?.[0] ?? null;
+
+  // Filter for Nurse Action Card
+  const nurseVisits = visits?.filter(v => v.created_by_role === 'nurse') || []
+  const nurseInvs = investigations?.filter(i => i.created_by_role === 'nurse') || []
+  const nurseDataPoints = [...nurseVisits, ...nurseInvs].sort((a, b) => 
+    new Date(b.visit_date || b.date || b.created_at).getTime() - 
+    new Date(a.visit_date || a.date || a.created_at).getTime()
+  )
+
 
   const catStyle = CATEGORY_STYLES[patient.category] ?? CATEGORY_STYLES['Normal']
   const isDeceased = patient.category === 'Deceased/Archive';
@@ -146,8 +157,8 @@ export function PsychPatientDetail({
     lastHba1c: lastInv?.hba1c,
     lastHb: lastInv?.hb,
     lastVisit: lastVisit?.visit_date,
-    investigations: investigations || [],
-    visits: visits || []
+    investigations: investigations?.filter(i => i.created_by_role !== 'nurse') || [],
+    visits: visits?.filter(v => v.created_by_role !== 'nurse') || []
   }
 
   return (
@@ -371,11 +382,72 @@ export function PsychPatientDetail({
         </div>
       </div>
 
-      {/* ── Last Snapshots (Internal Med & Psych) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        
-        {/* Psych Visit Box */}
-        <div className="bg-indigo-50/30 dark:bg-indigo-950/10 rounded-2xl border border-indigo-200 dark:border-indigo-800 shadow-lg overflow-hidden">
+      {/* ── (Nurse action) Card ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-blue-200 dark:border-blue-900 shadow-xl overflow-hidden glass-card animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-blue-100 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
+              <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                      <Thermometer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                      <h2 className="font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Nurse Action</h2>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nursing Clinical Log</p>
+                  </div>
+              </div>
+              {profile?.role?.toLowerCase() === 'nurse' && (
+                  <div className="flex items-center gap-2">
+                      <AddVisitModal patientId={patient.id} role="nurse" variant="button" />
+                      <AddInvestigationModal patientId={patient.id} role="nurse" variant="button" />
+                  </div>
+              )}
+          </div>
+          
+          <div className="p-6">
+              {nurseDataPoints.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center gap-2 opacity-30 text-center">
+                      <Plus className="h-8 w-8 text-blue-300" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">No nurse entries found</p>
+                  </div>
+              ) : (
+                  <div className="space-y-4">
+                      {nurseDataPoints.slice(0, 5).map((entry, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-blue-900/30">
+                              <div className="flex-1">
+                                  {entry.exam_notes ? (
+                                      <div className="space-y-1">
+                                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Vitals Check</p>
+                                          <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                              {entry.bp_sys && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">BP: {entry.bp_sys}/{entry.bp_dia}</span>}
+                                              {entry.pr && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">PR: {entry.pr}</span>}
+                                              {entry.temp && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">T: {entry.temp}°C</span>}
+                                              {entry.spo2 && <span className="text-xs font-bold text-slate-700 dark:text-slate-200">SpO2: {entry.spo2}%</span>}
+                                          </div>
+                                      </div>
+                                  ) : (
+                                      <div className="space-y-1">
+                                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">RBS Check</p>
+                                          <span className="text-sm font-black text-slate-800 dark:text-slate-100">{entry.rbs} mg/dL</span>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="text-right">
+                                  <p className="text-[10px] font-bold text-slate-400 capitalize">Nurse {entry.doctor_name || 'Staff'}</p>
+                                  <p className="text-[9px] text-slate-500">{format(parseISO(entry.visit_date || entry.date || entry.created_at), 'dd MMM, HH:mm')}</p>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+      </div>
+
+       {/* Snapshots */}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {profile?.role?.toLowerCase() !== 'nurse' && (
+          <>
+            {/* Psych Visit Box */}
+            <div className="bg-indigo-50/30 dark:bg-indigo-950/10 rounded-2xl border border-indigo-200 dark:border-indigo-800 shadow-lg overflow-hidden">
+
           <div className="flex items-center gap-2 px-5 py-4 border-b border-indigo-100 dark:border-indigo-800 bg-indigo-100/50 dark:bg-indigo-900/30">
             <div className="p-1.5 rounded-lg bg-indigo-200 dark:bg-indigo-900/60">
               <Brain className="h-4 w-4 text-indigo-700 dark:text-indigo-400" />
@@ -457,38 +529,43 @@ export function PsychPatientDetail({
                  </p>
               </div>
             </div>
-          ) : <p className="p-8 text-center text-sm italic text-muted-foreground">No visits recorded</p>}
-        </div>
-      </div>
+            ) : <p className="p-8 text-center text-sm italic text-muted-foreground">No visits recorded</p>}
+          </div>
+        </>
+      )}
+    </div>
 
       {/* ── Sub-pages Link Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <Link href={`/patient/${patient.id}/investigations`}>
-          <div className="bg-white dark:bg-slate-900 border border-blue-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
-              <div className="flex items-center gap-4">
-                <Activity className="text-blue-500" />
-                <span className="font-bold">Investigation History</span>
-              </div>
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-        </Link>
-        <Link href={`/patient/${patient.id}/visits`}>
-          <div className="bg-white dark:bg-slate-900 border border-emerald-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
-              <div className="flex items-center gap-4">
-                <FileText className="text-emerald-500" />
-                <span className="font-bold">Combined Clinical History</span>
-              </div>
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </div>
-        </Link>
-      </div>
+      {profile?.role?.toLowerCase() !== 'nurse' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Link href={`/patient/${patient.id}/investigations`}>
+            <div className="bg-white dark:bg-slate-900 border border-blue-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <Activity className="text-blue-500" />
+                  <span className="font-bold">Investigation History</span>
+                </div>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </Link>
+          <Link href={`/patient/${patient.id}/visits`}>
+            <div className="bg-white dark:bg-slate-900 border border-emerald-100 p-6 rounded-2xl hover:shadow-lg transition-all cursor-pointer flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <FileText className="text-emerald-500" />
+                  <span className="font-bold">Combined Clinical History</span>
+                </div>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
-       {!isDeceased && (
+       {!isDeceased && profile?.role?.toLowerCase() !== 'nurse' && (
          <AIAdviceSection patientData={displayPatient} aiEnabled={aiEnabled} />
        )}
 
        {/* ── Nurse Instruction History ── */}
-       <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
+       {profile?.role?.toLowerCase() !== 'nurse' && (
+         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden glass-card">
           <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-blue-50/50 dark:bg-blue-900/10">
              <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40">
@@ -600,7 +677,8 @@ export function PsychPatientDetail({
                </div>
              )}
           </div>
-       </div>
+        </div>
+      )}
     </div>
   )
 }
