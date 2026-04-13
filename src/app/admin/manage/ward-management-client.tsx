@@ -297,7 +297,7 @@ export default function WardManagementClient({
                </div>
 
                <div className="flex items-center gap-2">
-                  <Select value={pharmaCategory} onValueChange={setPharmaCategory}>
+                  <Select value={pharmaCategory} onValueChange={(v) => setPharmaCategory(v || "All")}>
                     <SelectTrigger className="h-10 w-32 rounded-xl font-bold bg-white dark:bg-slate-950">
                       <div className="flex items-center gap-2">
                          <Filter className="h-3 w-3 text-slate-400" />
@@ -319,7 +319,7 @@ export default function WardManagementClient({
                     </SelectContent>
                   </Select>
 
-                  <Select value={pharmaDept} onValueChange={setPharmaDept}>
+                  <Select value={pharmaDept} onValueChange={(v) => setPharmaDept(v || "All")}>
                     <SelectTrigger className="h-10 w-32 rounded-xl font-bold bg-white dark:bg-slate-950">
                       <SelectValue placeholder="Department" />
                     </SelectTrigger>
