@@ -59,15 +59,14 @@ export function OfflineDashboard() {
 
   const myWardName = profile?.ward_name ?? null;
   const router = useRouter();
-  const [isCachedAdmin, setIsCachedAdmin] = useState(false);
-  const [sessionRole, setSessionRole] = useState<string | null>(null);
 
   useEffect(() => {
     // Rely solely on the DatabaseProvider profile for authoritative role detection
     if (typeof window !== 'undefined' && profile?.user_id) {
-      if (profile.role === 'lab_tech') router.push('/laboratory');
-      if (profile.role === 'pharmacist') router.push('/pharmacy');
-      if (profile.role === 'nurse') router.push('/dashboard/select-ward');
+      const role = profile.role?.toLowerCase();
+      if (role === 'lab_tech') router.push('/laboratory');
+      else if (role === 'pharmacist') router.push('/pharmacy');
+      else if (role === 'nurse') router.push('/dashboard/select-ward');
     }
   }, [profile, router]);
 
@@ -76,11 +75,10 @@ export function OfflineDashboard() {
       console.log('[Clinical Admin Diagnostic]', {
         userId: profile.user_id,
         currentRole: profile.role,
-        sessionRole: sessionRole,
-        isSystemAdmin: profile?.role?.toLowerCase() === 'admin' || sessionRole?.toLowerCase() === 'admin' || isCachedAdmin
+        isSystemAdmin: profile?.role?.toLowerCase() === 'admin'
       });
     }
-  }, [profile, sessionRole, isCachedAdmin]);
+  }, [profile]);
 
   const isAdmin = profile?.role?.trim().toLowerCase() === 'admin';
   const isMaster = myWardName === 'Master Ward' || (isAdmin && (!myWardName || myWardName === 'Unassigned'));
@@ -129,8 +127,8 @@ export function OfflineDashboard() {
   }
   
   // Strict Role Guard: Return null (blocking Doctor UI) for specialty roles while redirection triggers.
-  const currentRole = profile?.role?.toLowerCase() || sessionRole?.toLowerCase();
-  const isSpecialtyRole = currentRole === 'nurse' || currentRole === 'lab_tech';
+  const currentRole = profile?.role?.toLowerCase();
+  const isSpecialtyRole = currentRole === 'nurse' || currentRole === 'lab_tech' || currentRole === 'pharmacist';
   if (isSpecialtyRole) return null;
 
   return (
