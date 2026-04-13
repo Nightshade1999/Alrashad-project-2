@@ -183,7 +183,6 @@ function createHeaderCell(text: string) {
       children: [new TextRun({ text, bold: true, color: "FFFFFF", size: 20 })],
       alignment: AlignmentType.CENTER 
     })],
-    backgroundColor: "1E293B", // slate-800
     verticalAlign: VerticalAlign.CENTER,
     shading: {
       fill: "1E293B",

@@ -73,7 +73,7 @@ export function PharmacyInventory() {
 
   const fetchInventory = async () => {
     setLoading(true)
-    let query = supabase.from("pharmacy_inventory").select("*")
+    let query = (supabase as any).from("pharmacy_inventory").select("*")
 
     if (search) {
       query = query.or(`scientific_name.ilike.%${search}%,generic_name.ilike.%${search}%`)
@@ -85,7 +85,7 @@ export function PharmacyInventory() {
     else {
       let results = data || []
       if (filterLowStock) {
-        results = results.filter(item => 
+        results = results.filter((item: any) => 
           item.quantity !== null && 
           item.min_stock_level !== null && 
           item.quantity <= item.min_stock_level
@@ -94,17 +94,17 @@ export function PharmacyInventory() {
       if (filterExpiring) {
         const soon = new Date()
         soon.setMonth(soon.getMonth() + 6)
-        results = results.filter(item => {
+        results = results.filter((item: any) => {
           if (!item.expiration_date) return false
           const exp = new Date(item.expiration_date)
           return exp >= new Date() && exp <= soon
         })
       }
       if (categoryFilter !== "All") {
-        results = results.filter(item => item.category === categoryFilter)
+        results = results.filter((item: any) => item.category === categoryFilter)
       }
       if (deptFilter !== "All") {
-        results = results.filter(item => (item.department || "Ward") === deptFilter)
+        results = results.filter((item: any) => (item.department || "Ward") === deptFilter)
       }
       setInventory(results)
     }
@@ -117,7 +117,7 @@ export function PharmacyInventory() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure? This item will be moved to the Recycle Bin.")) return
-    const { error } = await supabase.from("pharmacy_inventory").delete().eq("id", id)
+    const { error } = await (supabase as any).from("pharmacy_inventory").delete().eq("id", id)
     if (error) toast.error(error.message)
     else {
       toast.success("Item deleted")
@@ -182,13 +182,13 @@ export function PharmacyInventory() {
 
     let error;
     if (editingItem) {
-      const { error: err } = await supabase
+      const { error: err } = await (supabase as any)
         .from("pharmacy_inventory")
         .update(payload)
         .eq("id", editingItem.id)
       error = err
     } else {
-      const { error: err } = await supabase
+      const { error: err } = await (supabase as any)
         .from("pharmacy_inventory")
         .insert(payload)
       error = err

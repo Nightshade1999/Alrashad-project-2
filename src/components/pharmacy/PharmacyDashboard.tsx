@@ -27,7 +27,7 @@ export function PharmacyDashboard() {
     setLoading(true)
     
     // Fetch records to calculate accurate stats
-    const { data: allItems, error } = await supabase
+    const { data: allItems, error } = await (supabase as any)
       .from("pharmacy_inventory")
       .select("quantity, min_stock_level, expiration_date")
 
@@ -43,19 +43,19 @@ export function PharmacyDashboard() {
       sixMonthsFromNow.setMonth(now.getMonth() + 6)
 
       const total = allItems.length
-      const low = allItems.filter(item => 
+      const low = allItems.filter((item: any) => 
         item.quantity !== null && 
         item.min_stock_level !== null && 
         item.quantity <= item.min_stock_level
       ).length
 
-      const expiring = allItems.filter(item => {
+      const expiring = allItems.filter((item: any) => {
         if (!item.expiration_date) return false
         const expDate = new Date(item.expiration_date)
         return expDate >= now && expDate <= sixMonthsFromNow
       }).length
 
-      const { data: latest } = await supabase
+      const { data: latest } = await (supabase as any)
         .from("pharmacy_inventory")
         .select("*")
         .order("created_at", { ascending: false })
