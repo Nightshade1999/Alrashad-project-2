@@ -30,23 +30,31 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0d9488",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" }
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover",
+  viewportFit: "cover", // Vital for iPhone notch handling
 };
 
 export const metadata: Metadata = {
   title: "Ward Manager - Alrashad Medical",
   description: "Secure clinical management for medical wards",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Ward App",
+    statusBarStyle: "black-translucent", // Blends with app UI behind notch
+    title: "Alrashad Ward",
+  },
+  formatDetection: {
+    telephone: false, // Prevents iOS from blue-linking random numbers
   },
   icons: {
+    icon: "/icon.png",
     apple: "/icon.png",
   },
 };

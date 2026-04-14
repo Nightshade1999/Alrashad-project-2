@@ -70,11 +70,11 @@ export async function addVisitAction(payload: any) {
       created_by_role: role
     }
 
-    // 5. Nurse Restriction Enforcer: Keep ONLY vitals for nurses
+    // 5. Nurse Restriction Enforcer: nurses may only record vitals — no clinical notes.
+    // Fix 3: This block was previously empty (comment only) — no restriction was enforced.
     if (role === 'nurse') {
-        // Nurses can only add vitals and clinical status flags.
-        // We strip exam notes if strictly enforced, but here we just ensure nothing else sneaks in.
-        // The requirement says "vitals + RBS only".
+      sanitizedPayload.exam_notes = ''       // Nurses cannot write clinical exam notes
+      sanitizedPayload.is_psych_note = false // Nurses cannot flag psych notes
     }
 
     // 3. Primary Insert with explicit doctor name from client if available

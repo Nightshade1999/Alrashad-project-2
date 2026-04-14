@@ -262,6 +262,12 @@ export async function updateUserDetailsAction(
   accessibleWards?: string[],
   userName?: string
 ) {
+  // Fix 8: verifyAdmin() was missing — any authenticated user could call this action
+  try {
+    await verifyAdmin()
+  } catch (e: any) {
+    return { error: e.message }
+  }
   if (!userId) return { error: 'User ID required' }
 
   // Update email if provided
@@ -461,12 +467,13 @@ export async function syncWardSettingsAction() {
 
   // 2. Delete from ward_settings if not in activeWards
   // Note: if activeWards is empty, we delete all settings.
-  const query = getSupabaseAdmin()
+  // Fix 4: Must reassign query — .not() returns a NEW builder, dropping it silently deleted ALL wards
+  let query = getSupabaseAdmin()
     .from('ward_settings')
     .delete()
   
   if (activeWards.length > 0) {
-    query.not('ward_name', 'in', `(${activeWards.join(',')})`)
+    query = query.not('ward_name', 'in', `(${activeWards.map(w => `"${w}"`).join(',')})`)
   }
 
   const { error: deleteError } = await query
@@ -526,7 +533,17 @@ export async function syncProfileWardAction(newWardName: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Authentication required' }
 
-  // Update CURRENT user_profile ward_name
+  // Fix 11: Validate the ward actually exists before allowing a user to move themselves there
+  const { data: wardExists } = await getSupabaseAdmin()
+    .from('ward_settings')
+    .select('ward_name')
+    .eq('ward_name', newWardName)
+    .single()
+
+  if (!wardExists) {
+    return { error: `Ward "${newWardName}" does not exist. Contact your administrator.` }
+  }
+
   const { error } = await supabase
     .from('user_profiles')
     .update({ ward_name: newWardName })
@@ -857,6 +874,13 @@ export async function getTrashItemsAction() {
   }
 }
 
+// Fix 12/19: Only these tables are safe to restore into. Prevents a tampered trash record
+// from injecting data into auth.users or other sensitive system tables.
+const RESTORABLE_TABLES = new Set([
+  'patients', 'visits', 'investigations', 'reminders',
+  'referrals', 'nurse_instructions', 'pharmacy_inventory'
+])
+
 export async function restoreFromTrashAction(trashId: string) {
   try {
     await verifyAdmin()
@@ -870,19 +894,23 @@ export async function restoreFromTrashAction(trashId: string) {
       .single()
     
     if (fetchError || !trashRecord) throw new Error("Trash record not found")
+
+    // 2. Whitelist check — never restore into auth or system tables
+    if (!RESTORABLE_TABLES.has(trashRecord.table_name)) {
+      throw new Error(`Restore blocked: "${trashRecord.table_name}" is not a restorable table.`)
+    }
     
-    // 2. Insert back into original table
+    // 3. Insert back into original table
     const { error: restoreError } = await admin
       .from(trashRecord.table_name)
       .insert(trashRecord.data)
     
     if (restoreError) throw restoreError
     
-    // 3. Delete from trash
+    // 4. Delete from trash
     await admin.from('trash').delete().eq('id', trashId)
     
     revalidatePath('/admin/recycle-bin')
-    // Also revalidate the patient history paths just in case
     if (trashRecord.data.patient_id) {
         revalidatePath(`/patient/${trashRecord.data.patient_id}/investigations`)
         revalidatePath(`/patient/${trashRecord.data.patient_id}/visits`)
@@ -924,8 +952,12 @@ export async function bulkRestoreFromTrashAction(trashIds: string[]) {
     
     if (fetchError || !trashRecords) throw new Error("Trash records not found")
     
-    // Restore each record
+    // Restore each record (with whitelist check)
     for (const record of trashRecords) {
+      if (!RESTORABLE_TABLES.has(record.table_name)) {
+        console.warn(`Bulk restore skipped blocked table: ${record.table_name}`)
+        continue
+      }
       const { error: restoreError } = await admin
         .from(record.table_name)
         .insert(record.data)

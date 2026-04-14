@@ -10,8 +10,11 @@ export async function runMedicalCorrelationAction(
 ) {
   if (!dataset || dataset.length === 0) return { error: 'No data provided.' }
 
+  // Read engine URL from env — defaults to localhost for local dev only
+  const engineUrl = process.env.PYTHON_ENGINE_URL || 'http://127.0.0.1:8000'
+
   // 1. Send data to your Python Engine for pure math
-  const pythonResponse = await fetch('http://127.0.0.1:8000/api/analyze', {
+  const pythonResponse = await fetch(`${engineUrl}/api/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -42,14 +42,14 @@
   --color-card: var(--card);
   --radius-4xl: calc(var(--radius) * 2.6);
   
-  --animate-fade-in-up: fade-in-up 0.5s ease-out forwards;
-  --animate-scale-in: scale-in 0.2s ease-out forwards;
+  --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-scale-in: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-shimmer: shimmer 2.5s linear infinite;
   --animate-swing: swing 2s ease-in-out infinite;
-  --animate-splash-fade-in: splash-fade-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  --animate-splash-scale: splash-scale 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  --animate-reveal-text: reveal-text 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  --animate-slide-up-fade: slide-up-fade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-splash-fade-in: splash-fade-in 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  --animate-splash-scale: splash-scale 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-reveal-text: reveal-text 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-slide-up-fade: slide-up-fade 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes splash-fade-in {
@@ -58,18 +58,18 @@
 }
 
 @keyframes splash-scale {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: scale(0.85); opacity: 0; filter: blur(10px); }
+  to { transform: scale(1); opacity: 1; filter: blur(0); }
 }
 
 @keyframes reveal-text {
-  from { opacity: 0; transform: translateY(20px); filter: blur(5px); }
+  from { opacity: 0; transform: translateY(30px); filter: blur(12px); }
   to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes slide-up-fade {
-  from { opacity: 0; transform: translateY(15px); }
-  to { opacity: 0.6; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(20px); filter: blur(4px); }
+  to { opacity: 0.8; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes swing {

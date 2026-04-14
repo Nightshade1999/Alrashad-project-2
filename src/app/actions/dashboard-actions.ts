@@ -12,21 +12,27 @@ export async function getUrgentInsights() {
     { cookies: { getAll: () => cookieStore.getAll() } }
   )
 
-  // Fetch all patients
-  const { data: patients } = await supabase.from("patients").select("*").limit(5000)
+  // Fetch all patients (capped for AI context window)
+  const { data: patients } = await supabase.from("patients").select("*").limit(500)
   if (!patients || patients.length === 0) return "No patients found to analyze."
 
-  // Fetch all latest investigations
+  const patientIds = patients.map(p => p.id)
+
+  // Fix 6: Added limits and patient-scoped filters — these were previously unbounded
+  // and would fetch the entire table history, causing token/memory issues at scale.
   const { data: invs } = await supabase
     .from("investigations")
-    .select("*")
+    .select("patient_id, date, wbc, hb, rbs, s_creatinine, s_urea")
+    .in("patient_id", patientIds)
     .order("date", { ascending: false })
+    .limit(1000)
 
-  // Fetch all latest visits
   const { data: visits } = await supabase
     .from("visits")
-    .select("*")
+    .select("patient_id, visit_date, exam_notes")
+    .in("patient_id", patientIds)
     .order("visit_date", { ascending: false })
+    .limit(1000)
 
   // Summarize for AI
   const summary = patients.map(p => {

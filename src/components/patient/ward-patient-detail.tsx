@@ -29,7 +29,8 @@ import { AddReminderModal } from "@/components/reminders/add-reminder-modal"
 import { GueHistoryIcon } from "@/components/laboratory/GueHistoryIcon"
 import { AddNurseInstructionModal } from "@/components/patient/AddNurseInstructionModal"
 import { createClient } from "@/lib/supabase"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import { toast } from "sonner"
 
 const CATEGORY_STYLES: Record<string, { label: string; color: string; bg: string; dot: string }> = {
   'High Risk':       { label: 'High Risk',       color: 'text-red-700 dark:text-red-300',    bg: 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800',    dot: '🔴' },
@@ -79,6 +80,11 @@ export function WardPatientDetail({
   const [profile, setProfile] = useState<any>(initialProfile || null)
   const [showAllInstructions, setShowAllInstructions] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  // Fix 16: Replace window.confirm with inline confirm state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  // Fix 15: Single memoised Supabase client — was creating 3 separate instances
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     fetchInstructions()
@@ -86,7 +92,6 @@ export function WardPatientDetail({
   }, [patient.id])
 
   async function fetchProfile() {
-    const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data } = await supabase.from('user_profiles').select('*').eq('user_id', user.id).single()
@@ -96,7 +101,6 @@ export function WardPatientDetail({
 
   async function fetchInstructions() {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    const supabase = createClient()
     const { data } = await supabase
       .from('nurse_instructions')
       .select('*')
@@ -108,7 +112,6 @@ export function WardPatientDetail({
   }
 
   useEffect(() => {
-    const supabase = createClient()
     const channel = supabase
       .channel(`patient-instructions-${patient.id}`)
       .on(
@@ -136,18 +139,26 @@ export function WardPatientDetail({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [patient.id])
+  }, [patient.id, supabase])
 
+  // Fix 16: Two-step inline confirmation instead of window.confirm / alert
   const handleDeleteInstruction = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this instruction?")) return
+    if (confirmDeleteId !== id) {
+      // First click: show inline confirm state
+      setConfirmDeleteId(id)
+      return
+    }
+    // Second click: proceed with deletion
+    setConfirmDeleteId(null)
     setIsDeleting(id)
     try {
       const { deleteNurseInstructionAction } = await import("@/app/actions/nurse-actions")
       const res = await deleteNurseInstructionAction(id)
       if (res.error) throw new Error(res.error)
       setInstructions(prev => prev.filter(i => i.id !== id))
+      toast.success("Instruction deleted")
     } catch (err: any) {
-      alert(err.message || "Failed to delete")
+      toast.error(err.message || "Failed to delete instruction")
     } finally {
       setIsDeleting(null)
     }
@@ -700,11 +711,19 @@ export function WardPatientDetail({
                                        <Button 
                                          variant="ghost" 
                                          size="icon" 
-                                         className="h-8 w-8 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                                         className={`h-8 w-8 rounded-lg transition-colors ${
+                                           confirmDeleteId === inst.id
+                                             ? 'bg-rose-500 text-white hover:bg-rose-600'
+                                             : 'text-rose-500 hover:text-rose-600 hover:bg-rose-50'
+                                         }`}
                                          onClick={() => handleDeleteInstruction(inst.id)}
                                          disabled={isDeleting === inst.id}
+                                         title={confirmDeleteId === inst.id ? 'Click again to confirm' : 'Delete instruction'}
                                        >
-                                         <AlertTriangle className="h-4 w-4" />
+                                         {confirmDeleteId === inst.id
+                                           ? <span className="text-[9px] font-black">OK?</span>
+                                           : <AlertTriangle className="h-4 w-4" />
+                                         }
                                        </Button>
                                      </div>
                                    )}

@@ -9,8 +9,6 @@ export async function signInAction(prevState: any, formData: FormData) {
   const password = formData.get("password") as string;
   const cookieStore = await cookies();
 
-  console.log(`signInAction: Attempting login for ${email}...`);
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -25,7 +23,7 @@ export async function signInAction(prevState: any, formData: FormData) {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // This is expected when calling from Server Actions during a redirect
+            // Expected when calling from Server Actions during a redirect
           }
         },
       },
@@ -38,21 +36,9 @@ export async function signInAction(prevState: any, formData: FormData) {
   });
 
   if (error) {
-    console.warn(`signInAction: Login failed for ${email}: ${error.message}`);
     return { error: error.message };
   }
 
-  console.log(`signInAction: Login success for ${email}, checking role...`);
-  
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("role")
-    .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-    .single();
-
-  const role = profile?.role || "doctor";
-  console.log(`signInAction: User role is ${role}, redirecting...`);
-
-  // Return success to let the client handle hard redirect
+  // Return success — client handles role-based redirect via useDatabase profile
   return { success: true };
 }

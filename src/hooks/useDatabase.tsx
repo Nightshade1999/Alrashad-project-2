@@ -103,12 +103,15 @@ function buildReminderApi(supabase: any): ReminderApi {
       const { data } = await query.order('due_date', { ascending: true });
       return (data as unknown as any[]) || [];
     },
+    // Fix 5: was using `is_resolved` and `due_date` — those fields don't exist.
+    // The live table uses `status` (text) and `reminder_date` (date).
     listOverdueByPatients: async (patientIds: string[]) => {
+      const today = new Date().toISOString().split('T')[0]
       const { data } = await supabase
         .from('reminders')
         .select('patient_id')
-        .eq('is_resolved', false)
-        .lt('due_date', new Date().toISOString())
+        .eq('status', 'pending')
+        .lte('reminder_date', today)
         .in('patient_id', patientIds);
       
       const overduePatientIds = new Set((data as any[])?.map(r => r.patient_id) || []);
