@@ -737,6 +737,29 @@ export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'ove
         continue
       }
 
+      // Pre-process rows to strip legacy schema columns that cause Postgrest to reject upserts
+      if (table === 'patients') {
+        rowsToProcess.forEach(row => {
+          delete row.high_risk_date
+        })
+      } else if (table === 'ward_settings') {
+        rowsToProcess.forEach(row => {
+          delete row.id
+          delete row.updated_at
+        })
+      } else if (table === 'reminders') {
+        rowsToProcess.forEach(row => {
+          if (row.due_date !== undefined) {
+             row.reminder_date = row.due_date
+             delete row.due_date
+          }
+          if (row.is_resolved !== undefined) {
+             row.status = row.is_resolved ? 'resolved' : 'pending'
+             delete row.is_resolved
+          }
+        })
+      }
+
       // Perform Bulk Upsert or Insert
       // Note: We use chunks of 500 to avoid request size limits if data is huge
       const CHUNK_SIZE = 500
