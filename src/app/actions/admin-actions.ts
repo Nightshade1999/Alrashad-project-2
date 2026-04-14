@@ -738,9 +738,12 @@ export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'ove
       }
 
       // Pre-process rows to strip legacy schema columns that cause Postgrest to reject upserts
+      // ALso strips referencing UUIDs to `auth.users` to prevent FK constraint violations 
+      // when restoring to a fresh Supabase instance where those users haven't signed up yet.
       if (table === 'patients') {
         rowsToProcess.forEach(row => {
           delete row.high_risk_date
+          delete row.user_id // Prevents "key is not present in table auth.users"
         })
       } else if (table === 'ward_settings') {
         rowsToProcess.forEach(row => {
@@ -757,6 +760,15 @@ export async function restoreSystemDataAction(data: any, strategy: 'skip' | 'ove
              row.status = row.is_resolved ? 'resolved' : 'pending'
              delete row.is_resolved
           }
+        })
+      } else if (table === 'visits') {
+        rowsToProcess.forEach(row => {
+          delete row.doctor_id // Prevents FK error
+        })
+      } else if (table === 'investigations') {
+        rowsToProcess.forEach(row => {
+          delete row.doctor_id
+          delete row.lab_tech_id
         })
       }
 
